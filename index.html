@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interval Metronome</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>Interval Metronome</h1>
+    </header>
+
+    <!-- Section A: Metronome Controls -->
+    <section class="metronome-section">
+      <div class="beat-flash-container">
+        <div class="beat-flash" id="beatFlash"></div>
+      </div>
+
+      <div class="bpm-display">
+        <span id="bpmValue">120</span>
+        <span class="bpm-label">BPM</span>
+      </div>
+
+      <div class="bpm-slider-container">
+        <span class="slider-label">20</span>
+        <input type="range" id="bpmSlider" min="20" max="400" value="120" class="bpm-slider">
+        <span class="slider-label">400</span>
+      </div>
+
+      <div class="bpm-buttons">
+        <button class="bpm-btn" data-delta="-10">−10</button>
+        <button class="bpm-btn" data-delta="-1">−1</button>
+        <button class="bpm-btn" data-delta="1">+1</button>
+        <button class="bpm-btn" data-delta="10">+10</button>
+      </div>
+
+      <div class="subdivision-container">
+        <span class="section-label">Subdivision</span>
+        <div class="subdivision-buttons">
+          <button class="sub-btn active" data-mode="quarter">
+            <span class="sub-icon">♩</span>
+            <span class="sub-name">Quarter</span>
+          </button>
+          <button class="sub-btn" data-mode="eighth">
+            <span class="sub-icon">♪</span>
+            <span class="sub-name">8th</span>
+          </button>
+          <button class="sub-btn" data-mode="triplet">
+            <span class="sub-icon">♪³</span>
+            <span class="sub-name">Triplet</span>
+          </button>
+          <button class="sub-btn" data-mode="sixteenth">
+            <span class="sub-icon">♬</span>
+            <span class="sub-name">16th</span>
+          </button>
+          <button class="sub-btn" data-mode="sextuplet">
+            <span class="sub-icon">♬⁶</span>
+            <span class="sub-name">Sextuplet</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="start-stop-btn" id="startStopBtn">START</button>
+    </section>
+
+    <!-- Section B: Interval Timer Config -->
+    <section class="interval-section">
+      <div class="interval-toggle-row">
+        <span class="section-label">Interval Mode</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="intervalToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="interval-config" id="intervalConfig">
+        <div class="config-grid">
+          <div class="config-field">
+            <label for="numSets">Number of Sets</label>
+            <input type="number" id="numSets" min="1" max="99" value="4" class="config-input">
+          </div>
+
+          <div class="config-field">
+            <label>Duration per Set</label>
+            <div class="time-input">
+              <input type="number" id="setMins" min="0" max="59" value="2" class="time-part" placeholder="mm">
+              <span class="time-sep">:</span>
+              <input type="number" id="setSecs" min="0" max="59" value="0" class="time-part" placeholder="ss">
+            </div>
+          </div>
+
+          <div class="config-field">
+            <label for="startBpm">Starting BPM</label>
+            <input type="number" id="startBpm" min="20" max="400" value="80" class="config-input">
+          </div>
+
+          <div class="config-field">
+            <label for="bpmIncrement">BPM Increment / Set</label>
+            <input type="number" id="bpmIncrement" min="-380" max="380" value="5" class="config-input">
+          </div>
+
+          <div class="config-field">
+            <label>Rest Between Sets</label>
+            <div class="time-input">
+              <input type="number" id="restMins" min="0" max="59" value="0" class="time-part" placeholder="mm">
+              <span class="time-sep">:</span>
+              <input type="number" id="restSecs" min="0" max="59" value="30" class="time-part" placeholder="ss">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section C: Interval Status Display -->
+    <section class="interval-status" id="intervalStatus">
+      <div class="status-header">
+        <span class="status-phase" id="statusPhase">SET</span>
+        <span class="status-set" id="statusSet">Set 1 of 4</span>
+        <span class="status-bpm" id="statusBpm">BPM: 80</span>
+      </div>
+
+      <div class="status-countdown" id="statusCountdown">2:00</div>
+
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <div class="status-next" id="statusNext">Next set: BPM 85</div>
+    </section>
+
+    <!-- Done overlay -->
+    <div class="done-overlay" id="doneOverlay">
+      <div class="done-message">
+        <h2>Practice Complete!</h2>
+        <p id="doneSummary"></p>
+        <button class="done-btn" id="doneBtn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="metronome.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
