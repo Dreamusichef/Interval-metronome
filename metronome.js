@@ -83,11 +83,7 @@ const MetronomeEngine = (() => {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
 
-  function start() {
-    if (!audioCtx) init();
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+  function doStart() {
     if (running) return;
     running = true;
     currentTick = 0;
@@ -95,6 +91,15 @@ const MetronomeEngine = (() => {
     scheduler();
     schedulerTimer = setInterval(scheduler, SCHEDULER_INTERVAL);
     rafId = requestAnimationFrame(visualLoop);
+  }
+
+  function start() {
+    if (!audioCtx) init();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(doStart);
+    } else {
+      doStart();
+    }
   }
 
   function stop() {
@@ -131,13 +136,30 @@ const MetronomeEngine = (() => {
     return running;
   }
 
-  // Resume audio context when tab regains visibility
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && audioCtx && audioCtx.state === 'suspended' && running) {
+  // iOS suspends AudioContext on screen lock — resume on any user touch as a catch-all
+  document.addEventListener('touchstart', () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().then(() => {
+        if (running) {
+          nextTickTime = audioCtx.currentTime + 0.05;
+          currentTick = 0;
+        }
+      });
+    }
+  }, { passive: true });
+
+  // Also handle tab visibility change (covers backgrounding on both iOS and Android)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && audioCtx && running) {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          nextTickTime = audioCtx.currentTime + 0.05;
+          currentTick = 0;
+        });
+      } else {
         nextTickTime = audioCtx.currentTime + 0.05;
         currentTick = 0;
-      });
+      }
     }
   });
 
