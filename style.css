@@ -639,49 +639,6 @@ header h1 {
   color: var(--text);
 }
 
-/* ── Sound upload ── */
-.config-field.full-width {
-  grid-column: 1 / -1;
-}
-
-.upload-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.upload-btn {
-  padding: 8px 14px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.upload-btn:hover {
-  border-color: var(--accent-dim);
-  background: var(--border);
-}
-
-.upload-name {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.upload-name.loaded {
-  color: var(--success);
-}
 
 /* ── Number input spinners — hide on mobile for cleaner look ── */
 input[type="number"]::-webkit-inner-spin-button,
