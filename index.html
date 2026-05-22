@@ -65,6 +65,16 @@
       <button class="start-stop-btn" id="startStopBtn">START</button>
     </section>
 
+    <!-- Stopwatch -->
+    <section class="stopwatch-section">
+      <span class="section-label">Stopwatch</span>
+      <div class="stopwatch-display" id="stopwatchDisplay">0:00</div>
+      <div class="stopwatch-controls">
+        <button class="stopwatch-btn start-stop" id="stopwatchStartStop">START</button>
+        <button class="stopwatch-btn reset" id="stopwatchReset">RESET</button>
+      </div>
+    </section>
+
     <!-- Section B: Interval Timer Config -->
     <section class="interval-section">
       <div class="interval-toggle-row">
@@ -107,6 +117,28 @@
               <input type="number" id="restMins" min="0" max="59" value="0" class="time-part" placeholder="mm">
               <span class="time-sep">:</span>
               <input type="number" id="restSecs" min="0" max="59" value="30" class="time-part" placeholder="ss">
+            </div>
+          </div>
+
+          <div class="config-field full-width">
+            <label>Set End Sound</label>
+            <div class="upload-row">
+              <label class="upload-btn">
+                Choose File
+                <input type="file" id="setEndSoundFile" accept="audio/*" hidden>
+              </label>
+              <span class="upload-name" id="setEndSoundName">Default beeps</span>
+            </div>
+          </div>
+
+          <div class="config-field full-width">
+            <label>Set Start Sound</label>
+            <div class="upload-row">
+              <label class="upload-btn">
+                Choose File
+                <input type="file" id="setStartSoundFile" accept="audio/*" hidden>
+              </label>
+              <span class="upload-name" id="setStartSoundName">Default beeps</span>
             </div>
           </div>
         </div>
