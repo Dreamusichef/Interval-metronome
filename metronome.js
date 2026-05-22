@@ -13,6 +13,8 @@ const MetronomeEngine = (() => {
   };
 
   let audioCtx = null;
+  let setEndBuffer = null;
+  let setStartBuffer = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let running = false;
@@ -83,11 +85,7 @@ const MetronomeEngine = (() => {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
 
-  function start() {
-    if (!audioCtx) init();
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+  function doStart() {
     if (running) return;
     running = true;
     currentTick = 0;
@@ -95,6 +93,15 @@ const MetronomeEngine = (() => {
     scheduler();
     schedulerTimer = setInterval(scheduler, SCHEDULER_INTERVAL);
     rafId = requestAnimationFrame(visualLoop);
+  }
+
+  function start() {
+    if (!audioCtx) init();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(doStart);
+    } else {
+      doStart();
+    }
   }
 
   function stop() {
@@ -123,6 +130,50 @@ const MetronomeEngine = (() => {
     beatCallback = callback;
   }
 
+  function playSyntheticCue(pitches, spacing) {
+    if (!audioCtx) return;
+    pitches.forEach((freq, i) => {
+      const t = audioCtx.currentTime + i * spacing;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.55, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.22);
+    });
+  }
+
+  function playBuffer(buffer) {
+    if (!audioCtx || !buffer) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+  }
+
+  function playSetEndCue() {
+    if (setEndBuffer) { playBuffer(setEndBuffer); return; }
+    playSyntheticCue([880, 660, 440], 0.18);
+  }
+
+  function playSetStartCue() {
+    if (setStartBuffer) { playBuffer(setStartBuffer); return; }
+    playSyntheticCue([440, 660, 880], 0.18);
+  }
+
+  async function loadCueFile(file, type) {
+    if (!audioCtx) init();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+    if (type === 'end') setEndBuffer = decoded;
+    else setStartBuffer = decoded;
+  }
+
   function getCurrentBpm() {
     return bpm;
   }
@@ -131,15 +182,32 @@ const MetronomeEngine = (() => {
     return running;
   }
 
-  // Resume audio context when tab regains visibility
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && audioCtx && audioCtx.state === 'suspended' && running) {
+  // iOS suspends AudioContext on screen lock — resume on any user touch as a catch-all
+  document.addEventListener('touchstart', () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().then(() => {
+        if (running) {
+          nextTickTime = audioCtx.currentTime + 0.05;
+          currentTick = 0;
+        }
+      });
+    }
+  }, { passive: true });
+
+  // Also handle tab visibility change (covers backgrounding on both iOS and Android)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && audioCtx && running) {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          nextTickTime = audioCtx.currentTime + 0.05;
+          currentTick = 0;
+        });
+      } else {
         nextTickTime = audioCtx.currentTime + 0.05;
         currentTick = 0;
-      });
+      }
     }
   });
 
-  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning };
+  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning, playSetEndCue, playSetStartCue, loadCueFile };
 })();

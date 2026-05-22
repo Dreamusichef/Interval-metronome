@@ -27,6 +27,17 @@ const doneOverlay   = document.getElementById('doneOverlay');
 const doneSummary   = document.getElementById('doneSummary');
 const doneBtn       = document.getElementById('doneBtn');
 
+// Stopwatch
+const stopwatchDisplay   = document.getElementById('stopwatchDisplay');
+const stopwatchStartStop = document.getElementById('stopwatchStartStop');
+const stopwatchReset     = document.getElementById('stopwatchReset');
+
+// Sound uploads
+const setEndSoundFile    = document.getElementById('setEndSoundFile');
+const setStartSoundFile  = document.getElementById('setStartSoundFile');
+const setEndSoundName    = document.getElementById('setEndSoundName');
+const setStartSoundName  = document.getElementById('setStartSoundName');
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const States = { IDLE: 0, RUNNING_SET: 1, RESTING: 2, DONE: 3 };
 let appState = States.IDLE;
@@ -43,6 +54,84 @@ const session = {
   timeRemaining: 0,
   totalDuration: 0,
 };
+
+// ── Stopwatch ─────────────────────────────────────────────────────────────────
+let swSeconds = 0;
+let swRunning = false;
+let swTimer = null;
+const SW_MAX = 3600;
+
+function formatStopwatch(secs) {
+  if (secs >= 3600) return '1:00:00';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+stopwatchStartStop.addEventListener('click', () => {
+  if (swRunning) {
+    clearInterval(swTimer);
+    swTimer = null;
+    swRunning = false;
+    stopwatchStartStop.textContent = 'START';
+    stopwatchStartStop.classList.remove('running');
+  } else {
+    if (swSeconds >= SW_MAX) return;
+    swRunning = true;
+    stopwatchStartStop.textContent = 'STOP';
+    stopwatchStartStop.classList.add('running');
+    swTimer = setInterval(() => {
+      swSeconds++;
+      stopwatchDisplay.textContent = formatStopwatch(swSeconds);
+      if (swSeconds >= SW_MAX) {
+        clearInterval(swTimer);
+        swTimer = null;
+        swRunning = false;
+        stopwatchStartStop.textContent = 'START';
+        stopwatchStartStop.classList.remove('running');
+      }
+    }, 1000);
+  }
+});
+
+stopwatchReset.addEventListener('click', () => {
+  clearInterval(swTimer);
+  swTimer = null;
+  swRunning = false;
+  swSeconds = 0;
+  stopwatchDisplay.textContent = '0:00';
+  stopwatchStartStop.textContent = 'START';
+  stopwatchStartStop.classList.remove('running');
+});
+
+// ── Sound uploads ─────────────────────────────────────────────────────────────
+setEndSoundFile.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    MetronomeEngine.init();
+    await MetronomeEngine.loadCueFile(file, 'end');
+    setEndSoundName.textContent = file.name;
+    setEndSoundName.classList.add('loaded');
+  } catch {
+    setEndSoundName.textContent = 'Error loading file';
+    setEndSoundName.classList.remove('loaded');
+  }
+});
+
+setStartSoundFile.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    MetronomeEngine.init();
+    await MetronomeEngine.loadCueFile(file, 'start');
+    setStartSoundName.textContent = file.name;
+    setStartSoundName.classList.add('loaded');
+  } catch {
+    setStartSoundName.textContent = 'Error loading file';
+    setStartSoundName.classList.remove('loaded');
+  }
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function clampBpm(val) {
@@ -191,6 +280,8 @@ function countdownTick() {
 }
 
 function onSetComplete() {
+  MetronomeEngine.playSetEndCue();
+
   if (session.currentSet >= session.totalSets) {
     finishSession();
     return;
@@ -224,6 +315,7 @@ function advanceToNextSet() {
     MetronomeEngine.start();
   }
 
+  MetronomeEngine.playSetStartCue();
   appState = States.RUNNING_SET;
   updateStatusDisplay();
 }
@@ -285,7 +377,7 @@ function setConfigDisabled(disabled) {
   const fields = [
     numSetsInput, setMinsInput, setSecsInput,
     startBpmInput, bpmIncrInput, restMinsInput, restSecsInput,
-    intervalToggle,
+    intervalToggle, setEndSoundFile, setStartSoundFile,
   ];
   fields.forEach(el => { el.disabled = disabled; });
 }
