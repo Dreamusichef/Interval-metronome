@@ -166,14 +166,6 @@ const MetronomeEngine = (() => {
     playSyntheticCue([440, 660, 880], 0.18);
   }
 
-  async function loadCueFile(file, type) {
-    if (!audioCtx) init();
-    const arrayBuffer = await file.arrayBuffer();
-    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-    if (type === 'end') setEndBuffer = decoded;
-    else setStartBuffer = decoded;
-  }
-
   function getCurrentBpm() {
     return bpm;
   }
@@ -209,5 +201,5 @@ const MetronomeEngine = (() => {
     }
   });
 
-  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning, playSetEndCue, playSetStartCue, loadCueFile };
+  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning, playSetEndCue, playSetStartCue };
 })();
