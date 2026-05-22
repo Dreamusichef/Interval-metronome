@@ -83,6 +83,22 @@ const MetronomeEngine = (() => {
   function init() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    if (typeof SOUND_SET_END_B64 === 'string' && SOUND_SET_END_B64) {
+      fetch(SOUND_SET_END_B64)
+        .then(r => r.arrayBuffer())
+        .then(buf => audioCtx.decodeAudioData(buf))
+        .then(decoded => { setEndBuffer = decoded; })
+        .catch(() => {});
+    }
+
+    if (typeof SOUND_SET_START_B64 === 'string' && SOUND_SET_START_B64) {
+      fetch(SOUND_SET_START_B64)
+        .then(r => r.arrayBuffer())
+        .then(buf => audioCtx.decodeAudioData(buf))
+        .then(decoded => { setStartBuffer = decoded; })
+        .catch(() => {});
+    }
   }
 
   function doStart() {
