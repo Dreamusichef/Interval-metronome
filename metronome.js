@@ -15,6 +15,7 @@ const MetronomeEngine = (() => {
   let audioCtx = null;
   let setEndBuffer = null;
   let setStartBuffer = null;
+  let practiceCompleteBuffer = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let running = false;
@@ -97,6 +98,14 @@ const MetronomeEngine = (() => {
         .then(r => r.arrayBuffer())
         .then(buf => audioCtx.decodeAudioData(buf))
         .then(decoded => { setStartBuffer = decoded; })
+        .catch(() => {});
+    }
+
+    if (typeof SOUND_PRACTICE_COMPLETE_B64 === 'string' && SOUND_PRACTICE_COMPLETE_B64) {
+      fetch(SOUND_PRACTICE_COMPLETE_B64)
+        .then(r => r.arrayBuffer())
+        .then(buf => audioCtx.decodeAudioData(buf))
+        .then(decoded => { practiceCompleteBuffer = decoded; })
         .catch(() => {});
     }
   }
@@ -182,6 +191,11 @@ const MetronomeEngine = (() => {
     playSyntheticCue([440, 660, 880], 0.18);
   }
 
+  function playPracticeCompleteCue() {
+    if (practiceCompleteBuffer) { playBuffer(practiceCompleteBuffer); return; }
+    playSyntheticCue([440, 550, 660, 880], 0.15);
+  }
+
   function getCurrentBpm() {
     return bpm;
   }
@@ -217,5 +231,5 @@ const MetronomeEngine = (() => {
     }
   });
 
-  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning, playSetEndCue, playSetStartCue };
+  return { init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning, playSetEndCue, playSetStartCue, playPracticeCompleteCue };
 })();

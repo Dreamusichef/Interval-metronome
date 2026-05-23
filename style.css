@@ -3,9 +3,9 @@
   --surface: #1c1f26;
   --surface2: #252930;
   --border: #2e3340;
-  --accent: #f5a623;
-  --accent-dim: #b8771a;
-  --accent-flash: #ffcc5c;
+  --accent: #FFB800;
+  --accent-dim: #cc9200;
+  --accent-flash: #ffd84d;
   --tick-flash: #4a9eff;
   --text: #e8eaf0;
   --text-dim: #8a8f9e;
@@ -108,11 +108,23 @@ header h1 {
   line-height: 1;
 }
 
-.bpm-display #bpmValue {
+.bpm-value-input {
   font-size: 5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  -moz-appearance: textfield;
+  cursor: text;
+}
+
+.bpm-value-input::-webkit-inner-spin-button,
+.bpm-value-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
 }
 
 .bpm-label {
@@ -579,14 +591,14 @@ header h1 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 10px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .stopwatch-display {
-  font-size: 4rem;
+  font-size: 2.2rem;
   font-weight: 700;
   text-align: center;
   letter-spacing: -0.02em;
@@ -601,15 +613,15 @@ header h1 {
 
 .stopwatch-btn {
   flex: 1;
-  padding: 12px;
+  padding: 7px;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  min-height: 48px;
+  min-height: 38px;
   transition: background 0.15s, transform 0.08s;
 }
 

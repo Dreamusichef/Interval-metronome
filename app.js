@@ -112,7 +112,7 @@ function formatTime(secs) {
 
 function setDisplayBpm(val) {
   const clamped = clampBpm(val);
-  bpmValue.textContent = clamped;
+  bpmValue.value = clamped;
   bpmSlider.value = clamped;
   MetronomeEngine.setBpm(clamped);
 }
@@ -135,8 +135,24 @@ bpmSlider.addEventListener('input', () => {
 bpmButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     const delta = parseInt(btn.dataset.delta, 10);
-    setDisplayBpm(clampBpm(parseInt(bpmValue.textContent, 10) + delta));
+    setDisplayBpm(clampBpm(parseInt(bpmValue.value, 10) + delta));
   });
+});
+
+bpmValue.addEventListener('input', () => {
+  const val = parseInt(bpmValue.value, 10);
+  if (!isNaN(val)) {
+    bpmSlider.value = Math.max(20, Math.min(400, val));
+    MetronomeEngine.setBpm(val);
+  }
+});
+
+bpmValue.addEventListener('change', () => {
+  setDisplayBpm(parseInt(bpmValue.value, 10) || 120);
+});
+
+bpmValue.addEventListener('focus', () => {
+  bpmValue.select();
 });
 
 subBtns.forEach(btn => {
@@ -158,7 +174,7 @@ startStopBtn.addEventListener('click', () => {
     startIntervalSession();
   } else {
     MetronomeEngine.init();
-    MetronomeEngine.setBpm(clampBpm(parseInt(bpmValue.textContent, 10)));
+    MetronomeEngine.setBpm(clampBpm(parseInt(bpmValue.value, 10)));
     MetronomeEngine.start();
     appState = States.RUNNING_SET; // treat as "running" for stop check
     startStopBtn.textContent = 'STOP';
@@ -219,6 +235,7 @@ function startIntervalSession() {
   MetronomeEngine.setBpm(startBpm);
   setDisplayBpm(startBpm);
   MetronomeEngine.start();
+  MetronomeEngine.playSetStartCue();
 
   appState = States.RUNNING_SET;
   startStopBtn.textContent = 'STOP';
@@ -246,12 +263,12 @@ function countdownTick() {
 }
 
 function onSetComplete() {
-  MetronomeEngine.playSetEndCue();
-
   if (session.currentSet >= session.totalSets) {
     finishSession();
     return;
   }
+
+  MetronomeEngine.playSetEndCue();
 
   if (session.restDurationSecs > 0) {
     MetronomeEngine.stop();
@@ -288,6 +305,7 @@ function advanceToNextSet() {
 
 function finishSession() {
   MetronomeEngine.stop();
+  MetronomeEngine.playPracticeCompleteCue();
   clearInterval(countdownTimer);
   countdownTimer = null;
   appState = States.DONE;
