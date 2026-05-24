@@ -20,12 +20,13 @@ const MetronomeEngine = (() => {
   let practiceCompleteBuffer = null;
   let bpm = 120;
   let subdivision = 'quarter';
+  let beatsPerMeasure = 4;
+  let beatModes = ['accent', 'click', 'click', 'click'];
   let running = false;
   let schedulerTimer = null;
   let nextTickTime = 0;
   let currentTick = 0;
   let tickInterval = 0.5;
-  let beatModes = ['accent', 'click', 'click', 'click'];
   let beatCallback = null;
   let pendingVisuals = [];
   let rafId = null;
@@ -52,10 +53,10 @@ const MetronomeEngine = (() => {
   function scheduler() {
     const ticksPerBeat   = SUBDIVISION_TICKS[subdivision] || 1;
     tickInterval         = 60 / bpm / ticksPerBeat;
-    const ticksPerMeasure = ticksPerBeat * 4;
+    const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
 
     while (nextTickTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
-      const beatIndex  = Math.floor(currentTick / ticksPerBeat) % 4;
+      const beatIndex  = Math.floor(currentTick / ticksPerBeat) % beatsPerMeasure;
       const tickInBeat = currentTick % ticksPerBeat;
       const isFirst    = tickInBeat === 0;
       const mode       = beatModes[beatIndex];
@@ -139,8 +140,18 @@ const MetronomeEngine = (() => {
     currentTick = 0;
   }
 
+  function setBeatsPerMeasure(n) {
+    n = Math.max(1, Math.min(11, n));
+    beatsPerMeasure = n;
+    while (beatModes.length < n) beatModes.push('click');
+    beatModes = beatModes.slice(0, n);
+    currentTick = 0;
+  }
+
+  function getBeatsPerMeasure() { return beatsPerMeasure; }
+
   function setBeatMode(beatIndex, mode) {
-    if (beatIndex >= 0 && beatIndex < 4 && BEAT_MODES.includes(mode)) {
+    if (beatIndex >= 0 && beatIndex < beatsPerMeasure && BEAT_MODES.includes(mode)) {
       beatModes[beatIndex] = mode;
     }
   }
@@ -202,7 +213,7 @@ const MetronomeEngine = (() => {
 
   return {
     init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
-    setBeatMode, getBeatModes,
+    setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
   };
 })();
