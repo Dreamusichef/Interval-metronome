@@ -22,7 +22,6 @@ const MetronomeEngine = (() => {
   let practiceCompleteBuffer = null;
   let cowbellBeatBuffer   = null;
   let cowbellAccentBuffer = null;
-  let welcomeBuffer       = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let beatsPerMeasure = 4;
@@ -124,15 +123,26 @@ const MetronomeEngine = (() => {
     ].forEach(([src, setter]) => {
       if (src) fetch(src).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).then(setter).catch(() => {});
     });
+  }
 
-    // Welcome greeting — play once on first init
-    if (typeof SOUND_WELCOME_B64 !== 'undefined' && SOUND_WELCOME_B64) {
+  let welcomePlayed = false;
+  function playWelcomeGreeting() {
+    if (welcomePlayed) return;
+    if (typeof SOUND_WELCOME_B64 === 'undefined' || !SOUND_WELCOME_B64) return;
+    if (!audioCtx) init();
+
+    const fire = () => {
+      if (welcomePlayed || audioCtx.state !== 'running') return;
+      welcomePlayed = true;
       fetch(SOUND_WELCOME_B64)
         .then(r => r.arrayBuffer())
         .then(b => audioCtx.decodeAudioData(b))
-        .then(buf => { welcomeBuffer = buf; playBuffer(buf); })
-        .catch(() => {});
-    }
+        .then(buf => playBuffer(buf))
+        .catch(() => { welcomePlayed = false; });
+    };
+
+    if (audioCtx.state === 'suspended') audioCtx.resume().then(fire).catch(() => {});
+    else fire();
   }
 
   function doStart() {
@@ -248,6 +258,6 @@ const MetronomeEngine = (() => {
     init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
     setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
-    setSoundMode, getSoundMode,
+    setSoundMode, getSoundMode, playWelcomeGreeting,
   };
 })();

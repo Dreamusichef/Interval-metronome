@@ -439,6 +439,16 @@ function updateStatusDisplay() {
   }
 }
 
+// ── Welcome greeting ──────────────────────────────────────────────────────────
+MetronomeEngine.playWelcomeGreeting();
+const fireWelcome = () => {
+  MetronomeEngine.playWelcomeGreeting();
+  ['click', 'touchstart', 'keydown'].forEach(e =>
+    document.removeEventListener(e, fireWelcome, true));
+};
+['click', 'touchstart', 'keydown'].forEach(e =>
+  document.addEventListener(e, fireWelcome, true));
+
 // ── Utility ───────────────────────────────────────────────────────────────────
 function setConfigDisabled(disabled) {
   const fields = [
