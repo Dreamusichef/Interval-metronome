@@ -3,9 +3,11 @@
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const bpmValue      = document.getElementById('bpmValue');
 const bpmSlider     = document.getElementById('bpmSlider');
-const startStopBtn  = document.getElementById('startStopBtn');
-const tapBtn        = document.getElementById('tapBtn');
-const beatIndicators = document.querySelectorAll('.beat-indicator');
+const startStopBtn     = document.getElementById('startStopBtn');
+const tapBtn           = document.getElementById('tapBtn');
+const beatCountDec     = document.getElementById('beatCountDec');
+const beatCountInc     = document.getElementById('beatCountInc');
+const beatCountDisplay = document.getElementById('beatCountDisplay');
 const subBtns       = document.querySelectorAll('.sub-btn');
 const bpmButtons    = document.querySelectorAll('.bpm-btn');
 const intervalToggle = document.getElementById('intervalToggle');
@@ -129,18 +131,48 @@ function flashBeat(beatIndex, soundType) {
 
 MetronomeEngine.onBeat(flashBeat);
 
-// ── Beat indicator mode cycling ───────────────────────────────────────────────
+// ── Beat indicators ───────────────────────────────────────────────────────────
 const MODE_CYCLE = ['accent', 'click', 'silent'];
+let currentBeats = 4;
 
-beatIndicators.forEach(el => {
-  el.addEventListener('click', () => {
-    const beatIndex  = parseInt(el.dataset.beat, 10);
-    const current    = el.dataset.mode;
-    const next       = MODE_CYCLE[(MODE_CYCLE.indexOf(current) + 1) % MODE_CYCLE.length];
-    el.dataset.mode  = next;
-    MetronomeEngine.setBeatMode(beatIndex, next);
-  });
+function renderBeatIndicators(count) {
+  const container = document.getElementById('beatIndicators');
+  const modes     = MetronomeEngine.getBeatModes();
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const mode = modes[i] !== undefined ? modes[i] : (i === 0 ? 'accent' : 'click');
+    const el   = document.createElement('div');
+    el.className    = 'beat-indicator';
+    el.id           = 'beat' + i;
+    el.dataset.beat = i;
+    el.dataset.mode = mode;
+    el.innerHTML    = `<span class="beat-num">${i + 1}</span><span class="beat-pip"></span>`;
+    el.addEventListener('click', () => {
+      const next      = MODE_CYCLE[(MODE_CYCLE.indexOf(el.dataset.mode) + 1) % MODE_CYCLE.length];
+      el.dataset.mode = next;
+      MetronomeEngine.setBeatMode(i, next);
+    });
+    container.appendChild(el);
+  }
+}
+
+beatCountDec.addEventListener('click', () => {
+  if (currentBeats <= 1) return;
+  currentBeats--;
+  beatCountDisplay.textContent = currentBeats;
+  MetronomeEngine.setBeatsPerMeasure(currentBeats);
+  renderBeatIndicators(currentBeats);
 });
+
+beatCountInc.addEventListener('click', () => {
+  if (currentBeats >= 11) return;
+  currentBeats++;
+  beatCountDisplay.textContent = currentBeats;
+  MetronomeEngine.setBeatsPerMeasure(currentBeats);
+  renderBeatIndicators(currentBeats);
+});
+
+renderBeatIndicators(4);
 
 // ── Tap tempo ─────────────────────────────────────────────────────────────────
 const tapTimes = [];
