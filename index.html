@@ -14,8 +14,23 @@
 
     <!-- Section A: Metronome Controls -->
     <section class="metronome-section">
-      <div class="beat-flash-container">
-        <div class="beat-flash" id="beatFlash"></div>
+      <div class="beat-indicators">
+        <div class="beat-indicator" id="beat0" data-beat="0" data-mode="accent">
+          <span class="beat-num">1</span>
+          <span class="beat-pip"></span>
+        </div>
+        <div class="beat-indicator" id="beat1" data-beat="1" data-mode="click">
+          <span class="beat-num">2</span>
+          <span class="beat-pip"></span>
+        </div>
+        <div class="beat-indicator" id="beat2" data-beat="2" data-mode="click">
+          <span class="beat-num">3</span>
+          <span class="beat-pip"></span>
+        </div>
+        <div class="beat-indicator" id="beat3" data-beat="3" data-mode="click">
+          <span class="beat-num">4</span>
+          <span class="beat-pip"></span>
+        </div>
       </div>
 
       <div class="bpm-display">
@@ -62,7 +77,10 @@
         </div>
       </div>
 
-      <button class="start-stop-btn" id="startStopBtn">START</button>
+      <div class="start-row">
+        <button class="start-stop-btn" id="startStopBtn">START</button>
+        <button class="tap-btn" id="tapBtn">TAP</button>
+      </div>
     </section>
 
     <!-- Stopwatch -->
