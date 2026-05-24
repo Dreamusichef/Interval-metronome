@@ -130,7 +130,7 @@ function flashBeat(beatIndex, soundType) {
 MetronomeEngine.onBeat(flashBeat);
 
 // ── Beat indicator mode cycling ───────────────────────────────────────────────
-const MODE_CYCLE = ['accent', 'click', 'soft', 'silent'];
+const MODE_CYCLE = ['accent', 'click', 'silent'];
 
 beatIndicators.forEach(el => {
   el.addEventListener('click', () => {

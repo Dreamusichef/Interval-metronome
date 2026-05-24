@@ -119,18 +119,13 @@ header h1 {
 .beat-indicator[data-mode="click"]           { background: rgba(74,158,255,0.1); border-color: #3a5a7a; }
 .beat-indicator[data-mode="click"] .beat-pip  { background: #4a9eff; }
 
-/* Mode: soft */
-.beat-indicator[data-mode="soft"]            { background: rgba(74,158,255,0.04); border-color: var(--border); }
-.beat-indicator[data-mode="soft"] .beat-pip   { background: transparent; border: 2px solid #4a6a8a; }
-
 /* Mode: silent */
 .beat-indicator[data-mode="silent"]          { background: transparent; border-color: var(--border); opacity: 0.4; }
 .beat-indicator[data-mode="silent"] .beat-pip { background: transparent; border: 2px solid var(--text-dim); position: relative; }
 
 /* Flash states */
 .beat-indicator.flash-accent { background: var(--accent)  !important; border-color: var(--accent-flash) !important; box-shadow: 0 0 20px var(--accent); }
-.beat-indicator.flash-click  { background: #4a9eff        !important; border-color: #4a9eff              !important; box-shadow: 0 0 14px #4a9eff; }
-.beat-indicator.flash-soft   { background: rgba(74,158,255,0.35) !important; border-color: #4a9eff       !important; }
+.beat-indicator.flash-click  { background: #4a9eff !important; border-color: #4a9eff !important; box-shadow: 0 0 14px #4a9eff; }
 
 /* ── BPM Display ── */
 .bpm-display {
