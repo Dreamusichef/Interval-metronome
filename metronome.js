@@ -14,6 +14,8 @@ const MetronomeEngine = (() => {
 
   const BEAT_MODES = ['accent', 'click', 'silent'];
 
+  let soundMode = 'click'; // 'click' | 'cowbell'
+
   let audioCtx = null;
   let setEndBuffer = null;
   let setStartBuffer = null;
@@ -31,8 +33,36 @@ const MetronomeEngine = (() => {
   let pendingVisuals = [];
   let rafId = null;
 
+  function scheduleCowbell(time, isAccent) {
+    const gainPeak  = isAccent ? 0.5  : 0.28;
+    const decayTime = isAccent ? 0.55 : 0.22;
+    // Two detuned square oscillators — classic cowbell timbre
+    [562, 845].forEach(freq => {
+      const osc  = audioCtx.createOscillator();
+      const hpf  = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      hpf.type = 'highpass';
+      hpf.frequency.value = 300;
+      gain.gain.setValueAtTime(gainPeak, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
+      osc.connect(hpf);
+      hpf.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + decayTime + 0.01);
+    });
+  }
+
   function scheduleSound(time, soundType) {
     if (soundType === 'silent') return;
+
+    if (soundMode === 'cowbell') {
+      scheduleCowbell(time, soundType === 'accent');
+      return;
+    }
+
     let freq, gainPeak, duration;
     if (soundType === 'accent') { freq = 1000; gainPeak = 0.8; duration = 0.06; }
     else                        { freq = 600;  gainPeak = 0.4; duration = 0.04; } // click
@@ -190,6 +220,9 @@ const MetronomeEngine = (() => {
   function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer);         else playSyntheticCue([440, 660, 880],       0.18); }
   function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer); else playSyntheticCue([440, 550, 660, 880], 0.15); }
 
+  function setSoundMode(mode) { if (mode === 'click' || mode === 'cowbell') soundMode = mode; }
+  function getSoundMode()     { return soundMode; }
+
   function getCurrentBpm() { return bpm; }
   function isRunning()     { return running; }
 
@@ -215,5 +248,6 @@ const MetronomeEngine = (() => {
     init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
     setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
+    setSoundMode, getSoundMode,
   };
 })();

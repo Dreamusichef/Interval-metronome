@@ -5,6 +5,7 @@ const bpmValue      = document.getElementById('bpmValue');
 const bpmSlider     = document.getElementById('bpmSlider');
 const startStopBtn     = document.getElementById('startStopBtn');
 const tapBtn           = document.getElementById('tapBtn');
+const soundModeBtn     = document.getElementById('soundModeBtn');
 const beatCountDec     = document.getElementById('beatCountDec');
 const beatCountInc     = document.getElementById('beatCountInc');
 const beatCountDisplay = document.getElementById('beatCountDisplay');
@@ -155,6 +156,14 @@ function renderBeatIndicators(count) {
     container.appendChild(el);
   }
 }
+
+// ── Sound mode toggle ─────────────────────────────────────────────────────────
+soundModeBtn.addEventListener('click', () => {
+  const next = MetronomeEngine.getSoundMode() === 'click' ? 'cowbell' : 'click';
+  MetronomeEngine.setSoundMode(next);
+  soundModeBtn.textContent = next === 'cowbell' ? 'COWBELL' : 'CLICK';
+  soundModeBtn.classList.toggle('cowbell', next === 'cowbell');
+});
 
 beatCountDec.addEventListener('click', () => {
   if (currentBeats <= 1) return;
