@@ -4,7 +4,8 @@
 const bpmValue      = document.getElementById('bpmValue');
 const bpmSlider     = document.getElementById('bpmSlider');
 const startStopBtn  = document.getElementById('startStopBtn');
-const beatFlash     = document.getElementById('beatFlash');
+const tapBtn        = document.getElementById('tapBtn');
+const beatIndicators = document.querySelectorAll('.beat-indicator');
 const subBtns       = document.querySelectorAll('.sub-btn');
 const bpmButtons    = document.querySelectorAll('.bpm-btn');
 const intervalToggle = document.getElementById('intervalToggle');
@@ -117,15 +118,56 @@ function setDisplayBpm(val) {
   MetronomeEngine.setBpm(clamped);
 }
 
-function flashBeat(isAccent) {
-  beatFlash.classList.remove('flash-accent', 'flash-tick');
-  // Force reflow so re-adding the class triggers transition
-  void beatFlash.offsetWidth;
-  beatFlash.classList.add(isAccent ? 'flash-accent' : 'flash-tick');
-  setTimeout(() => beatFlash.classList.remove('flash-accent', 'flash-tick'), 80);
+function flashBeat(beatIndex, soundType) {
+  const el = document.getElementById('beat' + beatIndex);
+  if (!el || soundType === 'silent') return;
+  el.classList.remove('flash-accent', 'flash-click', 'flash-soft');
+  void el.offsetWidth;
+  el.classList.add('flash-' + soundType);
+  setTimeout(() => el.classList.remove('flash-accent', 'flash-click', 'flash-soft'), 90);
 }
 
 MetronomeEngine.onBeat(flashBeat);
+
+// ── Beat indicator mode cycling ───────────────────────────────────────────────
+const MODE_CYCLE = ['accent', 'click', 'soft', 'silent'];
+
+beatIndicators.forEach(el => {
+  el.addEventListener('click', () => {
+    const beatIndex  = parseInt(el.dataset.beat, 10);
+    const current    = el.dataset.mode;
+    const next       = MODE_CYCLE[(MODE_CYCLE.indexOf(current) + 1) % MODE_CYCLE.length];
+    el.dataset.mode  = next;
+    MetronomeEngine.setBeatMode(beatIndex, next);
+  });
+});
+
+// ── Tap tempo ─────────────────────────────────────────────────────────────────
+const tapTimes = [];
+const TAP_RESET_MS = 2500;
+let tapResetTimer = null;
+
+tapBtn.addEventListener('click', () => {
+  const now = Date.now();
+
+  if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > TAP_RESET_MS) {
+    tapTimes.length = 0;
+  }
+
+  tapTimes.push(now);
+
+  if (tapTimes.length >= 4) {
+    let total = 0;
+    for (let i = 1; i < tapTimes.length; i++) total += tapTimes[i] - tapTimes[i - 1];
+    const avgMs = total / (tapTimes.length - 1);
+    setDisplayBpm(clampBpm(Math.round(60000 / avgMs)));
+  }
+
+  if (tapTimes.length > 8) tapTimes.shift();
+
+  clearTimeout(tapResetTimer);
+  tapResetTimer = setTimeout(() => { tapTimes.length = 0; }, TAP_RESET_MS);
+});
 
 // ── Metronome controls ────────────────────────────────────────────────────────
 bpmSlider.addEventListener('input', () => {

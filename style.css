@@ -75,32 +75,62 @@ header h1 {
   color: var(--text-dim);
 }
 
-/* ── Beat Flash ── */
-.beat-flash-container {
+/* ── Beat Indicators ── */
+.beat-indicators {
   display: flex;
-  justify-content: center;
+  gap: 8px;
 }
 
-.beat-flash {
-  width: 56px;
+.beat-indicator {
+  flex: 1;
   height: 56px;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.08s;
+}
+
+.beat-num {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  line-height: 1;
+}
+
+.beat-pip {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--surface2);
-  border: 2px solid var(--border);
-  transition: background 0.05s ease, border-color 0.05s ease, box-shadow 0.05s ease;
+  display: block;
 }
 
-.beat-flash.flash-accent {
-  background: var(--accent-flash);
-  border-color: var(--accent-flash);
-  box-shadow: 0 0 24px var(--accent-flash);
-}
+/* Mode: accent */
+.beat-indicator[data-mode="accent"]          { background: rgba(255,184,0,0.15); border-color: var(--accent); }
+.beat-indicator[data-mode="accent"] .beat-pip { background: var(--accent); }
 
-.beat-flash.flash-tick {
-  background: var(--tick-flash);
-  border-color: var(--tick-flash);
-  box-shadow: 0 0 14px var(--tick-flash);
-}
+/* Mode: click */
+.beat-indicator[data-mode="click"]           { background: rgba(74,158,255,0.1); border-color: #3a5a7a; }
+.beat-indicator[data-mode="click"] .beat-pip  { background: #4a9eff; }
+
+/* Mode: soft */
+.beat-indicator[data-mode="soft"]            { background: rgba(74,158,255,0.04); border-color: var(--border); }
+.beat-indicator[data-mode="soft"] .beat-pip   { background: transparent; border: 2px solid #4a6a8a; }
+
+/* Mode: silent */
+.beat-indicator[data-mode="silent"]          { background: transparent; border-color: var(--border); opacity: 0.4; }
+.beat-indicator[data-mode="silent"] .beat-pip { background: transparent; border: 2px solid var(--text-dim); position: relative; }
+
+/* Flash states */
+.beat-indicator.flash-accent { background: var(--accent)  !important; border-color: var(--accent-flash) !important; box-shadow: 0 0 20px var(--accent); }
+.beat-indicator.flash-click  { background: #4a9eff        !important; border-color: #4a9eff              !important; box-shadow: 0 0 14px #4a9eff; }
+.beat-indicator.flash-soft   { background: rgba(74,158,255,0.35) !important; border-color: #4a9eff       !important; }
 
 /* ── BPM Display ── */
 .bpm-display {
@@ -267,9 +297,15 @@ header h1 {
   margin-top: 3px;
 }
 
+/* ── Start Row ── */
+.start-row {
+  display: flex;
+  gap: 10px;
+}
+
 /* ── Start / Stop Button ── */
 .start-stop-btn {
-  width: 100%;
+  flex: 1;
   padding: 16px;
   background: var(--accent);
   border: none;
@@ -300,6 +336,26 @@ header h1 {
 .start-stop-btn.running:hover {
   background: #f06060;
 }
+
+/* ── Tap Button ── */
+.tap-btn {
+  flex: 1;
+  padding: 16px;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 56px;
+  transition: background 0.1s, border-color 0.1s, transform 0.06s;
+}
+
+.tap-btn:hover  { background: var(--border); border-color: var(--accent-dim); }
+.tap-btn:active { transform: scale(0.96); background: rgba(255,184,0,0.15); border-color: var(--accent); }
 
 /* ── Interval Toggle Row ── */
 .interval-toggle-row {
