@@ -155,6 +155,26 @@ const MetronomeEngine = (() => {
     else fire();
   }
 
+  let welcomePlayed = false;
+  function playWelcomeGreeting() {
+    if (welcomePlayed) return;
+    if (typeof SOUND_WELCOME_B64 === 'undefined' || !SOUND_WELCOME_B64) return;
+    if (!audioCtx) init();
+
+    const fire = () => {
+      if (welcomePlayed || audioCtx.state !== 'running') return;
+      welcomePlayed = true;
+      fetch(SOUND_WELCOME_B64)
+        .then(r => r.arrayBuffer())
+        .then(b => audioCtx.decodeAudioData(b))
+        .then(buf => playBuffer(buf))
+        .catch(() => { welcomePlayed = false; });
+    };
+
+    if (audioCtx.state === 'suspended') audioCtx.resume().then(fire).catch(() => {});
+    else fire();
+  }
+
   function doStart() {
     if (running) return;
     running      = true;

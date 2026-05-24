@@ -280,6 +280,7 @@ function stopAll() {
 // ── Interval toggle ───────────────────────────────────────────────────────────
 intervalToggle.addEventListener('change', () => {
   intervalConfig.classList.toggle('visible', intervalToggle.checked);
+  MetronomeEngine.playWelcomeGreeting();
 });
 
 // ── Interval Session ──────────────────────────────────────────────────────────
