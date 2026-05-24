@@ -12,7 +12,7 @@ const MetronomeEngine = (() => {
     sextuplet: 6,
   };
 
-  const BEAT_MODES = ['accent', 'click', 'soft', 'silent'];
+  const BEAT_MODES = ['accent', 'click', 'silent'];
 
   let audioCtx = null;
   let setEndBuffer = null;
@@ -33,9 +33,8 @@ const MetronomeEngine = (() => {
   function scheduleSound(time, soundType) {
     if (soundType === 'silent') return;
     let freq, gainPeak, duration;
-    if (soundType === 'accent')     { freq = 1000; gainPeak = 0.8; duration = 0.06; }
-    else if (soundType === 'click') { freq = 600;  gainPeak = 0.4; duration = 0.04; }
-    else                            { freq = 600;  gainPeak = 0.2; duration = 0.03; } // soft
+    if (soundType === 'accent') { freq = 1000; gainPeak = 0.8; duration = 0.06; }
+    else                        { freq = 600;  gainPeak = 0.4; duration = 0.04; } // click
 
     const osc  = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -65,9 +64,9 @@ const MetronomeEngine = (() => {
       if (mode === 'silent') {
         soundType = 'silent';
       } else if (isFirst) {
-        soundType = mode; // 'accent' | 'click' | 'soft' for the beat itself
+        soundType = mode; // 'accent' | 'click' for the beat itself
       } else {
-        soundType = mode === 'soft' ? 'soft' : 'click'; // subdivisions
+        soundType = 'click'; // subdivisions always click
       }
 
       scheduleSound(nextTickTime, soundType);
