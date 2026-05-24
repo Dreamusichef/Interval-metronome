@@ -82,6 +82,32 @@ header h1 {
   justify-content: space-between;
 }
 
+.sound-mode-btn {
+  padding: 5px 11px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 28px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.sound-mode-btn:hover {
+  border-color: var(--accent-dim);
+  color: var(--text);
+}
+
+.sound-mode-btn.cowbell {
+  background: rgba(255, 184, 0, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .beat-count-ctrl {
   display: flex;
   align-items: center;
