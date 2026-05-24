@@ -11,6 +11,7 @@
 </head>
 <body>
   <div class="app-container">
+
     <!-- Section A: Metronome Controls -->
     <section class="metronome-section">
       <div class="beat-count-row">
@@ -74,20 +75,10 @@
       </div>
     </section>
 
-    <!-- Stopwatch -->
-    <section class="stopwatch-section">
-      <span class="section-label">Stopwatch</span>
-      <div class="stopwatch-display" id="stopwatchDisplay">0:00</div>
-      <div class="stopwatch-controls">
-        <button class="stopwatch-btn start-stop" id="stopwatchStartStop">START</button>
-        <button class="stopwatch-btn reset" id="stopwatchReset">RESET</button>
-      </div>
-    </section>
-
-    <!-- Section B: Interval Timer Config -->
+    <!-- Section B: Ramp Mode Config -->
     <section class="interval-section">
       <div class="interval-toggle-row">
-        <span class="section-label">Interval Mode</span>
+        <span class="section-label">Ramp Mode</span>
         <label class="toggle-switch">
           <input type="checkbox" id="intervalToggle">
           <span class="toggle-slider"></span>
@@ -132,7 +123,7 @@
       </div>
     </section>
 
-    <!-- Section C: Interval Status Display -->
+    <!-- Section C: Ramp Status Display -->
     <section class="interval-status" id="intervalStatus">
       <div class="status-header">
         <span class="status-phase" id="statusPhase">SET</span>
@@ -147,6 +138,24 @@
       </div>
 
       <div class="status-next" id="statusNext">Next set: BPM 85</div>
+    </section>
+
+    <!-- Section D: Stopwatch -->
+    <section class="stopwatch-section">
+      <div class="interval-toggle-row">
+        <span class="section-label">Stopwatch</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="stopwatchToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="stopwatch-body" id="stopwatchBody">
+        <div class="stopwatch-display" id="stopwatchDisplay">0:00</div>
+        <div class="stopwatch-controls">
+          <button class="stopwatch-btn start-stop" id="stopwatchStartStop">START</button>
+          <button class="stopwatch-btn reset" id="stopwatchReset">RESET</button>
+        </div>
+      </div>
     </section>
 
     <!-- Done overlay -->

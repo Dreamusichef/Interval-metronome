@@ -22,7 +22,6 @@ const MetronomeEngine = (() => {
   let practiceCompleteBuffer = null;
   let cowbellBeatBuffer   = null;
   let cowbellAccentBuffer = null;
-  let welcomeBuffer       = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let beatsPerMeasure = 4;
@@ -111,28 +110,48 @@ const MetronomeEngine = (() => {
     }
   }
 
+  function loadAudio(dataUrl, setter) {
+    if (!dataUrl) return;
+    try {
+      const raw = atob(dataUrl.split(',')[1]);
+      const buf = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+      audioCtx.decodeAudioData(buf.buffer.slice(0)).then(setter).catch(() => {});
+    } catch (e) {}
+  }
+
   function init() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    [
-      [typeof SOUND_SET_END_B64           !== 'undefined' && SOUND_SET_END_B64,           b => { setEndBuffer           = b; }],
-      [typeof SOUND_SET_START_B64         !== 'undefined' && SOUND_SET_START_B64,         b => { setStartBuffer         = b; }],
-      [typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' && SOUND_PRACTICE_COMPLETE_B64, b => { practiceCompleteBuffer = b; }],
-      [typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' && SOUND_COWBELL_BEAT_B64,      b => { cowbellBeatBuffer      = b; }],
-      [typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' && SOUND_COWBELL_ACCENT_B64,    b => { cowbellAccentBuffer    = b; }],
-    ].forEach(([src, setter]) => {
-      if (src) fetch(src).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).then(setter).catch(() => {});
-    });
+    loadAudio(typeof SOUND_SET_END_B64           !== 'undefined' ? SOUND_SET_END_B64           : null, b => { setEndBuffer           = b; });
+    loadAudio(typeof SOUND_SET_START_B64         !== 'undefined' ? SOUND_SET_START_B64         : null, b => { setStartBuffer         = b; });
+    loadAudio(typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' ? SOUND_PRACTICE_COMPLETE_B64 : null, b => { practiceCompleteBuffer = b; });
+    loadAudio(typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' ? SOUND_COWBELL_BEAT_B64      : null, b => { cowbellBeatBuffer      = b; });
+    loadAudio(typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' ? SOUND_COWBELL_ACCENT_B64    : null, b => { cowbellAccentBuffer    = b; });
+  }
 
-    // Welcome greeting — play once on first init
-    if (typeof SOUND_WELCOME_B64 !== 'undefined' && SOUND_WELCOME_B64) {
-      fetch(SOUND_WELCOME_B64)
-        .then(r => r.arrayBuffer())
-        .then(b => audioCtx.decodeAudioData(b))
-        .then(buf => { welcomeBuffer = buf; playBuffer(buf); })
-        .catch(() => {});
-    }
+  let welcomePlayed = false;
+  function playWelcomeGreeting() {
+    if (welcomePlayed) return;
+    if (typeof SOUND_WELCOME_B64 === 'undefined' || !SOUND_WELCOME_B64) return;
+    if (!audioCtx) init();
+
+    const fire = () => {
+      if (welcomePlayed || audioCtx.state !== 'running') return;
+      welcomePlayed = true;
+      try {
+        const raw = atob(SOUND_WELCOME_B64.split(',')[1]);
+        const buf = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+        audioCtx.decodeAudioData(buf.buffer.slice(0))
+          .then(b => playBuffer(b))
+          .catch(() => { welcomePlayed = false; });
+      } catch (e) { welcomePlayed = false; }
+    };
+
+    if (audioCtx.state === 'suspended') audioCtx.resume().then(fire).catch(() => {});
+    else fire();
   }
 
   let welcomePlayed = false;

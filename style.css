@@ -197,7 +197,6 @@ body {
   user-select: none;
   padding: 4px 0;
   -webkit-tap-highlight-color: transparent;
-  transition: filter 0.08s;
 }
 .beat-indicator:active { opacity: 0.65; }
 
@@ -215,42 +214,32 @@ body {
   width: 30px;
   height: 30px;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-  transition: background 0.08s;
+  transition: background 0.08s, filter 0.08s;
 }
 
 /* Mode fills — 3D gradient gem look */
 .beat-indicator[data-mode="accent"] .beat-pip {
   background: linear-gradient(145deg, #ffe980 0%, #FFB800 55%, #7a5000 100%);
-}
-.beat-indicator[data-mode="accent"] {
   filter: drop-shadow(0 0 5px rgba(255, 184, 0, 0.6));
 }
 
 .beat-indicator[data-mode="click"] .beat-pip {
   background: linear-gradient(145deg, #80eeff 0%, #00c8ff 55%, #004466 100%);
-}
-.beat-indicator[data-mode="click"] {
   filter: drop-shadow(0 0 5px rgba(0, 200, 255, 0.5));
 }
 
 .beat-indicator[data-mode="silent"] .beat-pip {
   background: linear-gradient(145deg, #141e2e 0%, #070d18 100%);
-}
-.beat-indicator[data-mode="silent"] {
   filter: none;
 }
 
 /* Flash */
 .beat-indicator.flash-accent .beat-pip {
   background: linear-gradient(145deg, #ffffff 0%, var(--accent-flash) 45%, #FFB800 100%) !important;
-}
-.beat-indicator.flash-accent {
   filter: drop-shadow(0 0 14px rgba(255, 224, 102, 1)) !important;
 }
 .beat-indicator.flash-click .beat-pip {
   background: linear-gradient(145deg, #ffffff 0%, #aaefff 45%, var(--cyan) 100%) !important;
-}
-.beat-indicator.flash-click {
   filter: drop-shadow(0 0 14px rgba(0, 200, 255, 1)) !important;
 }
 
@@ -781,9 +770,15 @@ body {
   padding: 10px 14px;
   gap: 8px;
 }
+.stopwatch-body { display: none; }
+.stopwatch-body.visible {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .stopwatch-display {
   font-family: 'Orbitron', monospace;
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 900;
   text-align: center;
   letter-spacing: 0.04em;
