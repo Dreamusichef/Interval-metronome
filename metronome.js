@@ -22,6 +22,7 @@ const MetronomeEngine = (() => {
   let practiceCompleteBuffer = null;
   let cowbellBeatBuffer   = null;
   let cowbellAccentBuffer = null;
+  let welcomeBuffer       = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let beatsPerMeasure = 4;
@@ -123,6 +124,15 @@ const MetronomeEngine = (() => {
     ].forEach(([src, setter]) => {
       if (src) fetch(src).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).then(setter).catch(() => {});
     });
+
+    // Welcome greeting — play once on first init
+    if (typeof SOUND_WELCOME_B64 !== 'undefined' && SOUND_WELCOME_B64) {
+      fetch(SOUND_WELCOME_B64)
+        .then(r => r.arrayBuffer())
+        .then(b => audioCtx.decodeAudioData(b))
+        .then(buf => { welcomeBuffer = buf; playBuffer(buf); })
+        .catch(() => {});
+    }
   }
 
   function doStart() {
