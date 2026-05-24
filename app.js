@@ -280,6 +280,7 @@ function stopAll() {
 // ── Interval toggle ───────────────────────────────────────────────────────────
 intervalToggle.addEventListener('change', () => {
   intervalConfig.classList.toggle('visible', intervalToggle.checked);
+  MetronomeEngine.playWelcomeGreeting();
 });
 
 // ── Interval Session ──────────────────────────────────────────────────────────
@@ -438,16 +439,6 @@ function updateStatusDisplay() {
     statusNext.textContent = 'Last set';
   }
 }
-
-// ── Welcome greeting ──────────────────────────────────────────────────────────
-MetronomeEngine.playWelcomeGreeting();
-const fireWelcome = () => {
-  MetronomeEngine.playWelcomeGreeting();
-  ['click', 'touchstart', 'keydown'].forEach(e =>
-    document.removeEventListener(e, fireWelcome, true));
-};
-['click', 'touchstart', 'keydown'].forEach(e =>
-  document.addEventListener(e, fireWelcome, true));
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 function setConfigDisabled(disabled) {
