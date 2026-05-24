@@ -20,6 +20,8 @@ const MetronomeEngine = (() => {
   let setEndBuffer = null;
   let setStartBuffer = null;
   let practiceCompleteBuffer = null;
+  let cowbellBeatBuffer   = null;
+  let cowbellAccentBuffer = null;
   let bpm = 120;
   let subdivision = 'quarter';
   let beatsPerMeasure = 4;
@@ -33,34 +35,20 @@ const MetronomeEngine = (() => {
   let pendingVisuals = [];
   let rafId = null;
 
-  function scheduleCowbell(time, isAccent) {
-    const gainPeak  = isAccent ? 0.5  : 0.28;
-    const decayTime = isAccent ? 0.55 : 0.22;
-    // Two detuned square oscillators — classic cowbell timbre
-    [562, 845].forEach(freq => {
-      const osc  = audioCtx.createOscillator();
-      const hpf  = audioCtx.createBiquadFilter();
-      const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = freq;
-      hpf.type = 'highpass';
-      hpf.frequency.value = 300;
-      gain.gain.setValueAtTime(gainPeak, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
-      osc.connect(hpf);
-      hpf.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(time);
-      osc.stop(time + decayTime + 0.01);
-    });
+  function scheduleBufferAt(buffer, time) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start(time);
   }
 
   function scheduleSound(time, soundType) {
     if (soundType === 'silent') return;
 
     if (soundMode === 'cowbell') {
-      scheduleCowbell(time, soundType === 'accent');
-      return;
+      const buf = soundType === 'accent' ? cowbellAccentBuffer : cowbellBeatBuffer;
+      if (buf) { scheduleBufferAt(buf, time); return; }
+      // fall through to click if buffers not yet loaded
     }
 
     let freq, gainPeak, duration;
@@ -127,9 +115,11 @@ const MetronomeEngine = (() => {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
     [
-      [typeof SOUND_SET_END_B64          !== 'undefined' && SOUND_SET_END_B64,          b => { setEndBuffer           = b; }],
-      [typeof SOUND_SET_START_B64        !== 'undefined' && SOUND_SET_START_B64,        b => { setStartBuffer         = b; }],
+      [typeof SOUND_SET_END_B64           !== 'undefined' && SOUND_SET_END_B64,           b => { setEndBuffer           = b; }],
+      [typeof SOUND_SET_START_B64         !== 'undefined' && SOUND_SET_START_B64,         b => { setStartBuffer         = b; }],
       [typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' && SOUND_PRACTICE_COMPLETE_B64, b => { practiceCompleteBuffer = b; }],
+      [typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' && SOUND_COWBELL_BEAT_B64,      b => { cowbellBeatBuffer      = b; }],
+      [typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' && SOUND_COWBELL_ACCENT_B64,    b => { cowbellAccentBuffer    = b; }],
     ].forEach(([src, setter]) => {
       if (src) fetch(src).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).then(setter).catch(() => {});
     });
