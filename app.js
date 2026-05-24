@@ -38,7 +38,22 @@ const stopwatchBody      = document.getElementById('stopwatchBody');
 
 // Guard: if MetronomeEngine failed to load, show a recoverable error state
 const ME = (typeof MetronomeEngine !== 'undefined') ? MetronomeEngine : null;
-if (!ME) console.error('MetronomeEngine failed to load — audio will not work.');
+if (!ME) {
+  const msg = 'MetronomeEngine failed to load — audio will not work.';
+  console.error(msg);
+  if (window.__showError) window.__showError(msg);
+}
+
+function safeHandler(label, fn) {
+  return function(ev) {
+    try { return fn.call(this, ev); }
+    catch (e) {
+      const msg = '[' + label + '] ' + (e && e.message ? e.message : String(e));
+      console.error(msg, e);
+      if (window.__showError) window.__showError(msg);
+    }
+  };
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const States = { IDLE: 0, RUNNING_SET: 1, RESTING: 2, DONE: 3 };
@@ -233,7 +248,7 @@ subBtns.forEach(btn => {
 });
 
 // ── Start / Stop ──────────────────────────────────────────────────────────────
-startStopBtn.addEventListener('click', () => {
+startStopBtn.addEventListener('click', safeHandler('startStop', () => {
   if (appState !== States.IDLE) { stopAll(); return; }
 
   if (intervalToggle.checked) {
@@ -247,7 +262,7 @@ startStopBtn.addEventListener('click', () => {
     startStopBtn.classList.add('running');
     setConfigDisabled(true);
   }
-});
+}));
 
 function stopAll() {
   ME?.stop();
@@ -261,10 +276,32 @@ function stopAll() {
 }
 
 // ── Ramp Mode toggle ──────────────────────────────────────────────────────────
-intervalToggle.addEventListener('change', () => {
+function applyRampToggleState() {
   intervalConfig.classList.toggle('visible', intervalToggle.checked);
   ME?.playWelcomeGreeting();
-});
+}
+intervalToggle.addEventListener('change', safeHandler('rampChange', applyRampToggleState));
+intervalToggle.addEventListener('input',  safeHandler('rampInput',  applyRampToggleState));
+
+// Fallback for Android Chrome where label-wrapped checkbox change events can be flaky:
+// listen to click on the parent .toggle-switch label directly.
+const rampLabel = intervalToggle.closest('.toggle-switch');
+if (rampLabel) {
+  rampLabel.addEventListener('click', safeHandler('rampLabelClick', () => {
+    // Defer to next tick so the native checkbox toggle (from the label) is reflected first.
+    setTimeout(applyRampToggleState, 0);
+  }));
+}
+
+// Same fallback for stopwatch toggle
+const swLabel = stopwatchToggle.closest('.toggle-switch');
+if (swLabel) {
+  swLabel.addEventListener('click', safeHandler('swLabelClick', () => {
+    setTimeout(() => {
+      stopwatchBody.classList.toggle('visible', stopwatchToggle.checked);
+    }, 0);
+  }));
+}
 
 // ── Ramp Session ──────────────────────────────────────────────────────────────
 function parseIntVal(el, fallback) {
