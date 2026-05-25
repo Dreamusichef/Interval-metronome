@@ -52,17 +52,23 @@ const MetronomeEngine = (() => {
     }
 
     let freq, gainPeak, duration;
-    if (soundType === 'accent') { freq = 1000; gainPeak = 0.8; duration = 0.06; }
-    else                        { freq = 600;  gainPeak = 0.4; duration = 0.04; } // click
+    if (soundType === 'accent') { freq = 880; gainPeak = 0.7; duration = 0.06; }
+    else                        { freq = 540; gainPeak = 0.35; duration = 0.04; } // click
 
-    const osc  = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const osc    = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const gain   = audioCtx.createGain();
     osc.type = 'triangle';
     osc.frequency.value = freq;
+    // Low-pass at 2kHz removes harsh upper harmonics while keeping the click crisp
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000;
+    filter.Q.value = 0.5;
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(gainPeak, time + 0.001);
+    gain.gain.linearRampToValueAtTime(gainPeak, time + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-    osc.connect(gain);
+    osc.connect(filter);
+    filter.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start(time);
     osc.stop(time + duration + 0.01);
