@@ -495,6 +495,41 @@ body {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.65), inset 0 0 14px rgba(0, 200, 255, 0.12);
 }
 
+/* ── Pause button ──────────────────────────────── */
+.pause-btn {
+  display: none;
+  flex: 1;
+  padding: 15px 8px;
+  background: linear-gradient(180deg, #0d1e32 0%, #071220 100%);
+  border: 1px solid rgba(0, 200, 255, 0.35);
+  color: var(--cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 48px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(0, 200, 255, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.65);
+  transition: color 0.12s, box-shadow 0.12s, transform 0.06s;
+}
+.pause-btn.visible { display: flex; align-items: center; justify-content: center; }
+.pause-btn:active  { transform: translateY(1px); }
+.pause-btn.resuming {
+  border-color: rgba(0, 232, 122, 0.45);
+  color: var(--success);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 0 14px rgba(0, 232, 122, 0.18),
+    0 4px 14px rgba(0, 0, 0, 0.65);
+}
+
 /* ── Interval Toggle Row ───────────────────────── */
 .interval-toggle-row {
   display: flex;

@@ -35,6 +35,7 @@ const stopwatchStartStop = document.getElementById('stopwatchStartStop');
 const stopwatchReset     = document.getElementById('stopwatchReset');
 const stopwatchToggle    = document.getElementById('stopwatchToggle');
 const stopwatchBody      = document.getElementById('stopwatchBody');
+const pauseBtn           = document.getElementById('pauseBtn');
 
 // Guard: if MetronomeEngine failed to load, show a recoverable error state
 const ME = (typeof MetronomeEngine !== 'undefined') ? MetronomeEngine : null;
@@ -59,6 +60,7 @@ function safeHandler(label, fn) {
 const States = { IDLE: 0, RUNNING_SET: 1, RESTING: 2, DONE: 3 };
 let appState = States.IDLE;
 let countdownTimer = null;
+let isPaused = false;
 
 const session = {
   totalSets: 0, setDurationSecs: 0, restDurationSecs: 0,
@@ -268,12 +270,40 @@ function stopAll() {
   ME?.stop();
   clearInterval(countdownTimer);
   countdownTimer = null;
+  isPaused = false;
   appState = States.IDLE;
   startStopBtn.textContent = 'START';
   startStopBtn.classList.remove('running');
+  pauseBtn.classList.remove('visible', 'resuming');
   intervalStatus.classList.remove('visible');
   setConfigDisabled(false);
 }
+
+// ── Pause / Resume (ramp sessions only) ───────────────────────────────────────
+pauseBtn.addEventListener('click', safeHandler('pause', () => {
+  if (appState === States.IDLE) return;
+
+  if (isPaused) {
+    isPaused = false;
+    pauseBtn.textContent = 'PAUSE';
+    pauseBtn.classList.remove('resuming');
+    // During a set: restart the metronome at the current BPM
+    if (appState === States.RUNNING_SET) {
+      ME?.init();
+      ME?.setBpm(session.currentBpm);
+      ME?.start();
+    }
+    // Restart the countdown (works for both set and rest phases)
+    countdownTimer = setInterval(countdownTick, 1000);
+  } else {
+    isPaused = true;
+    pauseBtn.textContent = 'RESUME';
+    pauseBtn.classList.add('resuming');
+    ME?.stop();
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+}));
 
 // ── Ramp Mode toggle ──────────────────────────────────────────────────────────
 function applyRampToggleState() {
@@ -330,9 +360,13 @@ function startIntervalSession() {
   ME?.start();
   ME?.playSetStartCue();
 
+  isPaused = false;
   appState = States.RUNNING_SET;
   startStopBtn.textContent = 'STOP';
   startStopBtn.classList.add('running');
+  pauseBtn.textContent = 'PAUSE';
+  pauseBtn.classList.add('visible');
+  pauseBtn.classList.remove('resuming');
   setConfigDisabled(true);
   intervalStatus.classList.add('visible');
   updateStatusDisplay();
@@ -383,10 +417,12 @@ function finishSession() {
   ME?.playPracticeCompleteCue();
   clearInterval(countdownTimer);
   countdownTimer = null;
+  isPaused = false;
   appState = States.DONE;
   intervalStatus.classList.remove('visible');
   startStopBtn.textContent = 'START';
   startStopBtn.classList.remove('running');
+  pauseBtn.classList.remove('visible', 'resuming');
   setConfigDisabled(false);
   const finalBpm = clampBpm(session.startBpm + (session.totalSets - 1) * session.bpmIncrement);
   doneSummary.textContent =
