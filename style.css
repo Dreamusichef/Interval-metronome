@@ -183,19 +183,22 @@ body {
 .beat-indicators {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
+  /* 6 × 40px items + 5 × 6px gaps = 270px — hard cap at 6 per row */
+  max-width: 270px;
+  margin: 0 auto;
 }
 
 .beat-indicator {
-  width: 44px;
+  width: 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   cursor: pointer;
   user-select: none;
-  padding: 4px 0;
+  padding: 3px 0;
   -webkit-tap-highlight-color: transparent;
 }
 .beat-indicator:active { opacity: 0.65; }
@@ -211,8 +214,8 @@ body {
 
 .beat-pip {
   display: block;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   transition: background 0.08s, filter 0.08s;
 }
