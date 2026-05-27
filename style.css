@@ -202,7 +202,7 @@ body {
 
 .beat-num {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.58rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-dim);
@@ -338,7 +338,7 @@ body {
   border: 1px solid var(--border);
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.92rem;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
   min-height: 38px;
@@ -356,12 +356,6 @@ body {
 }
 
 /* ── Subdivision ───────────────────────────────── */
-.subdivision-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .subdivision-buttons {
   display: flex;
   gap: 5px;
@@ -370,14 +364,14 @@ body {
 .sub-btn {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 7px 3px;
+  justify-content: center;
+  padding: 6px 3px;
   background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
   border: 1px solid var(--border);
   color: var(--text-dim);
   cursor: pointer;
-  min-height: 44px;
+  min-height: 34px;
   clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 6px rgba(0, 0, 0, 0.4);
   transition: color 0.15s, box-shadow 0.15s;
@@ -396,16 +390,8 @@ body {
 }
 
 .sub-icon {
-  font-size: 1rem;
+  font-size: 1.1rem;
   line-height: 1;
-}
-.sub-name {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 0.58rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-top: 3px;
 }
 
 /* ── Start Row ─────────────────────────────────── */
@@ -580,36 +566,37 @@ body {
 
 .config-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
 }
 
 .config-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 .config-field label {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
 }
 
 .config-input {
   width: 100%;
-  padding: 9px 10px;
+  padding: 5px 6px;
   background: linear-gradient(180deg, var(--inset) 0%, #030609 100%);
   border: 1px solid var(--border);
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   text-align: center;
   outline: none;
-  min-height: 38px;
+  min-height: 32px;
   clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
   transition: border-color 0.15s;
@@ -620,20 +607,20 @@ body {
 .time-input {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 .time-part {
   flex: 1;
-  padding: 9px 5px;
+  padding: 5px 3px;
   background: linear-gradient(180deg, var(--inset) 0%, #030609 100%);
   border: 1px solid var(--border);
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   text-align: center;
   outline: none;
-  min-height: 38px;
+  min-height: 32px;
   min-width: 0;
   clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
@@ -646,7 +633,7 @@ body {
   color: var(--text-dim);
   font-family: 'Orbitron', monospace;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 /* ── Interval Status ───────────────────────────── */
@@ -867,8 +854,8 @@ input[type="number"] { -moz-appearance: textfield; }
 /* ── Responsive ────────────────────────────────── */
 @media (max-width: 360px) {
   .subdivision-buttons { gap: 3px; }
-  .sub-btn { padding: 5px 2px; }
-  .sub-name { font-size: 0.52rem; }
-  .config-grid { grid-template-columns: 1fr; }
+  .sub-btn { padding: 4px 2px; }
+  .config-grid { grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .config-field label { font-size: 0.55rem; }
   .bpm-value-input { font-size: 3.2rem; }
 }
