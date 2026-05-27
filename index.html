@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260524b">
+  <link rel="stylesheet" href="style.css?v=20260527">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -65,30 +65,12 @@
         <button class="bpm-btn" data-delta="10">+10</button>
       </div>
 
-      <div class="subdivision-container">
-        <span class="section-label">Subdivision</span>
-        <div class="subdivision-buttons">
-          <button class="sub-btn active" data-mode="quarter">
-            <span class="sub-icon">♩</span>
-            <span class="sub-name">Quarter</span>
-          </button>
-          <button class="sub-btn" data-mode="eighth">
-            <span class="sub-icon">♪</span>
-            <span class="sub-name">8th</span>
-          </button>
-          <button class="sub-btn" data-mode="triplet">
-            <span class="sub-icon">♪³</span>
-            <span class="sub-name">Triplet</span>
-          </button>
-          <button class="sub-btn" data-mode="sixteenth">
-            <span class="sub-icon">♬</span>
-            <span class="sub-name">16th</span>
-          </button>
-          <button class="sub-btn" data-mode="sextuplet">
-            <span class="sub-icon">♬⁶</span>
-            <span class="sub-name">Sextuplet</span>
-          </button>
-        </div>
+      <div class="subdivision-buttons">
+        <button class="sub-btn active" data-mode="quarter"><span class="sub-icon">♩</span></button>
+        <button class="sub-btn" data-mode="eighth"><span class="sub-icon">♪</span></button>
+        <button class="sub-btn" data-mode="triplet"><span class="sub-icon">♪³</span></button>
+        <button class="sub-btn" data-mode="sixteenth"><span class="sub-icon">♬</span></button>
+        <button class="sub-btn" data-mode="sextuplet"><span class="sub-icon">♬⁶</span></button>
       </div>
 
       <div class="start-row">
@@ -96,6 +78,23 @@
         <button class="pause-btn" id="pauseBtn">PAUSE</button>
         <button class="tap-btn" id="tapBtn">TAP</button>
       </div>
+    </section>
+
+    <!-- Section C: Ramp Status Display (above config so it's visible during session) -->
+    <section class="interval-status" id="intervalStatus">
+      <div class="status-header">
+        <span class="status-phase" id="statusPhase">SET</span>
+        <span class="status-set" id="statusSet">Set 1 of 4</span>
+        <span class="status-bpm" id="statusBpm">BPM: 80</span>
+      </div>
+
+      <div class="status-countdown" id="statusCountdown">2:00</div>
+
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <div class="status-next" id="statusNext">Next set: BPM 85</div>
     </section>
 
     <!-- Section B: Ramp Mode Config -->
@@ -111,12 +110,17 @@
       <div class="interval-config" id="intervalConfig">
         <div class="config-grid">
           <div class="config-field">
-            <label for="numSets">Number of Sets</label>
+            <label for="startBpm">Starting BPM</label>
+            <input type="number" id="startBpm" min="20" max="400" value="80" class="config-input">
+          </div>
+
+          <div class="config-field">
+            <label for="numSets">Sets</label>
             <input type="number" id="numSets" min="1" max="99" value="4" class="config-input">
           </div>
 
           <div class="config-field">
-            <label>Duration per Set</label>
+            <label>Duration / Set</label>
             <div class="time-input">
               <input type="number" id="setMins" min="0" max="59" value="2" class="time-part" placeholder="mm">
               <span class="time-sep">:</span>
@@ -125,12 +129,7 @@
           </div>
 
           <div class="config-field">
-            <label for="startBpm">Starting BPM</label>
-            <input type="number" id="startBpm" min="20" max="400" value="80" class="config-input">
-          </div>
-
-          <div class="config-field">
-            <label for="bpmIncrement">BPM Increment / Set</label>
+            <label for="bpmIncrement">BPM Incr / Set</label>
             <input type="number" id="bpmIncrement" min="-380" max="380" value="5" class="config-input">
           </div>
 
@@ -144,23 +143,6 @@
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- Section C: Ramp Status Display -->
-    <section class="interval-status" id="intervalStatus">
-      <div class="status-header">
-        <span class="status-phase" id="statusPhase">SET</span>
-        <span class="status-set" id="statusSet">Set 1 of 4</span>
-        <span class="status-bpm" id="statusBpm">BPM: 80</span>
-      </div>
-
-      <div class="status-countdown" id="statusCountdown">2:00</div>
-
-      <div class="progress-bar-container">
-        <div class="progress-bar" id="progressBar"></div>
-      </div>
-
-      <div class="status-next" id="statusNext">Next set: BPM 85</div>
     </section>
 
     <!-- Section D: Stopwatch -->
@@ -193,6 +175,6 @@
 
   <script src="sounds.js?v=20260524b"></script>
   <script src="metronome.js?v=20260524b"></script>
-  <script src="app.js?v=20260524b"></script>
+  <script src="app.js?v=20260527"></script>
 </body>
 </html>
