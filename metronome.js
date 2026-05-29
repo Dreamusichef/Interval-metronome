@@ -52,8 +52,8 @@ const MetronomeEngine = (() => {
     }
 
     let freq, gainPeak, duration;
-    if (soundType === 'accent') { freq = 880; gainPeak = 0.99; duration = 0.06; }
-    else                        { freq = 540; gainPeak = 0.49; duration = 0.04; } // click
+    if (soundType === 'accent') { freq = 880; gainPeak = 1.0;  duration = 0.06; }
+    else                        { freq = 540; gainPeak = 0.62; duration = 0.04; } // click
 
     const osc    = audioCtx.createOscillator();
     const filter = audioCtx.createBiquadFilter();
