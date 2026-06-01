@@ -1,0 +1,5 @@
+# Claude Code machine-local settings (permissions etc.) — do not share across machines
+.claude/settings.local.json
+
+# Node
+node_modules/

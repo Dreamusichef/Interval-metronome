@@ -32,6 +32,7 @@ const MetronomeEngine = (() => {
   let currentTick = 0;
   let tickInterval = 0.5;
   let beatCallback = null;
+  let scheduleCallback = null; // Roguelite hook: fires for every scheduled tick (audio-clock time)
   let pendingVisuals = [];
   let rafId = null;
 
@@ -95,6 +96,13 @@ const MetronomeEngine = (() => {
       }
 
       scheduleSound(nextTickTime, soundType);
+
+      // Roguelite detection hook. Fires synchronously as each tick is scheduled,
+      // handing out the tick's precise time in the audio clock (audioCtx.currentTime
+      // domain, seconds). Additive only — has no effect when no callback is registered.
+      if (scheduleCallback) {
+        scheduleCallback(nextTickTime, soundType, beatIndex, tickInBeat);
+      }
 
       if (isFirst) {
         pendingVisuals.push({ time: nextTickTime, beatIndex, soundType });
@@ -221,6 +229,14 @@ const MetronomeEngine = (() => {
 
   function onBeat(callback) { beatCallback = callback; }
 
+  // Roguelite hook: register/unregister a per-tick scheduling callback.
+  // callback(tickTimeSec, soundType, beatIndex, tickInBeat). Pass null to clear.
+  function onSchedule(callback) { scheduleCallback = callback; }
+
+  // Exposes the shared audio clock so the roguelite layer can reconcile it with
+  // the Web MIDI / performance.now() clock. Returns null until init() has run.
+  function getAudioContext() { return audioCtx; }
+
   function playSyntheticCue(pitches, spacing) {
     if (!audioCtx) return;
     pitches.forEach((freq, i) => {
@@ -280,5 +296,6 @@ const MetronomeEngine = (() => {
     setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
     setSoundMode, getSoundMode, playWelcomeGreeting,
+    onSchedule, getAudioContext,
   };
 })();

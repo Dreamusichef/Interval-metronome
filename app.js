@@ -277,6 +277,8 @@ function stopAll() {
   pauseBtn.classList.remove('visible', 'resuming');
   intervalStatus.classList.remove('visible');
   setConfigDisabled(false);
+  // Roguelite hook: the session stopped (manual STOP or programmatic abort).
+  document.dispatchEvent(new CustomEvent('ramp:stop'));
 }
 
 // ── Pause / Resume (ramp sessions only) ───────────────────────────────────────
@@ -371,6 +373,9 @@ function startIntervalSession() {
   intervalStatus.classList.add('visible');
   updateStatusDisplay();
   countdownTimer = setInterval(countdownTick, 1000);
+  // Roguelite hook: the session is fully live (appState set, BPM applied) — now
+  // announce the start BPM so a run can begin gating hits / check the ceiling.
+  document.dispatchEvent(new CustomEvent('ramp:start', { detail: { bpm: session.currentBpm } }));
 }
 
 function countdownTick() {
@@ -410,6 +415,9 @@ function advanceToNextSet() {
   ME?.playSetStartCue();
   appState = States.RUNNING_SET;
   updateStatusDisplay();
+  // Roguelite hook: the ramp just climbed — report the new BPM so a run can
+  // check it against the tier's ceiling.
+  document.dispatchEvent(new CustomEvent('ramp:bpmchange', { detail: { bpm: session.currentBpm } }));
 }
 
 function finishSession() {
@@ -428,7 +436,13 @@ function finishSession() {
   doneSummary.textContent =
     `Completed ${session.totalSets} set${session.totalSets !== 1 ? 's' : ''}. ` +
     `BPM ranged from ${session.startBpm} to ${finalBpm}.`;
-  doneOverlay.classList.add('visible');
+  // Roguelite hook: ramp finished cleanly (ran out of sets). A run treats this
+  // as a completion. Dispatched before showing the default overlay so the
+  // roguelite layer can suppress it in favour of its own completion screen.
+  document.dispatchEvent(new CustomEvent('ramp:complete', { detail: { finalBpm } }));
+  if (!window.__rogueSuppressDoneOverlay) {
+    doneOverlay.classList.add('visible');
+  }
   appState = States.IDLE;
 }
 
@@ -460,3 +474,24 @@ function setConfigDisabled(disabled) {
    bpmIncrInput, restMinsInput, restSecsInput, intervalToggle]
     .forEach(el => { el.disabled = disabled; });
 }
+
+// ── Roguelite control surface ───────────────────────────────────────────────
+// Minimal, additive API so Roguelite Mode can reuse the existing ramp engine
+// instead of duplicating it. The roguelite layer (roguelite.js) drives the
+// climb through this surface and listens to the ramp:* CustomEvents above.
+window.AppRamp = {
+  // Ensure Ramp Mode is on, then start the existing interval session unchanged.
+  startRampSession() {
+    if (appState !== States.IDLE) return false;
+    if (!intervalToggle.checked) {
+      intervalToggle.checked = true;
+      applyRampToggleState();
+    }
+    startIntervalSession();
+    return appState !== States.IDLE;
+  },
+  // Programmatic abort — same path as pressing STOP (fires ramp:stop).
+  stop() { if (appState !== States.IDLE) stopAll(); },
+  getCurrentBpm() { return session.currentBpm; },
+  isRunning() { return appState !== States.IDLE; },
+};

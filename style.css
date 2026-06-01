@@ -849,6 +849,215 @@ body {
 }
 .stopwatch-btn.reset:hover { color: var(--text); }
 
+/* ── Roguelite Mode ────────────────────────────── */
+/* Reuses the existing Mass Effect HUD system (same panel base, cut corners,
+   cyan/amber/danger/success vars) so it sits flush with the rest of the app. */
+.rogue-section {
+  position: relative;
+  background: linear-gradient(155deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 8px 28px rgba(0, 0, 0, 0.75),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rogue-section::before {
+  content: '';
+  position: absolute;
+  top: -1px; right: -1px;
+  border-style: solid;
+  border-width: 0 var(--cut) var(--cut) 0;
+  border-color: transparent var(--bg) transparent transparent;
+  z-index: 2; pointer-events: none;
+}
+.rogue-section::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: -1px;
+  border-style: solid;
+  border-width: var(--cut) 0 0 var(--cut);
+  border-color: transparent transparent transparent var(--bg);
+  z-index: 2; pointer-events: none;
+}
+
+.rogue-body { display: none; flex-direction: column; gap: 14px; }
+.rogue-body.visible { display: flex; }
+
+.rogue-intro {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.rogue-step { display: flex; flex-direction: column; gap: 7px; }
+
+.rogue-step-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  opacity: 0.75;
+}
+
+.rogue-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.rogue-btn {
+  padding: 9px 16px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 38px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.rogue-btn:hover:not(:disabled) {
+  color: var(--cyan);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 12px rgba(0, 200, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.rogue-btn:active:not(:disabled) { transform: translateY(1px); }
+.rogue-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.rogue-run-btn {
+  background: linear-gradient(180deg, #ffd455 0%, #FFB800 45%, #a87200 100%);
+  color: #060a10;
+  border: none;
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+}
+.rogue-run-btn:hover:not(:disabled) {
+  color: #060a10;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 20px rgba(255, 184, 0, 0.4);
+}
+.rogue-run-btn:disabled { color: #060a10; }
+
+.rogue-select {
+  flex: 1;
+  min-width: 120px;
+  padding: 7px 8px;
+  background: linear-gradient(180deg, var(--inset) 0%, #030609 100%);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  outline: none;
+  min-height: 36px;
+}
+
+.rogue-status {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.rogue-status.error { color: var(--danger); }
+
+.rogue-kicknote {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rogue-level-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.rogue-level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  min-height: 48px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.rogue-level-btn:hover:not(:disabled) { color: var(--text); }
+.rogue-level-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.rogue-level-btn.active {
+  background: linear-gradient(180deg, #0d1e32 0%, #071220 100%);
+  color: var(--cyan);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px rgba(0, 200, 255, 0.3),
+    0 0 14px rgba(0, 200, 255, 0.2);
+}
+.rogue-level-n {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.rogue-level-d {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Run-over / complete overlay (reuses .done-overlay / .done-message base) */
+.rogue-overlay-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+.rogue-overlay-title.fail { color: var(--danger); text-shadow: 0 0 20px rgba(255, 56, 56, 0.4); }
+.rogue-overlay-title.win  { color: var(--success); text-shadow: 0 0 20px rgba(0, 232, 122, 0.4); }
+
+.rogue-diag-big {
+  font-family: 'Orbitron', monospace;
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.rogue-diag-line {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+.rogue-diag-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.rogue-overlay .done-message { margin-bottom: 0; }
+.rogue-overlay #rogueOverlayClose { margin-top: 22px; }
+
 /* ── Number spinners — hide ────────────────────── */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }

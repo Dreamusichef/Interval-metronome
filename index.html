@@ -163,6 +163,94 @@
       </div>
     </section>
 
+    <!-- Section E: Roguelite Mode -->
+    <section class="rogue-section">
+      <div class="interval-toggle-row">
+        <span class="section-label">Roguelite Mode</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="rogueToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="rogue-body" id="rogueBody">
+        <p class="rogue-intro">
+          Double-bass run. The metronome ramps; every kick is read over MIDI and
+          timing-checked against the click. Each set opens with a 2-bar count-in,
+          then one bad hit ends the run. Reach the level's ceiling clean to complete
+          it. The level sets the start BPM and rest is fixed at 10s; the climb rate
+          (BPM increment, set length, number of sets) comes from your Ramp Mode settings.
+        </p>
+
+        <!-- Step 1: MIDI -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">1 · MIDI Device</span>
+          <div class="rogue-row">
+            <button class="rogue-btn" id="rogueMidiBtn">Connect MIDI</button>
+            <select class="rogue-select" id="rogueDeviceSelect" style="display:none"></select>
+          </div>
+          <div class="rogue-status" id="rogueMidiStatus">Not connected.</div>
+        </div>
+
+        <!-- Step 2: Learn kick -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">2 · Kick Note</span>
+          <div class="rogue-row">
+            <button class="rogue-btn" id="rogueLearnBtn" disabled>Learn Kick</button>
+            <span class="rogue-kicknote" id="rogueKickNote">Kick note: 36 (default)</span>
+          </div>
+        </div>
+
+        <!-- Step 3: Calibrate -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">3 · Calibrate (16 bars)</span>
+          <button class="rogue-btn" id="rogueCalBtn" disabled>Calibrate</button>
+          <div class="rogue-status" id="rogueCalStatus">Play a kick on every click for 16 bars.</div>
+        </div>
+
+        <!-- Step 4: Challenge level -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">4 · Challenge Level</span>
+          <div class="rogue-level-row">
+            <button class="rogue-level-btn" data-level="1">
+              <span class="rogue-level-n">LVL 1</span><span class="rogue-level-d">80–100 · ±40ms</span>
+            </button>
+            <button class="rogue-level-btn" data-level="2">
+              <span class="rogue-level-n">LVL 2</span><span class="rogue-level-d">100–120 · ±35ms</span>
+            </button>
+            <button class="rogue-level-btn" data-level="3">
+              <span class="rogue-level-n">LVL 3</span><span class="rogue-level-d">120–140 · ±30ms</span>
+            </button>
+            <button class="rogue-level-btn" data-level="4">
+              <span class="rogue-level-n">LVL 4</span><span class="rogue-level-d">140–160 · ±25ms</span>
+            </button>
+            <button class="rogue-level-btn" data-level="5">
+              <span class="rogue-level-n">LVL 5</span><span class="rogue-level-d">160–180 · ±20ms</span>
+            </button>
+            <button class="rogue-level-btn" data-level="6">
+              <span class="rogue-level-n">LVL 6</span><span class="rogue-level-d">180–200 · ±15ms</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 5: Run -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">5 · Run</span>
+          <button class="rogue-btn rogue-run-btn" id="rogueRunBtn" disabled>Start Run</button>
+          <div class="rogue-status" id="rogueRunStatus">Calibrate and pick a level to begin.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Roguelite run-over / complete overlay -->
+    <div class="done-overlay rogue-overlay" id="rogueOverlay">
+      <div class="done-message">
+        <h2 class="rogue-overlay-title" id="rogueOverlayTitle">RUN OVER</h2>
+        <div id="rogueOverlayBody"></div>
+        <button class="done-btn" id="rogueOverlayClose">OK</button>
+      </div>
+    </div>
+
     <!-- Done overlay -->
     <div class="done-overlay" id="doneOverlay">
       <div class="done-message">
@@ -176,5 +264,6 @@
   <script src="sounds.js?v=20260524b"></script>
   <script src="metronome.js?v=20260524b"></script>
   <script src="app.js?v=20260527"></script>
+  <script src="roguelite.js?v=20260531"></script>
 </body>
 </html>
