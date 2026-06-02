@@ -969,20 +969,24 @@ body {
 }
 .rogue-status.error { color: var(--danger); }
 
-/* GAME / GAUNTLET selector + GAME params. */
-.rogue-mode-select { display: flex; gap: 8px; margin-bottom: 10px; }
+/* TIME TRIAL / SUDDEN DEATH / GAUNTLET selector + free-mode params. */
+.rogue-mode-select { display: flex; gap: 6px; margin-bottom: 10px; }
 .rogue-mode-btn {
   flex: 1;
-  padding: 9px 6px;
+  min-width: 0;
+  padding: 8px 3px;
   cursor: pointer;
   font-family: 'Orbitron', monospace;
   font-weight: 700;
-  font-size: 0.8rem;
-  letter-spacing: 0.06em;
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  white-space: normal;
+  text-align: center;
   color: var(--text-dim);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
 .rogue-mode-btn.active {
   color: #060a10;
@@ -1002,13 +1006,26 @@ body {
   color: var(--text-dim);
 }
 
-/* Challenge (sudden-death) sub-toggle inside GAME params. */
-.rogue-mode-row {
-  margin: 4px 0 2px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+/* Calibration tempo field — label + number with a BPM unit suffix. */
+.rogue-cal-tempo { display: block; margin-bottom: 8px; }
+.rogue-field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
 }
-.rogue-mode-row .section-label { color: var(--accent); }
+.rogue-input-unit { display: flex; align-items: center; gap: 8px; }
+.rogue-input-unit .config-input { flex: 1; }
+.rogue-unit {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
 
 /* Skip-calibration manual offset row. */
 .rogue-manual-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
@@ -1165,30 +1182,32 @@ body.rogue-run .rogue-hud {
 .rogue-hud-verdict {
   font-family: 'Orbitron', monospace;
   font-weight: 900;
-  font-size: 4rem;
+  font-size: 3.6rem;
   line-height: 1;
   letter-spacing: 0.04em;
   color: var(--text-dim);
   transition: color 0.06s ease, text-shadow 0.06s ease;
 }
 .rogue-hud-verdict.rogue-good { color: var(--success); text-shadow: 0 0 18px rgba(0, 232, 122, 0.6); }
-.rogue-hud-verdict.rogue-edge { color: var(--accent);  text-shadow: 0 0 18px rgba(255, 184, 0, 0.6); }
-.rogue-hud-verdict.rogue-fail { color: var(--danger);  text-shadow: 0 0 20px rgba(255, 56, 56, 0.75); }
+.rogue-hud-verdict.rogue-drag { color: var(--accent);  text-shadow: 0 0 18px rgba(255, 184, 0, 0.6); }
+.rogue-hud-verdict.rogue-rush { color: #ff7a18;        text-shadow: 0 0 18px rgba(255, 122, 24, 0.65); }
+.rogue-hud-verdict.rogue-bad  { color: var(--danger);  text-shadow: 0 0 20px rgba(255, 56, 56, 0.75); }
 .rogue-hud-bpm {
   font-family: 'Orbitron', monospace;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.9rem;
   color: var(--cyan);
 }
 
-/* Scrolling beat-history lane — newest beat on the right, older slide off the left. */
+/* Scrolling beat-history lane — newest slides in on the right, oldest fades off the
+   left. Width = exactly 10 cells (10×26 + 9×5 = 305px) so 10 full hexagons show. */
 .rogue-lane {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 5px;
-  width: 100%;
-  max-width: 320px;
+  width: 305px;
+  max-width: 100%;
   height: 32px;
   overflow: hidden;
 }
@@ -1200,9 +1219,12 @@ body.rogue-run .rogue-hud {
   animation: rogue-lane-in 0.12s ease-out;
 }
 .rogue-lane-cell.rogue-good { background: linear-gradient(145deg, #b6ffd9 0%, var(--success) 55%, #00643a 100%); filter: drop-shadow(0 0 6px rgba(0, 232, 122, 0.7)); }
-.rogue-lane-cell.rogue-edge { background: linear-gradient(145deg, #ffe980 0%, var(--accent) 55%, #7a5000 100%); filter: drop-shadow(0 0 6px rgba(255, 184, 0, 0.7)); }
-.rogue-lane-cell.rogue-fail { background: linear-gradient(145deg, #ffd0d0 0%, var(--danger) 55%, #5a0000 100%); filter: drop-shadow(0 0 7px rgba(255, 56, 56, 0.85)); }
-@keyframes rogue-lane-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+.rogue-lane-cell.rogue-drag { background: linear-gradient(145deg, #ffe980 0%, var(--accent) 55%, #7a5000 100%); filter: drop-shadow(0 0 6px rgba(255, 184, 0, 0.7)); }
+.rogue-lane-cell.rogue-rush { background: linear-gradient(145deg, #ffc187 0%, #ff7a18 55%, #6e3000 100%); filter: drop-shadow(0 0 6px rgba(255, 122, 24, 0.75)); }
+.rogue-lane-cell.rogue-bad  { background: linear-gradient(145deg, #ffd0d0 0%, var(--danger) 55%, #5a0000 100%); filter: drop-shadow(0 0 7px rgba(255, 56, 56, 0.85)); }
+.rogue-lane-cell.leaving { animation: rogue-lane-out 0.24s ease-in forwards; }
+@keyframes rogue-lane-in  { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes rogue-lane-out { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 0; transform: translateX(-10px) scale(0.55); } }
 
 /* Declutter: while a run is live, the page IS the game — hide everything else. */
 body.rogue-run .beat-indicators,
@@ -1216,3 +1238,94 @@ body.rogue-run .tap-btn,
 body.rogue-run .interval-section,
 body.rogue-run .stopwatch-section,
 body.rogue-run .rogue-section { display: none !important; }
+
+/* Result card — Good / Neutral / Bad table with hexagon icons, then % green. */
+.rogue-result { margin: 14px auto 4px; max-width: 280px; }
+.rogue-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rogue-hex {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.rogue-hex.rogue-good { background: linear-gradient(145deg, #b6ffd9 0%, var(--success) 55%, #00643a 100%); }
+.rogue-hex.rogue-drag { background: linear-gradient(145deg, #ffe980 0%, var(--accent) 55%, #7a5000 100%); }
+.rogue-hex.rogue-bad  { background: linear-gradient(145deg, #ffd0d0 0%, var(--danger) 55%, #5a0000 100%); }
+.rl-lbl {
+  flex: 1 1 auto;
+  text-align: left;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.rl-split { font-weight: 600; font-size: 0.74rem; color: var(--text-dim); }
+.rl-n {
+  flex: 0 0 auto;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.rogue-result-score { display: flex; align-items: baseline; justify-content: center; gap: 16px; margin-top: 14px; }
+.rogue-result-rank {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 3.4rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.rogue-result-pct {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 2.2rem;
+  color: var(--success);
+  text-shadow: 0 0 16px rgba(0, 232, 122, 0.5);
+}
+.rogue-result-pct span { font-size: 1.1rem; font-weight: 700; color: var(--text-dim); }
+
+/* Live HUD rank + DMC-style filling gauge meter. */
+.rogue-hud-score { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 2px; }
+.rogue-hud-rank {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 2.6rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  min-width: 2.4ch;
+  text-align: right;
+}
+.rogue-hud-gauge {
+  display: block;
+  width: 150px;
+  height: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  overflow: hidden;
+}
+.rogue-hud-gauge-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px currentColor;
+  transition: width 0.15s ease, background 0.15s ease;
+}
+
+/* Rank colours (shared by live HUD + result card) — escalating sci-fi palette. */
+.rank-ss { color: #ffe066; text-shadow: 0 0 10px rgba(255, 224, 102, 0.9), 0 0 28px rgba(255, 184, 0, 0.7); }
+.rank-s  { color: var(--cyan);    text-shadow: 0 0 10px rgba(0, 200, 255, 0.85), 0 0 24px rgba(0, 200, 255, 0.5); }
+.rank-a  { color: var(--success); text-shadow: 0 0 10px rgba(0, 232, 122, 0.8); }
+.rank-b  { color: #4aa8ff;        text-shadow: 0 0 9px rgba(74, 168, 255, 0.7); }
+.rank-c  { color: var(--text);    text-shadow: 0 0 8px rgba(232, 240, 245, 0.4); }
+.rank-d  { color: var(--text-dim); }
+.rank-e  { color: var(--danger);  text-shadow: 0 0 9px rgba(255, 56, 56, 0.6); }

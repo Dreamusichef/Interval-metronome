@@ -239,10 +239,9 @@ const RogueliteMode = (() => {
   // The run subtracts the pass-2 16th mean (gross + drift) so runs centre on 0 and
   // gate your consistency; the drift is shown as feedback, not gated.
   const CAL_BEATS = 4;                 // 4/4
-  const CAL_BPM = 80;                  // both passes (quarter-note click)
-  const CAL_COUNTOFF_BARS = 2;         // ungated count-off at the start of each pass
-  const CAL_P1_MEASURE_BARS = 4;       // pass 1: quarters measured (4×4 = 16 samples)
-  const CAL_P2_MEASURE_BARS = 8;       // pass 2: 16ths measured (8×4×4 = 128 samples)
+  const CAL_BPM_DEFAULT = 100;         // fallback calibration tempo (both steps) if input missing
+  const CAL_COUNTOFF_BARS = 2;         // ungated count-off at the start of each step
+  const CAL_MEASURE_BARS = 8;          // both steps: 2 count-off + 8 measured = 10-bar test
   const CAL_CAPTURE_WINDOW_MS = 150;   // generous match window for the (quarter) gross pass
   const CAL_MIN_SAMPLES = 8;           // below this, calibration is rejected
 
@@ -251,10 +250,22 @@ const RogueliteMode = (() => {
   // 0.5 the slots TILE the timeline — a kick lands in exactly one 16th, and a
   // dropped 16th leaves a real, detectable gap. This is the only fail condition.
   const RUN_PRESENCE_FACTOR = 0.5;
-  // HUD feedback: a 'clear' hit is GREEN if it landed within this fraction of the
-  // slot half-width, YELLOW ("edge") in the outer remainder. 0.65 → green inside
-  // 65% of the slot, yellow in the outer 35%.
-  const RUN_GOOD_FRACTION = 0.65;
+  // HUD feedback: a 'clear' hit is GOOD (green) if it landed within this fraction of
+  // the slot HALF-WIDTH; beyond it (out to the slot edge) it's neutral and shown as
+  // RUSH (early) / DRAG (late). The fraction ramps with tempo: WIDER GOOD at fast
+  // tempos (the slot is already tight in ms), NARROWER at slow tempos (a wide slow
+  // slot would otherwise read GOOD until you spill into the next slot = BAD, so the
+  // rush/drag band would never show). Steps by 20-BPM band.
+  function goodFraction(bpm) {
+    if (bpm < 60)  return 0.50;
+    if (bpm < 80)  return 0.55;
+    if (bpm < 100) return 0.60;
+    if (bpm < 120) return 0.65;
+    if (bpm < 140) return 0.70;
+    if (bpm < 160) return 0.75;
+    if (bpm < 180) return 0.80;
+    return 0.85;
+  }
   // The FIRST gated 16th of each set gets a generous early grace (× the slot
   // half-width) so a rushed start isn't orphaned and instantly failed. Early side
   // only — the late edge stays normal so it can't steal the second slot's kick.
@@ -280,18 +291,16 @@ const RogueliteMode = (() => {
   // — slowest case is 80 BPM quarters at 750ms — so it cleanly flags set boundaries.
   const RUN_SEGMENT_GAP_MS = 1500;
 
-  // TEMPORARY: per-hit run diagnostics. Logs every gated 16th and, on a fail,
-  // dumps the surrounding kick events so we can see WHY an intermittent run died
-  // (mis-paired kick vs genuine out-of-window vs double-trigger). Set false to
-  // silence once the timing is dialled in.
-  const RL_DEBUG = true;
+  // Per-hit run diagnostics: logs every gated 16th and, on a fail, dumps the nearby
+  // kick events. Off for release (flip to true to debug timing/clock issues).
+  const RL_DEBUG = false;
 
   // Default single combined-kick MIDI note (GM kick). Overridable via "learn".
   const DEFAULT_KICK_NOTE = 36;
 
   // ── Run / session state ──────────────────────────────────────────────────
   const runState = {
-    mode: 'game',               // 'game' (free BPM+duration) | 'gauntlet' (level climb)
+    mode: 'timetrial',          // 'timetrial' | 'suddendeath' (both free BPM+duration) | 'gauntlet'
     level: null,                // 1..6 (gauntlet only)
     gameBpm: 120,               // game mode: chosen BPM
     gameMins: 3,                // game mode: chosen duration (minutes)
@@ -302,7 +311,8 @@ const RogueliteMode = (() => {
     suddenDeath: false,         // one bad beat ends the run (gauntlet always; game = Challenge)
     diedAtBpm: null,
     hitsCleared: 0,             // cleared 16th-note slots this run
-    tally: { good: 0, neutral: 0, fail: 0 },   // per-beat verdict counts (for the result card)
+    gauge: 0,                   // live DMC-style gauge (0–100), drives the live rank
+    tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
     // kickNote is a single number today; widening it to a Set later is the only
@@ -376,6 +386,20 @@ const RogueliteMode = (() => {
         'if they are huge/constant the timeStamp origin is wrong, see code comment)');
     }
     return true;
+  }
+
+  // Re-anchor the audio↔perf map on EVERY scheduled tick. captureSync() takes one
+  // sample at the start of a phase; reusing it for ~40s is fragile — if the audio
+  // clock stalls even briefly (a device hiccup / momentary suspend) the anchor goes
+  // stale and every computed click time is off by the stall, corrupting the whole
+  // calibration (the ~160ms offset swings we saw). Sampling (currentTime, now)
+  // adjacent inside each tick callback is just as simultaneous as captureSync but
+  // immune to long-term drift: a stall can only ever skew one tick, not the session.
+  function refreshSync() {
+    const ctx = (typeof MetronomeEngine !== 'undefined') && MetronomeEngine.getAudioContext();
+    if (ctx && ctx.state === 'running' && ctx.currentTime > 0) {
+      sync = { a0: ctx.currentTime, p0: performance.now() };
+    }
   }
 
   // ── Kick event buffer ────────────────────────────────────────────────────
@@ -489,44 +513,59 @@ const RogueliteMode = (() => {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // CALIBRATION — two passes (audible quarter-note click @ CAL_BPM throughout):
-  //   Pass 1: play QUARTERS  → unambiguous GROSS offset (hardware + MIDI latency)
-  //   Pass 2: play 16ths     → de-aliased by the gross offset; gives 16th mean
-  //                            (habitual drift) + spread (consistency)
+  // CALIBRATION — TWO SEPARATE STEPS, each an 8-bar test at the chosen tempo:
+  //   Step 1 (quarters, REQUIRED): play QUARTERS → the gross offset (hardware + MIDI
+  //           latency + your click-reaction). This alone is enough to play. It's also
+  //           the de-alias anchor for step 2.
+  //   Step 2 (16ths, OPTIONAL): play 16ths → de-aliased by the step-1 offset, then
+  //           refined → your 16th-pocket mean. Replaces the offset with the pocket;
+  //           also reports drift (16ths vs quarters) + spread (consistency).
+  // Skip both and type a known offset instead (see applyManualOffset).
   // ───────────────────────────────────────────────────────────────────────────
-  let calState = null;   // per-pass collection state
-  let calData = null;    // cross-pass accumulator: { grossOffset }
+  let calState = null;   // per-step collection state
 
-  async function startCalibration() {
-    if (typeof MetronomeEngine === 'undefined') return;
-    if (runState.kickNote == null) { setMidiStatus('Learn your kick note first.', true); return; }
+  // Shared setup for either calibration step. Returns false if it couldn't start.
+  async function beginCalStep() {
+    if (typeof MetronomeEngine === 'undefined') return false;
+    if (runState.kickNote == null) { setMidiStatus('Learn your kick note first.', true); return false; }
     if (window.AppRamp && window.AppRamp.isRunning()) window.AppRamp.stop();
-
     MetronomeEngine.init();
-    if (!(await captureSync())) { setCalStatus('Audio not ready — try again.', true); return; }
-
-    // Audible click is a clean 4/4 quarter pulse for BOTH passes. The clock keeps
-    // running between passes (engine.stop() halts the scheduler, not the context),
-    // so a single sync capture stays valid across the whole calibration.
+    if (!(await captureSync())) { setCalStatus('Audio not ready — try again.', true); return false; }
     MetronomeEngine.setBeatsPerMeasure(CAL_BEATS);
-    MetronomeEngine.setSubdivision('quarter');
-    MetronomeEngine.setBpm(CAL_BPM);
-
+    MetronomeEngine.setSubdivision('quarter');   // audible quarter pulse for both steps
     runState.status = 'calibrating';
-    calData = { grossOffset: 0 };
+    return true;
+  }
+
+  // Step 1 (required): quarters → gross offset.
+  async function startCalQuarters() {
+    if (!(await beginCalStep())) return;
     startCalPass(1);
   }
 
+  // Step 2 (optional): 16ths → refined pocket. Needs a gross offset (from step 1 or a
+  // manually-entered offset) to de-alias against.
+  async function startCal16() {
+    if (!runState.calibration || runState.calibration.grossOffset == null) {
+      setCalStatus('Calibrate the quarters offset first (or enter an offset).', true);
+      return;
+    }
+    if (!(await beginCalStep())) return;
+    startCalPass(2);
+  }
+
   function startCalPass(pass) {
-    const measureBars = (pass === 1) ? CAL_P1_MEASURE_BARS : CAL_P2_MEASURE_BARS;
-    const totalBars = CAL_COUNTOFF_BARS + measureBars;
+    const totalBars = CAL_COUNTOFF_BARS + CAL_MEASURE_BARS;
+    const bpm = Math.max(40, Math.min(200, parseIntOr(el.cal16Bpm, CAL_BPM_DEFAULT)));
+    MetronomeEngine.setBpm(bpm);
     events = [];
     calState = {
       pass,
+      bpm,
       tickCount: 0,
       countoffTicks: CAL_COUNTOFF_BARS * CAL_BEATS,
       totalTicks: totalBars * CAL_BEATS,
-      measureBars,
+      measureBars: CAL_MEASURE_BARS,
       lastTickPerf: 0,
       loggedRaw: 0,
       expected: [],   // pass 1: quarter perf times; pass 2: derived 16th perf times
@@ -538,6 +577,7 @@ const RogueliteMode = (() => {
 
   function onCalTick(tickTimeSec) {
     if (!calState) return;
+    refreshSync();                 // fresh audio↔perf anchor for this tick (drift-proof)
     const idx = calState.tickCount++;
     const perf = audioToPerfMs(tickTimeSec, sync);
     calState.lastTickPerf = perf;
@@ -546,14 +586,13 @@ const RogueliteMode = (() => {
     const inCountoff = idx < calState.countoffTicks;
 
     // Obvious banner so the count-off vs the measured phase is unmistakable.
+    const label = calState.pass === 1 ? 'QUARTERS' : '16THS';
     if (inCountoff) {
-      const what = calState.pass === 1 ? 'play QUARTERS' : 'play 16ths';
-      setStatusBanner(el.calStatus, 'PASS ' + calState.pass + '/2 · COUNT-OFF ' + bar + '/' +
-        CAL_COUNTOFF_BARS + ' — get ready to ' + what, 'countin');
+      setStatusBanner(el.calStatus, label + ' · COUNT-OFF ' + bar + '/' + CAL_COUNTOFF_BARS +
+        ' — get ready to play ' + (calState.pass === 1 ? 'QUARTERS' : '16ths'), 'countin');
     } else if (idx < calState.totalTicks) {
       const mbar = bar - CAL_COUNTOFF_BARS;
-      setStatusBanner(el.calStatus, 'PASS ' + calState.pass + '/2 · ' +
-        (calState.pass === 1 ? 'QUARTERS' : '16THS') + ' — measuring bar ' + mbar + '/' +
+      setStatusBanner(el.calStatus, label + ' — measuring bar ' + mbar + '/' +
         calState.measureBars, 'live');
     }
 
@@ -562,7 +601,7 @@ const RogueliteMode = (() => {
       if (calState.pass === 1) {
         calState.expected.push(perf);                 // one sample per quarter click
       } else {
-        const s = 60 / CAL_BPM / 4;                   // 16th interval (sec)
+        const s = 60 / calState.bpm / 4;              // 16th interval (sec) at this pass's tempo
         for (let k = 0; k < 4; k++) {
           calState.expected.push(audioToPerfMs(tickTimeSec + k * s, sync));
         }
@@ -601,55 +640,73 @@ const RogueliteMode = (() => {
     MetronomeEngine.stop();
 
     const pass = calState.pass;
+    const passBpm = calState.bpm;
     const expectedTimes = calState.expected;
     const eventTimes = events.map(e => e.t);
-
-    if (pass === 1) {
-      // Gross offset from the quarter grid (750ms spacing → no aliasing).
-      const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
-      if (gross.sampleCount < CAL_MIN_SAMPLES) {
-        abortCalibration('Pass 1: only ' + gross.sampleCount + ' quarter hits detected — ' +
-          'play a kick on every click, then recalibrate.');
-        return;
-      }
-      calData.grossOffset = gross.meanOffset;
-      console.info('[roguelite] cal pass 1 gross offset:', signed(gross.meanOffset) +
-        'ms (' + gross.sampleCount + ' hits)');
-      setStatusBanner(el.calStatus, 'PASS 1 done · offset ' + signed(gross.meanOffset) +
-        'ms. Get ready — PASS 2: continuous 16ths…', 'countin');
-      // Short breather, then pass 2 (engine restarts inside startCalPass).
-      setTimeout(() => { if (runState.status === 'calibrating') startCalPass(2); }, 1500);
-      return;
-    }
-
-    // Pass 2: shift the 16th grid by the gross offset so each kick matches its
-    // CORRECT 16th, then measure with a tight (< half-spacing) window.
-    const G = calData.grossOffset;
-    const shifted = expectedTimes.map(t => t + G);
-    const spacing16 = 60000 / CAL_BPM / 4;
-    const tight = spacing16 * 0.45;
-    const fine = computeCalibration(shifted, eventTimes, tight);
-
     calState = null;
     events = [];
     runState.status = 'idle';
 
-    if (fine.sampleCount < CAL_MIN_SAMPLES) {
-      abortCalibration('Pass 2: only ' + fine.sampleCount + ' of your 16ths matched — ' +
-        'play continuous 16ths on the click, then recalibrate.');
+    if (pass === 1) {
+      // STEP 1 (quarters): gross offset from the quarter grid (no aliasing). This is
+      // a complete, usable calibration on its own — the run can start after it.
+      const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
+      if (gross.sampleCount < CAL_MIN_SAMPLES) {
+        abortCalibration('Quarters: only ' + gross.sampleCount + ' hits detected — ' +
+          'play a kick on every click, then try again.');
+        return;
+      }
+      const G = gross.meanOffset;
+      console.info('[roguelite] cal quarters gross offset:', signed(G) + 'ms (' + gross.sampleCount + ' hits)');
+      runState.meanOffset = G;
+      runState.calibration = { meanOffset: G, sd: gross.sd, sampleCount: gross.sampleCount, grossOffset: G, drift: 0, refined: false };
+      setStatus(el.calStatus, 'Quarters calibrated @ ' + passBpm + ' BPM. Offset ' + signed(G) +
+        'ms (subtracted). Optional: refine your 16th pocket.', false);
+      updateGates();
       return;
     }
 
-    const meanOffset = G + fine.meanOffset;   // absolute 16th-grid mean → the run subtracts this
+    // STEP 2 (16ths): de-alias against the existing gross offset, then REFINE.
+    // 16ths are spaced 60000/bpm/4 ms apart; matching is only unambiguous within
+    // ±half that. A first match shifted by the quarter offset G can mis-assign edge
+    // kicks at faster tempos, so we re-centre on that rough mean — residuals shrink
+    // to ~the spread, keeping every kick on its correct 16th at any tempo.
+    const G = (runState.calibration && runState.calibration.grossOffset != null)
+      ? runState.calibration.grossOffset : 0;
+    const spacing16 = 60000 / passBpm / 4;
+    const tight = spacing16 * 0.45;
+    const rough = computeCalibration(expectedTimes.map(t => t + G), eventTimes, tight);
+
+    let meanOffset, sd, sampleCount;
+    if (rough.sampleCount >= CAL_MIN_SAMPLES) {
+      const M0 = G + rough.meanOffset;
+      const refined = computeCalibration(expectedTimes.map(t => t + M0), eventTimes, tight);
+      meanOffset = M0 + refined.meanOffset;
+      sd = refined.sd;
+      sampleCount = refined.sampleCount;
+    } else {
+      meanOffset = G + rough.meanOffset;
+      sd = rough.sd;
+      sampleCount = rough.sampleCount;
+    }
+
+    if (sampleCount < CAL_MIN_SAMPLES) {
+      // Keep the quarters calibration intact; just report the refine failed.
+      setStatus(el.calStatus, '16ths: only ' + sampleCount + ' matched — keeping your quarters ' +
+        'offset. Play continuous 16ths and try the refine again.', true);
+      updateGates();
+      return;
+    }
+
     const drift = meanOffset - G;             // 16th vs quarter (negative = rushing 16ths)
     runState.meanOffset = meanOffset;
-    runState.calibration = { meanOffset, sd: fine.sd, sampleCount: fine.sampleCount, grossOffset: G, drift };
+    runState.calibration = { meanOffset, sd, sampleCount, grossOffset: G, drift, refined: true };
 
     const dir = drift < 0 ? 'rushing' : 'dragging';
     setStatus(el.calStatus,
-      'Calibrated. Offset ' + signed(meanOffset) + 'ms (subtracted). 16ths ' + dir + ' ' +
-      Math.abs(drift).toFixed(0) + 'ms vs your quarters · consistency ±' + fine.sd.toFixed(0) +
-      'ms over ' + fine.sampleCount + ' hits.', false);
+      'Pocket refined @ ' + passBpm + ' BPM 16ths. Offset ' + signed(meanOffset) +
+      'ms (subtracted). 16ths ' + dir + ' ' + Math.abs(drift).toFixed(0) +
+      'ms vs quarters · consistency ±' + sd.toFixed(0) + 'ms over ' + sampleCount + ' hits.', false);
     updateGates();
   }
 
@@ -692,7 +749,8 @@ const RogueliteMode = (() => {
     }
 
     runState.hitsCleared = 0;
-    runState.tally = { good: 0, neutral: 0, fail: 0 };
+    runState.gauge = 0;
+    runState.tally = { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 };
     runState.diedAtBpm = null;
     runState.status = 'running';
     window.__rogueSuppressDoneOverlay = false;
@@ -720,13 +778,13 @@ const RogueliteMode = (() => {
       setInput('restMins', 0);
       setInput('restSecs', RUN_REST_SECS);
     } else {
-      // GAME: one set at the user's chosen BPM for the chosen duration. No climb.
-      // Sudden death only if Challenge is on.
+      // TIME TRIAL / SUDDEN DEATH: one set at the user's chosen BPM for the chosen
+      // duration. No climb. Sudden death ends on one bad beat; time trial never fails.
       const bpm  = Math.max(20, Math.min(400, parseIntOr(el.gameBpm, 120)));
       const mins = Math.max(1, Math.min(60, parseIntOr(el.gameMins, 3)));
       runState.gameBpm = bpm;
       runState.gameMins = mins;
-      runState.suddenDeath = !!(el.challenge && el.challenge.checked);
+      runState.suddenDeath = (runState.mode === 'suddendeath');
       setInput('startBpm',     bpm);
       setInput('numSets',      1);
       setInput('bpmIncrement', 0);
@@ -760,17 +818,21 @@ const RogueliteMode = (() => {
       setRunStatus('Could not start the ramp — check your Ramp Mode settings.', true);
       return;
     }
-    const where = (runState.mode === 'gauntlet')
-      ? ('Gauntlet L' + runState.level + ' · ' + LEVELS[runState.level].bpmStart + '–' +
-         LEVELS[runState.level].bpmCeiling + ' BPM')
-      : ('Game · ' + runState.gameBpm + ' BPM · ' + runState.gameMins + ' min' +
-         (runState.suddenDeath ? ' · Challenge' : ''));
+    let where;
+    if (runState.mode === 'gauntlet') {
+      where = 'Gauntlet L' + runState.level + ' · ' + LEVELS[runState.level].bpmStart + '–' +
+        LEVELS[runState.level].bpmCeiling + ' BPM';
+    } else {
+      where = (runState.mode === 'suddendeath' ? 'Sudden Death' : 'Time Trial') +
+        ' · ' + runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
+    }
     setRunStatus(where + ' — ' + RUN_LEAD_IN_BARS + '-bar count-in, then play continuous 16ths.');
     updateGates();
   }
 
   function onRunTick(tickTimeSec, soundType, beatIndex, tickInBeat) {
     if (runState.status !== 'running') return;
+    refreshSync();                 // fresh audio↔perf anchor for this tick (drift-proof)
     const expectedPerf = audioToPerfMs(tickTimeSec, sync);
 
     // New set? Either the very first tick of the run, or the first tick after a
@@ -786,9 +848,9 @@ const RogueliteMode = (() => {
       runGating = false;
       events = [];
       hudBeatRank = [0, 0, 0, 0];
-      // Don't let the 2-bar count-in eat into the set's clock — hold the set
-      // countdown now; it starts fresh (full minute) when gating goes live.
-      if (window.AppRamp && window.AppRamp.holdSetCountdown) window.AppRamp.holdSetCountdown();
+      hudBeatOff  = [0, 0, 0, 0];
+      // (The set countdown is held in maybeCompleteOnBpm — the ramp:start/bpmchange
+      // handler — which fires after the timer exists; doing it here is too early.)
     }
 
     // Lead-in: the player can't be locked in on beat 1. Bars 1–2 of the set play
@@ -800,7 +862,7 @@ const RogueliteMode = (() => {
       if (!runGating) {
         if (runBarCount <= RUN_LEAD_IN_BARS) {
           setRunBanner('COUNT-IN ' + runBarCount + ' / ' + RUN_LEAD_IN_BARS, 'countin');
-          setHudVerdict(-1, 'READY');
+          setHudVerdict(-1, 0, 'READY');
         } else {
           runGating = true;
           // Drop any kicks played during the count-in so they can't be matched
@@ -824,8 +886,10 @@ const RogueliteMode = (() => {
     // four 16ths and require a kick in each. Continuity game: the slot is ±half the
     // 16th spacing, so the 16ths TILE the timeline — timing wobble inside the slot
     // is fine; only a DROPPED 16th (empty slot = a skip / frozen foot) ends the run.
-    const sixteenthMs = 60000 / currentRunBpm() / 4;
+    const bpm = currentRunBpm();
+    const sixteenthMs = 60000 / bpm / 4;
     const presenceMs = sixteenthMs * RUN_PRESENCE_FACTOR;
+    const goodMs = presenceMs * goodFraction(bpm);   // GOOD vs RUSH/DRAG threshold (tempo-aware)
     const sixteenthSec = sixteenthMs / 1000;
     for (let k = 0; k < 4; k++) {
       const subPerf = audioToPerfMs(tickTimeSec + k * sixteenthSec, sync);
@@ -833,11 +897,11 @@ const RogueliteMode = (() => {
       // subPerf + meanOffset, so the eval timer must wait out meanOffset too.
       const evalAt = subPerf + runState.meanOffset + presenceMs + EVAL_MARGIN_MS;
       const delay = Math.max(0, evalAt - performance.now());
-      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, beatIndex, k), delay));
+      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, goodMs, beatIndex, k), delay));
     }
   }
 
-  function evaluateHit(expectedPerf, presenceMs, beatIndex, sixteenthIdx) {
+  function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, sixteenthIdx) {
     if (runState.status !== 'running') return;
 
     // The first scored 16th of each set is lenient on the early side (a rushed start
@@ -850,18 +914,22 @@ const RogueliteMode = (() => {
           presenceMs * RUN_FIRST_SLOT_EARLY_MULT)
       : classifySlot(expectedPerf, runState.meanOffset, presenceMs, events);
 
-    // Verdict for the HUD: 0 = good (well inside the slot), 1 = neutral (rode the
-    // slot edge), 2 = fail. A beat's lane cell shows the WORST of its four 16ths.
-    // The lenient first slot, when present, always scores GOOD (it's a freebie).
-    let rank;
+    // Verdict for this 16th: 0 = good (well inside the slot), 1 = neutral (rode the
+    // edge — signed offset gives RUSH/DRAG), 2 = bad (drop/cram). The lenient first
+    // slot, when present, always scores GOOD. A beat takes the WORST of its four.
+    let rank, off = 0;
     if (c.result === 'clear') {
-      rank = firstGated ? 0 : ((Math.abs(c.offset) > presenceMs * RUN_GOOD_FRACTION) ? 1 : 0);
+      off = c.offset;
+      rank = firstGated ? 0 : ((Math.abs(off) > goodMs) ? 1 : 0);
     } else {
       rank = 2;
     }
-    if (sixteenthIdx === 0) hudBeatRank[beatIndex] = rank;
-    else hudBeatRank[beatIndex] = Math.max(hudBeatRank[beatIndex], rank);
-    setHudVerdict(c.result === 'clear' ? hudBeatRank[beatIndex] : 2);
+    if (sixteenthIdx === 0) { hudBeatRank[beatIndex] = rank; hudBeatOff[beatIndex] = off; }
+    else if (rank > hudBeatRank[beatIndex]) { hudBeatRank[beatIndex] = rank; hudBeatOff[beatIndex] = off; }
+    else if (rank === 1 && hudBeatRank[beatIndex] === 1 && Math.abs(off) > Math.abs(hudBeatOff[beatIndex])) {
+      hudBeatOff[beatIndex] = off;   // keep the most extreme neutral direction this beat
+    }
+    setHudVerdict(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
 
     // Consume matched kicks so they can't satisfy later slots.
     if (c.result === 'clear') { events[c.indices[0]].consumed = true; runState.hitsCleared++; }
@@ -883,23 +951,31 @@ const RogueliteMode = (() => {
       }
     }
 
-    // Roguelite (sudden death): a bad beat ends the run immediately.
+    // Sudden death (Challenge / Gauntlet): a bad beat ends the run immediately.
     if (rank === 2 && runState.suddenDeath) {
-      addLaneCell(2);
-      runState.tally.fail++;
+      addLaneCell('rogue-bad');
+      runState.tally.bad++;
       failRun(c);   // 'drop' (skip/freeze) or 'cram' (over-rush)
       return;
     }
 
     // Otherwise the run continues. At beat completion, append the lane cell and
-    // tally the beat by its worst 16th (in score mode a 'fail' beat just counts).
+    // tally the beat by its worst 16th (rush/drag split for neutral).
     if (sixteenthIdx === 3) {
-      const beatRank = hudBeatRank[beatIndex];
-      addLaneCell(beatRank);
-      runState.tally[TALLY_KEY[beatRank]]++;
+      tallyBeat(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
+      addLaneCell(verdictClass(hudBeatRank[beatIndex], hudBeatOff[beatIndex]));
+      bumpGauge(hudBeatRank[beatIndex]);   // climb/drop the style gauge
+      updateScoreHud();
     }
     // Purge consumed/stale events a few slots behind the current expected time.
     pruneEvents(expectedPerf - presenceMs * 4);
+  }
+
+  function tallyBeat(rank, off) {
+    const t = runState.tally;
+    if (rank === 2) { t.bad++; return; }
+    if (rank === 1) { t.neutral++; if (off < 0) t.rush++; else t.drag++; return; }
+    t.good++;
   }
 
   function pruneEvents(beforePerf) {
@@ -943,7 +1019,14 @@ const RogueliteMode = (() => {
   function maybeCompleteOnBpm(bpm) {
     if (typeof bpm === 'number') runState.currentBpm = bpm;
     if (runState.status !== 'running') return;
-    // Only GAUNTLET has a ceiling; GAME finishes by its duration (natural ramp end).
+    // Every set begins here (ramp:start for set 1, ramp:bpmchange for later sets) —
+    // and crucially this fires AFTER app.js has marked the set running and started its
+    // countdown. Hold that countdown through the 2-bar count-in; it starts fresh at
+    // gating-live (see onRunTick → beginSetCountdown). Doing this in onRunTick instead
+    // is too early — it runs during ME.start(), before the set/timer exist, so the
+    // clock would tick down through the count-in and then visibly snap back.
+    if (window.AppRamp && window.AppRamp.holdSetCountdown) window.AppRamp.holdSetCountdown();
+    // Only GAUNTLET has a ceiling; free modes finish by their duration (natural end).
     if (runState.mode !== 'gauntlet') return;
     const ceiling = LEVELS[runState.level].bpmCeiling;
     if (runState.currentBpm > ceiling) completeRun(true);
@@ -993,58 +1076,59 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // DIAGNOSTICS / overlays  (factual and clinical — the number is the feedback)
   // ───────────────────────────────────────────────────────────────────────────
-  function tallyLine() {
+  // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
+  // green percentage. Neutral row also shows the rush/drag split.
+  function resultTable() {
     const t = runState.tally;
-    return '<div class="rogue-diag-sub">Beats: ' + t.good + ' good · ' + t.neutral +
-      ' neutral · ' + t.fail + ' fail</div>';
+    const total = t.good + t.neutral + t.bad;
+    const pct = total ? Math.round(t.good / total * 100) : 0;
+    const split = t.neutral ? ' <span class="rl-split">(' + t.rush + ' rush · ' + t.drag + ' drag)</span>' : '';
+    const row = (cls, label, n, extra) =>
+      '<div class="rogue-result-row">' +
+        '<span class="rogue-hex ' + cls + '"></span>' +
+        '<span class="rl-lbl">' + label + (extra || '') + '</span>' +
+        '<span class="rl-n">' + n + '</span>' +
+      '</div>';
+    const rank = rankFor(pct);
+    return '<div class="rogue-result">' +
+        row('rogue-good', 'Good', t.good) +
+        row('rogue-drag', 'Neutral', t.neutral, split) +
+        row('rogue-bad',  'Bad', t.bad) +
+        '<div class="rogue-result-score">' +
+          '<span class="rogue-result-rank ' + rankClass(rank) + '">' + rank + '</span>' +
+          '<span class="rogue-result-pct">' + pct + '% <span>green</span></span>' +
+        '</div>' +
+      '</div>';
   }
 
   function showGameOver(c) {
-    const sd = (runState.calibration && runState.calibration.sampleCount) ? runState.calibration.sd.toFixed(0) : '—';
     const line = (c && c.result === 'cram')
-      ? 'Crammed an extra kick into one 16th — rushed too hard (2+ hits in one slot).'
+      ? 'Crammed an extra kick into one 16th — rushed too hard.'
       : 'Dropped a 16th — a kick went missing (a skip or a frozen foot).';
     el.overlayTitle.textContent = 'RUN OVER';
     el.overlayTitle.className = 'rogue-overlay-title fail';
     el.overlayBody.innerHTML =
       '<div class="rogue-diag-big">' + runState.diedAtBpm + ' BPM</div>' +
       '<div class="rogue-diag-line">' + line + '</div>' +
-      tallyLine() +
-      '<div class="rogue-diag-sub">Your calibration consistency: ±' + sd + 'ms</div>';
+      resultTable();
     el.overlay.classList.add('visible');
   }
 
   function showComplete() {
-    const sd = (runState.calibration && runState.calibration.sampleCount) ? runState.calibration.sd.toFixed(0) : '—';
-    const t = runState.tally;
-    const totalBeats = t.good + t.neutral + t.fail;
-    const pctGreen = totalBeats ? Math.round(t.good / totalBeats * 100) : 0;
-    const consistency = '<div class="rogue-diag-sub">Your calibration consistency: ±' + sd + 'ms</div>';
     el.overlayTitle.className = 'rogue-overlay-title win';
-
+    let ctx;
     if (runState.mode === 'gauntlet') {
-      // Survived the level climb to the ceiling.
       el.overlayTitle.textContent = 'GAUNTLET CLEARED';
-      el.overlayBody.innerHTML =
-        '<div class="rogue-diag-big">' + LEVELS[runState.level].bpmCeiling + ' BPM</div>' +
-        '<div class="rogue-diag-line">Survived all 5 sets to the ceiling.</div>' +
-        tallyLine() + consistency;
+      ctx = 'Survived all 5 sets to ' + LEVELS[runState.level].bpmCeiling + ' BPM';
     } else if (runState.suddenDeath) {
-      // GAME + Challenge: lasted the full duration without a fatal beat.
-      el.overlayTitle.textContent = 'CHALLENGE CLEARED';
-      el.overlayBody.innerHTML =
-        '<div class="rogue-diag-big">' + runState.gameBpm + ' BPM</div>' +
-        '<div class="rogue-diag-line">Held it ' + runState.gameMins + ' min with no dropped beat.</div>' +
-        tallyLine() + consistency;
+      el.overlayTitle.textContent = 'SUDDEN DEATH CLEARED';
+      ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min, no dropped beat';
     } else {
-      // GAME: the scored result card.
       el.overlayTitle.textContent = 'RESULTS';
-      el.overlayBody.innerHTML =
-        '<div class="rogue-diag-big">' + pctGreen + '% green</div>' +
-        '<div class="rogue-diag-line">' + runState.gameBpm + ' BPM · ' + runState.gameMins +
-          ' min · ' + totalBeats + ' beats</div>' +
-        tallyLine() + consistency;
+      ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
     }
+    el.overlayBody.innerHTML =
+      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
     el.overlay.classList.add('visible');
   }
 
@@ -1071,12 +1155,49 @@ const RogueliteMode = (() => {
   }
 
   // ── Focused HUD (active only while a run is live: body.rogue-run) ────────────
-  const RANK_CLASS = ['rogue-good', 'rogue-edge', 'rogue-fail'];
-  const VERDICT_WORD = ['GOOD', 'NEUTRAL', 'FAIL'];   // green / yellow / red
-  const TALLY_KEY = ['good', 'neutral', 'fail'];      // rank → runState.tally key
-  const LANE_MAX = 24;                                 // beats kept in the scrolling lane
-  let hudBeatRank = [0, 0, 0, 0];                      // worst rank per beat (this bar)
-  let prevRampToggle = false;                          // restore Ramp Mode toggle after a run
+  // Verdict model: rank 0 = good, 1 = neutral (rode the edge), 2 = bad (drop/cram).
+  // For neutral, the SIGNED offset gives direction — early (<0) = RUSH (orange),
+  // late (>0) = DRAG (yellow). Good = green, bad = red.
+  const LANE_VISIBLE = 10;            // full hexagons shown in the scrolling lane
+  let hudBeatRank = [0, 0, 0, 0];     // worst rank per beat (this bar)
+  let hudBeatOff  = [0, 0, 0, 0];     // signed offset of the worst neutral 16th (direction)
+  let prevRampToggle = false;         // restore Ramp Mode toggle after a run
+
+  function verdictClass(rank, off) {
+    if (rank === 2) return 'rogue-bad';
+    if (rank === 1) return off < 0 ? 'rogue-rush' : 'rogue-drag';
+    return 'rogue-good';
+  }
+  function verdictWord(rank, off) {
+    if (rank === 2) return 'BAD';
+    if (rank === 1) return off < 0 ? 'RUSH' : 'DRAG';
+    return 'GOOD';
+  }
+
+  // DMC-style rank from the running % of GOOD beats (SS=100, then descending bands).
+  function rankFor(pct) {
+    if (pct >= 100) return 'SS';
+    if (pct >= 91)  return 'S';
+    if (pct >= 81)  return 'A';
+    if (pct >= 66)  return 'B';
+    if (pct >= 51)  return 'C';
+    if (pct >= 36)  return 'D';
+    return 'E';
+  }
+  function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
+  const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
+
+  // DMC-style STYLE GAUGE (0–100) for the live HUD: fills from zero with GOOD beats,
+  // inches up on NEUTRAL, drops hard on BAD. The live rank reads off this gauge, so
+  // you climb E→…→SS by stringing clean beats together and tumble when you blow one.
+  // (The end-of-run grade is separate — it's overall accuracy; see resultTable.)
+  const GAUGE_GOOD = 4;       // ~9 good beats to leave E, ~25 to max
+  const GAUGE_NEUTRAL = 1;
+  const GAUGE_BAD = 20;       // a bad beat ≈ a rank lost
+  function bumpGauge(rank) {
+    const d = rank === 0 ? GAUGE_GOOD : (rank === 1 ? GAUGE_NEUTRAL : -GAUGE_BAD);
+    runState.gauge = Math.max(0, Math.min(100, runState.gauge + d));
+  }
 
   // Drive both the setup-panel banner (hidden in HUD mode) and the big HUD banner.
   function setRunBanner(msg, cls) {
@@ -1087,21 +1208,41 @@ const RogueliteMode = (() => {
     }
   }
 
-  // rank -1 = neutral text (e.g. 'READY'); 0/1/2 = good/neutral/fail colour + word.
-  function setHudVerdict(rank, text) {
+  // rank -1 = neutral text (e.g. 'READY'); otherwise good/rush/drag/bad word+colour.
+  function setHudVerdict(rank, off, text) {
     if (!el.hudVerdict) return;
-    el.hudVerdict.textContent = text || (rank >= 0 ? VERDICT_WORD[rank] : '—');
-    el.hudVerdict.className = 'rogue-hud-verdict' + (rank >= 0 ? ' ' + RANK_CLASS[rank] : '');
+    el.hudVerdict.textContent = text || (rank >= 0 ? verdictWord(rank, off) : '—');
+    el.hudVerdict.className = 'rogue-hud-verdict' + (rank >= 0 ? ' ' + verdictClass(rank, off) : '');
   }
 
-  // Scrolling beat-history lane: one hexagon cell per completed beat, newest on the
-  // right, older ones sliding off the left — a running visual trail of the run.
-  function addLaneCell(rank) {
+  // Live score: the style gauge as a filling meter + its rank, updated each beat.
+  function updateScoreHud() {
+    const g = Math.round(runState.gauge);
+    const rank = rankFor(g);
+    if (el.hudRank) {
+      el.hudRank.textContent = rank;
+      el.hudRank.className = 'rogue-hud-rank ' + rankClass(rank);
+    }
+    if (el.hudGaugeFill) {
+      el.hudGaugeFill.style.width = g + '%';
+      el.hudGaugeFill.style.background = RANK_COLOR[rank] || 'var(--cyan)';
+    }
+  }
+
+  // Scrolling beat-history lane: one hexagon per completed beat, newest sliding in
+  // on the right, the oldest fading out on the left. Exactly LANE_VISIBLE on screen.
+  function addLaneCell(cls) {
     if (!el.lane) return;
+    el.lane.querySelectorAll('.rogue-lane-cell.leaving').forEach(c => c.remove());
     const cell = document.createElement('div');
-    cell.className = 'rogue-lane-cell ' + RANK_CLASS[rank];
+    cell.className = 'rogue-lane-cell ' + cls;
     el.lane.appendChild(cell);
-    while (el.lane.children.length > LANE_MAX) el.lane.removeChild(el.lane.firstChild);
+    while (el.lane.children.length > LANE_VISIBLE + 1) el.lane.removeChild(el.lane.firstChild);
+    if (el.lane.children.length > LANE_VISIBLE) {
+      const old = el.lane.firstChild;
+      old.classList.add('leaving');                       // fade/shrink out
+      setTimeout(() => { if (old.parentNode) old.remove(); }, 240);
+    }
   }
   function resetLane() { if (el.lane) el.lane.innerHTML = ''; }
 
@@ -1109,8 +1250,10 @@ const RogueliteMode = (() => {
     const tgl = document.getElementById('intervalToggle');
     prevRampToggle = tgl ? tgl.checked : false;
     hudBeatRank = [0, 0, 0, 0];
+    hudBeatOff  = [0, 0, 0, 0];
     resetLane();
-    setHudVerdict(-1, 'READY');
+    setHudVerdict(-1, 0, 'READY');
+    updateScoreHud();   // resets to E / — (no beats yet)
     if (el.hudBpm) el.hudBpm.textContent = '';
     document.body.classList.add('rogue-run');
   }
@@ -1145,13 +1288,15 @@ const RogueliteMode = (() => {
     const hasMidi = !!midiAccess && midiInputs.length > 0;
     const hasKick = hasMidi && runState.kickNote != null;
     const hasCal = runState.calibration != null;
-    // GAME always has params (BPM input defaults); GAUNTLET needs a level picked.
-    const hasTarget = (runState.mode === 'game') || (runState.level != null);
+    const hasAnchor = hasCal && runState.calibration.grossOffset != null;   // enables 16ths refine
+    // Free modes always have params (BPM input defaults); GAUNTLET needs a level picked.
+    const hasTarget = (runState.mode !== 'gauntlet') || (runState.level != null);
     const busy = runState.status === 'calibrating' || runState.status === 'running';
 
-    if (el.learnBtn)  el.learnBtn.disabled  = !hasMidi || busy;
-    if (el.calBtn)    el.calBtn.disabled    = !hasKick || busy;
-    if (el.manualBtn) el.manualBtn.disabled = busy;
+    if (el.learnBtn)      el.learnBtn.disabled      = !hasMidi || busy;
+    if (el.calQuartersBtn) el.calQuartersBtn.disabled = !hasKick || busy;
+    if (el.cal16Btn)      el.cal16Btn.disabled      = !hasKick || !hasAnchor || busy;
+    if (el.manualBtn)     el.manualBtn.disabled     = busy;
     // Run needs the offset (calibrated or manual), a target, AND a live MIDI input
     // (manual offset can be set with no kit attached, so check MIDI explicitly).
     if (el.runBtn)   el.runBtn.disabled   = !(hasCal && hasTarget && hasMidi) || busy;
@@ -1166,10 +1311,12 @@ const RogueliteMode = (() => {
   }
 
   function selectMode(m) {
-    runState.mode = (m === 'gauntlet') ? 'gauntlet' : 'game';
+    runState.mode = (m === 'gauntlet' || m === 'suddendeath') ? m : 'timetrial';
+    const isGauntlet = runState.mode === 'gauntlet';
     el.modeBtns && el.modeBtns.forEach(b => b.classList.toggle('active', b.dataset.rmode === runState.mode));
-    if (el.gameParams)     el.gameParams.style.display     = (runState.mode === 'game')     ? '' : 'none';
-    if (el.gauntletParams) el.gauntletParams.style.display = (runState.mode === 'gauntlet') ? '' : 'none';
+    // TIME TRIAL and SUDDEN DEATH both use the free BPM+duration params.
+    if (el.gameParams)     el.gameParams.style.display     = isGauntlet ? 'none' : '';
+    if (el.gauntletParams) el.gauntletParams.style.display = isGauntlet ? '' : 'none';
     updateGates();
   }
 
@@ -1182,13 +1329,14 @@ const RogueliteMode = (() => {
       gauntletParams: document.getElementById('rogueGauntletParams'),
       gameBpm:        document.getElementById('rogueGameBpm'),
       gameMins:       document.getElementById('rogueGameMins'),
-      challenge:      document.getElementById('rogueChallenge'),
       midiBtn:      document.getElementById('rogueMidiBtn'),
       deviceSelect: document.getElementById('rogueDeviceSelect'),
       midiStatus:   document.getElementById('rogueMidiStatus'),
       learnBtn:     document.getElementById('rogueLearnBtn'),
       kickNote:     document.getElementById('rogueKickNote'),
-      calBtn:       document.getElementById('rogueCalBtn'),
+      calQuartersBtn: document.getElementById('rogueCalQuartersBtn'),
+      cal16Btn:     document.getElementById('rogueCal16Btn'),
+      cal16Bpm:     document.getElementById('rogueCal16Bpm'),
       calStatus:    document.getElementById('rogueCalStatus'),
       manualOffset: document.getElementById('rogueManualOffset'),
       manualBtn:    document.getElementById('rogueManualBtn'),
@@ -1202,6 +1350,8 @@ const RogueliteMode = (() => {
       hudVerdict:   document.getElementById('rogueHudVerdict'),
       hudBanner:    document.getElementById('rogueHudBanner'),
       hudBpm:       document.getElementById('rogueHudBpm'),
+      hudRank:      document.getElementById('rogueHudRank'),
+      hudGaugeFill: document.getElementById('rogueHudGaugeFill'),
       lane:         document.getElementById('rogueLane'),
     };
     if (!el.toggle) return; // markup not present — nothing to wire
@@ -1218,7 +1368,8 @@ const RogueliteMode = (() => {
 
     el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
     el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
-    el.calBtn   && el.calBtn.addEventListener('click', () => startCalibration());
+    el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
+    el.cal16Btn && el.cal16Btn.addEventListener('click', () => startCal16());
     el.manualBtn && el.manualBtn.addEventListener('click', () => applyManualOffset());
     el.runBtn   && el.runBtn.addEventListener('click', () => startRun());
     el.deviceSelect && el.deviceSelect.addEventListener('change', () => selectInput(el.deviceSelect.value));
@@ -1263,7 +1414,7 @@ const RogueliteMode = (() => {
 
   return {
     // public surface (mostly for debugging / future wiring)
-    LEVELS, runState, enableMidi, learnKick, startCalibration, startRun,
+    LEVELS, runState, enableMidi, learnKick, startCalQuarters, startCal16, startRun,
     _math: RL_TimingMath,
   };
 })();

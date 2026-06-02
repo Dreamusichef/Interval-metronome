@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260527">
+  <link rel="stylesheet" href="style.css?v=20260602">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -52,6 +52,10 @@
         <div class="rogue-lane" id="rogueLane"></div>
         <div class="rogue-hud-banner" id="rogueHudBanner">READY</div>
         <div class="rogue-hud-verdict" id="rogueHudVerdict">—</div>
+        <div class="rogue-hud-score">
+          <span class="rogue-hud-rank rank-e" id="rogueHudRank">E</span>
+          <span class="rogue-hud-gauge"><i class="rogue-hud-gauge-fill" id="rogueHudGaugeFill"></i></span>
+        </div>
         <div class="rogue-hud-bpm" id="rogueHudBpm"></div>
       </div>
 
@@ -183,11 +187,9 @@
 
       <div class="rogue-body" id="rogueBody">
         <p class="rogue-intro">
-          Double-bass game. A quarter-note click pulses while you play continuous
-          16ths over MIDI; each beat is scored green (in the pocket), yellow (rode
-          the edge) or red (dropped/crammed). <b>GAME</b>: your BPM &amp; duration,
-          scored — rack up greens for a result card. <b>GAUNTLET</b>: climb levels
-          1–6, five 1-min sets +5 BPM, sudden death — survive to win.
+          How good is your timing? Test yourself in Time Trial, push it in Sudden
+          Death, or face the Gauntlet. Lock into the click and find out what you're
+          made of.
         </p>
 
         <!-- Step 1: MIDI -->
@@ -211,9 +213,19 @@
 
         <!-- Step 3: Calibrate -->
         <div class="rogue-step">
-          <span class="rogue-step-label">3 · Calibrate (2 passes)</span>
-          <button class="rogue-btn" id="rogueCalBtn" disabled>Calibrate</button>
-          <div class="rogue-status" id="rogueCalStatus">Pass 1: play quarters. Pass 2: play continuous 16ths. Each has a 2-bar count-off.</div>
+          <span class="rogue-step-label">3 · Calibrate</span>
+          <label class="rogue-cal-tempo">
+            <span class="rogue-field-label">Fastest comfortable tempo for 16ths</span>
+            <span class="rogue-input-unit">
+              <input type="number" id="rogueCal16Bpm" min="40" max="200" value="100" class="config-input">
+              <span class="rogue-unit">BPM</span>
+            </span>
+          </label>
+          <div class="rogue-row">
+            <button class="rogue-btn" id="rogueCalQuartersBtn" disabled>Calibrate quarters</button>
+            <button class="rogue-btn" id="rogueCal16Btn" disabled>Refine 16ths · optional</button>
+          </div>
+          <div class="rogue-status" id="rogueCalStatus">Step 1: quarters sets your offset. Step 2: 16ths refines your pocket (optional). Each: 2-bar count-off + 8 measured bars.</div>
           <div class="rogue-manual-row">
             <input type="number" id="rogueManualOffset" placeholder="offset ms" class="config-input rogue-manual-input">
             <button class="rogue-btn" id="rogueManualBtn">Skip · use offset</button>
@@ -224,11 +236,12 @@
         <div class="rogue-step">
           <span class="rogue-step-label">4 · Mode</span>
           <div class="rogue-mode-select">
-            <button class="rogue-mode-btn active" data-rmode="game">GAME</button>
+            <button class="rogue-mode-btn active" data-rmode="timetrial">TIME TRIAL</button>
+            <button class="rogue-mode-btn" data-rmode="suddendeath">SUDDEN DEATH</button>
             <button class="rogue-mode-btn" data-rmode="gauntlet">GAUNTLET</button>
           </div>
 
-          <!-- GAME params: free BPM + duration, optional Challenge (sudden death) -->
+          <!-- TIME TRIAL / SUDDEN DEATH params: free BPM + duration -->
           <div class="rogue-mode-params" id="rogueGameParams">
             <div class="rogue-field-row">
               <label class="rogue-field">
@@ -238,13 +251,6 @@
               <label class="rogue-field">
                 <span>Minutes</span>
                 <input type="number" id="rogueGameMins" min="1" max="60" value="3" class="config-input">
-              </label>
-            </div>
-            <div class="interval-toggle-row rogue-mode-row">
-              <span class="section-label">Challenge — one bad beat ends it</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="rogueChallenge">
-                <span class="toggle-slider"></span>
               </label>
             </div>
           </div>
@@ -304,7 +310,7 @@
 
   <script src="sounds.js?v=20260524b"></script>
   <script src="metronome.js?v=20260524b"></script>
-  <script src="app.js?v=20260527"></script>
-  <script src="roguelite.js?v=20260531"></script>
+  <script src="app.js?v=20260602"></script>
+  <script src="roguelite.js?v=20260602"></script>
 </body>
 </html>
