@@ -311,7 +311,7 @@ const RogueliteMode = (() => {
     suddenDeath: false,         // one bad beat ends the run (gauntlet always; game = Challenge)
     diedAtBpm: null,
     hitsCleared: 0,             // cleared 16th-note slots this run
-    gauge: 0,                   // live DMC-style gauge (0–100), drives the live rank
+    totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
@@ -749,7 +749,6 @@ const RogueliteMode = (() => {
     }
 
     runState.hitsCleared = 0;
-    runState.gauge = 0;
     runState.tally = { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 };
     runState.diedAtBpm = null;
     runState.status = 'running';
@@ -777,6 +776,10 @@ const RogueliteMode = (() => {
       setInput('setSecs',      RUN_SET_SECS);
       setInput('restMins', 0);
       setInput('restSecs', RUN_REST_SECS);
+      // Gauge denominator: sum of (set minutes × set BPM = quarter-beats) over all sets.
+      let tb = 0;
+      for (let i = 0; i < RUN_NUM_SETS; i++) tb += RUN_SET_MINS * (level.bpmStart + i * RUN_BPM_INCREMENT);
+      runState.totalRunBeats = tb;
     } else {
       // TIME TRIAL / SUDDEN DEATH: one set at the user's chosen BPM for the chosen
       // duration. No climb. Sudden death ends on one bad beat; time trial never fails.
@@ -792,6 +795,7 @@ const RogueliteMode = (() => {
       setInput('setSecs',      0);
       setInput('restMins', 0);
       setInput('restSecs', 0);
+      runState.totalRunBeats = mins * bpm;   // minutes × quarter-beats-per-minute
     }
 
     // Fresh clock reconciliation for this run (don't trust a sync captured back
@@ -964,8 +968,7 @@ const RogueliteMode = (() => {
     if (sixteenthIdx === 3) {
       tallyBeat(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
       addLaneCell(verdictClass(hudBeatRank[beatIndex], hudBeatOff[beatIndex]));
-      bumpGauge(hudBeatRank[beatIndex]);   // climb/drop the style gauge
-      updateScoreHud();
+      updateScoreHud();   // gauge = good ÷ total run beats (fills, never drops)
     }
     // Purge consumed/stale events a few slots behind the current expected time.
     pruneEvents(expectedPerf - presenceMs * 4);
@@ -1089,7 +1092,9 @@ const RogueliteMode = (() => {
         '<span class="rl-lbl">' + label + (extra || '') + '</span>' +
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
-    const rank = rankFor(pct);
+    // Flawless run (every beat GOOD) → SS; one neutral/bad caps the grade at S.
+    const flawless = total > 0 && t.neutral === 0 && t.bad === 0;
+    const rank = flawless ? 'SS' : rankFor(Math.floor(total ? t.good / total * 100 : 0));
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
         row('rogue-drag', 'Neutral', t.neutral, split) +
@@ -1174,9 +1179,10 @@ const RogueliteMode = (() => {
     return 'GOOD';
   }
 
-  // DMC-style rank from the running % of GOOD beats (SS=100, then descending bands).
+  // Rank bands for the descending grades. SS is NOT here — it's reserved for a
+  // FLAWLESS run (no neutral/bad beats) and applied separately, so a single missed
+  // beat caps you at S for the whole level.
   function rankFor(pct) {
-    if (pct >= 100) return 'SS';
     if (pct >= 91)  return 'S';
     if (pct >= 81)  return 'A';
     if (pct >= 66)  return 'B';
@@ -1187,16 +1193,16 @@ const RogueliteMode = (() => {
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
   const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
 
-  // DMC-style STYLE GAUGE (0–100) for the live HUD: fills from zero with GOOD beats,
-  // inches up on NEUTRAL, drops hard on BAD. The live rank reads off this gauge, so
-  // you climb E→…→SS by stringing clean beats together and tumble when you blow one.
-  // (The end-of-run grade is separate — it's overall accuracy; see resultTable.)
-  const GAUGE_GOOD = 4;       // ~9 good beats to leave E, ~25 to max
-  const GAUGE_NEUTRAL = 1;
-  const GAUGE_BAD = 20;       // a bad beat ≈ a rank lost
-  function bumpGauge(rank) {
-    const d = rank === 0 ? GAUGE_GOOD : (rank === 1 ? GAUGE_NEUTRAL : -GAUGE_BAD);
-    runState.gauge = Math.max(0, Math.min(100, runState.gauge + d));
+  // Style gauge = GOOD beats ÷ total beats in the run, as a %. It only ever FILLS
+  // (good beats add; neutral/bad just don't), so it climbs from E and never drops.
+  // SS requires filling it completely — i.e. every beat of the run was GOOD; one
+  // neutral/bad beat makes 100% unreachable, capping the run at S.
+  function scoreRank() {
+    const t = runState.tally;
+    const g = Math.max(0, Math.min(100, Math.round(t.good / (runState.totalRunBeats || 1) * 100)));
+    const flawless = (t.neutral === 0 && t.bad === 0);
+    const rank = (flawless && g >= 91) ? 'SS' : rankFor(g);
+    return { gauge: g, rank };
   }
 
   // Drive both the setup-panel banner (hidden in HUD mode) and the big HUD banner.
@@ -1217,14 +1223,13 @@ const RogueliteMode = (() => {
 
   // Live score: the style gauge as a filling meter + its rank, updated each beat.
   function updateScoreHud() {
-    const g = Math.round(runState.gauge);
-    const rank = rankFor(g);
+    const { gauge, rank } = scoreRank();
     if (el.hudRank) {
       el.hudRank.textContent = rank;
       el.hudRank.className = 'rogue-hud-rank ' + rankClass(rank);
     }
     if (el.hudGaugeFill) {
-      el.hudGaugeFill.style.width = g + '%';
+      el.hudGaugeFill.style.width = gauge + '%';
       el.hudGaugeFill.style.background = RANK_COLOR[rank] || 'var(--cyan)';
     }
   }

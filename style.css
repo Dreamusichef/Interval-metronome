@@ -1291,22 +1291,31 @@ body.rogue-run .rogue-section { display: none !important; }
 }
 .rogue-result-pct span { font-size: 1.1rem; font-weight: 700; color: var(--text-dim); }
 
-/* Live HUD rank + DMC-style filling gauge meter. */
-.rogue-hud-score { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 2px; }
+/* Live HUD rank + filling gauge meter — spans the lane width (305px) for continuity:
+   rank flush-left (at the first hexagon), gauge flexing out to the right hexagon.
+   The rank sits in a fixed 2-char slot so the gauge start doesn't shift when E→SS. */
+.rogue-hud-score {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 305px;
+  max-width: 100%;
+  margin: 2px auto 0;
+}
 .rogue-hud-rank {
+  flex: 0 0 auto;
+  min-width: 2.1ch;
+  text-align: left;
   font-family: 'Orbitron', monospace;
   font-weight: 900;
   font-style: italic;
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   line-height: 1;
   letter-spacing: 0.02em;
-  min-width: 2.4ch;
-  text-align: right;
 }
 .rogue-hud-gauge {
-  display: block;
-  width: 150px;
-  height: 9px;
+  flex: 1 1 auto;
+  height: 12px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
   clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
