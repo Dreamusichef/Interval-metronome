@@ -969,6 +969,74 @@ body {
 }
 .rogue-status.error { color: var(--danger); }
 
+/* GAME / GAUNTLET selector + GAME params. */
+.rogue-mode-select { display: flex; gap: 8px; margin-bottom: 10px; }
+.rogue-mode-btn {
+  flex: 1;
+  padding: 9px 6px;
+  cursor: pointer;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.rogue-mode-btn.active {
+  color: #060a10;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+.rogue-mode-btn:disabled { opacity: 0.5; cursor: default; }
+
+.rogue-field-row { display: flex; gap: 10px; margin-bottom: 6px; }
+.rogue-field { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.rogue-field > span {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+/* Challenge (sudden-death) sub-toggle inside GAME params. */
+.rogue-mode-row {
+  margin: 4px 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rogue-mode-row .section-label { color: var(--accent); }
+
+/* Skip-calibration manual offset row. */
+.rogue-manual-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.rogue-manual-input { width: 90px; flex: 0 0 auto; }
+
+/* Prominent count-off / live banners during calibration and runs. */
+.rogue-status.countin,
+.rogue-status.live {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid currentColor;
+  background: rgba(255, 255, 255, 0.04);
+}
+.rogue-status.countin {
+  color: var(--accent);
+  animation: rogue-countin-pulse 0.5s steps(1, end) infinite alternate;
+}
+.rogue-status.live { color: var(--success); }
+@keyframes rogue-countin-pulse {
+  from { opacity: 1; }
+  to   { opacity: 0.55; }
+}
+
 .rogue-kicknote {
   font-family: 'Orbitron', monospace;
   font-size: 0.74rem;
@@ -1071,3 +1139,80 @@ input[type="number"] { -moz-appearance: textfield; }
   .config-field label { font-size: 0.55rem; }
   .bpm-value-input { font-size: 3.2rem; }
 }
+
+/* ═══ Roguelite Focused HUD — active only while a run is live (body.rogue-run) ═══ */
+.rogue-hud { display: none; }
+body.rogue-run .rogue-hud {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+.rogue-hud-banner {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.rogue-hud-banner.countin {
+  color: var(--accent);
+  animation: rogue-countin-pulse 0.5s steps(1, end) infinite alternate;
+}
+.rogue-hud-banner.live { color: var(--success); }
+.rogue-hud-verdict {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 4rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  transition: color 0.06s ease, text-shadow 0.06s ease;
+}
+.rogue-hud-verdict.rogue-good { color: var(--success); text-shadow: 0 0 18px rgba(0, 232, 122, 0.6); }
+.rogue-hud-verdict.rogue-edge { color: var(--accent);  text-shadow: 0 0 18px rgba(255, 184, 0, 0.6); }
+.rogue-hud-verdict.rogue-fail { color: var(--danger);  text-shadow: 0 0 20px rgba(255, 56, 56, 0.75); }
+.rogue-hud-bpm {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--cyan);
+}
+
+/* Scrolling beat-history lane — newest beat on the right, older slide off the left. */
+.rogue-lane {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  width: 100%;
+  max-width: 320px;
+  height: 32px;
+  overflow: hidden;
+}
+.rogue-lane-cell {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  animation: rogue-lane-in 0.12s ease-out;
+}
+.rogue-lane-cell.rogue-good { background: linear-gradient(145deg, #b6ffd9 0%, var(--success) 55%, #00643a 100%); filter: drop-shadow(0 0 6px rgba(0, 232, 122, 0.7)); }
+.rogue-lane-cell.rogue-edge { background: linear-gradient(145deg, #ffe980 0%, var(--accent) 55%, #7a5000 100%); filter: drop-shadow(0 0 6px rgba(255, 184, 0, 0.7)); }
+.rogue-lane-cell.rogue-fail { background: linear-gradient(145deg, #ffd0d0 0%, var(--danger) 55%, #5a0000 100%); filter: drop-shadow(0 0 7px rgba(255, 56, 56, 0.85)); }
+@keyframes rogue-lane-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Declutter: while a run is live, the page IS the game — hide everything else. */
+body.rogue-run .beat-indicators,
+body.rogue-run .beat-count-row,
+body.rogue-run .bpm-display,
+body.rogue-run .bpm-slider-container,
+body.rogue-run .bpm-buttons,
+body.rogue-run .subdivision-buttons,
+body.rogue-run .pause-btn,
+body.rogue-run .tap-btn,
+body.rogue-run .interval-section,
+body.rogue-run .stopwatch-section,
+body.rogue-run .rogue-section { display: none !important; }

@@ -17,7 +17,7 @@
 */
 
 const M = require('./roguelite.js');
-const { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit } = M;
+const { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot } = M;
 
 let failures = 0;
 function assert(cond, msg) {
@@ -121,11 +121,81 @@ console.log('\n[4] Hit classification — clear / out / miss after offset subtra
   assert(r.eventIndex === 1 && r.result === 'clear', 'consumed event skipped → matches the next one');
 }
 
-console.log('\n[5] High-tempo non-overlap sanity (Level 6 top = 200 BPM 16ths, ±15ms)');
+console.log('\n[5] Continuity-game presence slots tile the timeline (factor 0.5)');
 {
-  // 16th-note spacing at 200 BPM = 75ms; ±15ms windows (30ms wide) can't overlap.
-  const spacing = 60000 / 200 / 4;
-  assert(spacing > 2 * 15, `subdivision spacing ${spacing.toFixed(1)}ms > window width 30ms — no overlap`);
+  // The run gates PRESENCE: each 16th owns a slot of ±(0.5 × spacing). At factor
+  // 0.5 the slots tile exactly — a kick lands in exactly one slot (no gaps, no
+  // double-claim) and a dropped 16th leaves a real, detectable hole. Verify the
+  // tiling identity holds at both the slowest and fastest run tempos.
+  const FACTOR = 0.5;
+  for (const bpm of [80, 200]) {
+    const spacing = 60000 / bpm / 4;
+    const slotWidth = 2 * (spacing * FACTOR);
+    assert(Math.abs(slotWidth - spacing) < 1e-9,
+      `${bpm} BPM 16ths: slot width ${slotWidth.toFixed(1)}ms == spacing ${spacing.toFixed(1)}ms — tiles cleanly`);
+  }
+}
+
+console.log('\n[6] Slot gate — exactly one kick per slot (drop / clear / cram)');
+{
+  const centre = 1000, h = 40, mean = 0;   // slot = [960, 1040)
+  const E = (...ts) => ts.map(t => ({ t, consumed: false }));
+
+  let r = classifySlot(centre, mean, h, E());
+  assert(r.result === 'drop' && r.count === 0, 'empty slot → drop (a skipped 16th)');
+
+  r = classifySlot(centre, mean, h, E(1012));
+  assert(r.result === 'clear' && r.count === 1, 'one kick in slot → clear');
+
+  r = classifySlot(centre, mean, h, E(985, 1015));
+  assert(r.result === 'cram' && r.count === 2, 'two kicks in one slot → cram (over-rush)');
+
+  // Neighbours outside the slot don't count; the matched index is returned.
+  r = classifySlot(centre, mean, h, E(900, 1005, 1100));
+  assert(r.result === 'clear' && r.indices[0] === 1, 'only the in-slot kick counts (neighbours ignored)');
+
+  // Half-open boundary: centre-h is IN, centre+h is OUT (goes to the next slot).
+  r = classifySlot(centre, mean, h, E(960));
+  assert(r.result === 'clear', 'left edge (centre−h) is inside the slot');
+  r = classifySlot(centre, mean, h, E(1040));
+  assert(r.result === 'drop', 'right edge (centre+h) belongs to the NEXT slot');
+
+  // meanOffset shifts the slot centre.
+  r = classifySlot(centre, 100, h, E(1100));
+  assert(r.result === 'clear', 'meanOffset shifts the slot (kick at centre+offset → clear)');
+
+  // Consumed events are ignored (already claimed by an earlier slot).
+  const evs = [{ t: 1005, consumed: true }, { t: 1020, consumed: false }];
+  r = classifySlot(centre, mean, h, evs);
+  assert(r.result === 'clear' && r.count === 1, 'consumed kicks are skipped');
+}
+
+console.log('\n[7] First-slot leniency — generous early grace, normal late edge');
+{
+  const centre = 1000, h = 40, mean = 0, early = 120;   // window = [880, 1040)
+  const E = (...ts) => ts.map(t => ({ t, consumed: false }));
+
+  // A rushed start that the NORMAL slot would orphan is now caught.
+  const normal = classifySlot(centre, mean, h, E(910));     // 90ms early
+  assert(normal.result === 'drop', 'normal slot drops a 90ms-early start (the bug)');
+  let r = classifyFirstSlot(centre, mean, h, E(910), early);
+  assert(r.result === 'clear' && r.offset === -90, 'first slot CLEARS the same 90ms-early start');
+
+  // Still requires a note — a total no-show first beat fails.
+  r = classifyFirstSlot(centre, mean, h, E(), early);
+  assert(r.result === 'drop', 'first slot still drops when nothing is played');
+
+  // Late edge stays normal so it can't steal the next slot's kick.
+  r = classifyFirstSlot(centre, mean, h, E(1041), early);
+  assert(r.result === 'drop', 'a kick past the normal late edge is left for the next slot');
+
+  // Too-early (beyond the grace) is not grabbed.
+  r = classifyFirstSlot(centre, mean, h, E(870), early);   // 130ms early > 120 grace
+  assert(r.result === 'drop', 'a kick earlier than the grace window is not counted');
+
+  // On-time start still clears normally.
+  r = classifyFirstSlot(centre, mean, h, E(1005), early);
+  assert(r.result === 'clear', 'an on-time start clears');
 }
 
 console.log('\n' + (failures === 0

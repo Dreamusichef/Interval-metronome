@@ -47,6 +47,14 @@
       </div>
       <div class="beat-indicators" id="beatIndicators"></div>
 
+      <!-- Focused HUD: shown only while a Roguelite run is live (body.rogue-run). -->
+      <div class="rogue-hud" id="rogueHud" aria-hidden="true">
+        <div class="rogue-lane" id="rogueLane"></div>
+        <div class="rogue-hud-banner" id="rogueHudBanner">READY</div>
+        <div class="rogue-hud-verdict" id="rogueHudVerdict">—</div>
+        <div class="rogue-hud-bpm" id="rogueHudBpm"></div>
+      </div>
+
       <div class="bpm-display">
         <input type="number" id="bpmValue" value="120" min="20" max="400" class="bpm-value-input" inputmode="numeric">
         <span class="bpm-label">BPM</span>
@@ -163,10 +171,10 @@
       </div>
     </section>
 
-    <!-- Section E: Roguelite Mode -->
+    <!-- Section E: Game Mode (internally still "roguelite") -->
     <section class="rogue-section">
       <div class="interval-toggle-row">
-        <span class="section-label">Roguelite Mode</span>
+        <span class="section-label">Game Mode</span>
         <label class="toggle-switch">
           <input type="checkbox" id="rogueToggle">
           <span class="toggle-slider"></span>
@@ -175,11 +183,11 @@
 
       <div class="rogue-body" id="rogueBody">
         <p class="rogue-intro">
-          Double-bass run. The metronome ramps; every kick is read over MIDI and
-          timing-checked against the click. Each set opens with a 2-bar count-in,
-          then one bad hit ends the run. Reach the level's ceiling clean to complete
-          it. The level sets the start BPM and rest is fixed at 10s; the climb rate
-          (BPM increment, set length, number of sets) comes from your Ramp Mode settings.
+          Double-bass game. A quarter-note click pulses while you play continuous
+          16ths over MIDI; each beat is scored green (in the pocket), yellow (rode
+          the edge) or red (dropped/crammed). <b>GAME</b>: your BPM &amp; duration,
+          scored — rack up greens for a result card. <b>GAUNTLET</b>: climb levels
+          1–6, five 1-min sets +5 BPM, sudden death — survive to win.
         </p>
 
         <!-- Step 1: MIDI -->
@@ -203,33 +211,66 @@
 
         <!-- Step 3: Calibrate -->
         <div class="rogue-step">
-          <span class="rogue-step-label">3 · Calibrate (16 bars)</span>
+          <span class="rogue-step-label">3 · Calibrate (2 passes)</span>
           <button class="rogue-btn" id="rogueCalBtn" disabled>Calibrate</button>
-          <div class="rogue-status" id="rogueCalStatus">Play a kick on every click for 16 bars.</div>
+          <div class="rogue-status" id="rogueCalStatus">Pass 1: play quarters. Pass 2: play continuous 16ths. Each has a 2-bar count-off.</div>
+          <div class="rogue-manual-row">
+            <input type="number" id="rogueManualOffset" placeholder="offset ms" class="config-input rogue-manual-input">
+            <button class="rogue-btn" id="rogueManualBtn">Skip · use offset</button>
+          </div>
         </div>
 
-        <!-- Step 4: Challenge level -->
+        <!-- Step 4: Mode -->
         <div class="rogue-step">
-          <span class="rogue-step-label">4 · Challenge Level</span>
-          <div class="rogue-level-row">
-            <button class="rogue-level-btn" data-level="1">
-              <span class="rogue-level-n">LVL 1</span><span class="rogue-level-d">80–100 · ±40ms</span>
-            </button>
-            <button class="rogue-level-btn" data-level="2">
-              <span class="rogue-level-n">LVL 2</span><span class="rogue-level-d">100–120 · ±35ms</span>
-            </button>
-            <button class="rogue-level-btn" data-level="3">
-              <span class="rogue-level-n">LVL 3</span><span class="rogue-level-d">120–140 · ±30ms</span>
-            </button>
-            <button class="rogue-level-btn" data-level="4">
-              <span class="rogue-level-n">LVL 4</span><span class="rogue-level-d">140–160 · ±25ms</span>
-            </button>
-            <button class="rogue-level-btn" data-level="5">
-              <span class="rogue-level-n">LVL 5</span><span class="rogue-level-d">160–180 · ±20ms</span>
-            </button>
-            <button class="rogue-level-btn" data-level="6">
-              <span class="rogue-level-n">LVL 6</span><span class="rogue-level-d">180–200 · ±15ms</span>
-            </button>
+          <span class="rogue-step-label">4 · Mode</span>
+          <div class="rogue-mode-select">
+            <button class="rogue-mode-btn active" data-rmode="game">GAME</button>
+            <button class="rogue-mode-btn" data-rmode="gauntlet">GAUNTLET</button>
+          </div>
+
+          <!-- GAME params: free BPM + duration, optional Challenge (sudden death) -->
+          <div class="rogue-mode-params" id="rogueGameParams">
+            <div class="rogue-field-row">
+              <label class="rogue-field">
+                <span>BPM</span>
+                <input type="number" id="rogueGameBpm" min="20" max="400" value="120" class="config-input">
+              </label>
+              <label class="rogue-field">
+                <span>Minutes</span>
+                <input type="number" id="rogueGameMins" min="1" max="60" value="3" class="config-input">
+              </label>
+            </div>
+            <div class="interval-toggle-row rogue-mode-row">
+              <span class="section-label">Challenge — one bad beat ends it</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="rogueChallenge">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- GAUNTLET params: level climb (sudden death) -->
+          <div class="rogue-mode-params" id="rogueGauntletParams" style="display:none">
+            <div class="rogue-level-row">
+              <button class="rogue-level-btn" data-level="1">
+                <span class="rogue-level-n">LVL 1</span><span class="rogue-level-d">80–100 BPM</span>
+              </button>
+              <button class="rogue-level-btn" data-level="2">
+                <span class="rogue-level-n">LVL 2</span><span class="rogue-level-d">100–120 BPM</span>
+              </button>
+              <button class="rogue-level-btn" data-level="3">
+                <span class="rogue-level-n">LVL 3</span><span class="rogue-level-d">120–140 BPM</span>
+              </button>
+              <button class="rogue-level-btn" data-level="4">
+                <span class="rogue-level-n">LVL 4</span><span class="rogue-level-d">140–160 BPM</span>
+              </button>
+              <button class="rogue-level-btn" data-level="5">
+                <span class="rogue-level-n">LVL 5</span><span class="rogue-level-d">160–180 BPM</span>
+              </button>
+              <button class="rogue-level-btn" data-level="6">
+                <span class="rogue-level-n">LVL 6</span><span class="rogue-level-d">180–200 BPM</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -237,7 +278,7 @@
         <div class="rogue-step">
           <span class="rogue-step-label">5 · Run</span>
           <button class="rogue-btn rogue-run-btn" id="rogueRunBtn" disabled>Start Run</button>
-          <div class="rogue-status" id="rogueRunStatus">Calibrate and pick a level to begin.</div>
+          <div class="rogue-status" id="rogueRunStatus">Calibrate, then start.</div>
         </div>
       </div>
     </section>

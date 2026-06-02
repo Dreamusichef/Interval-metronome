@@ -494,4 +494,23 @@ window.AppRamp = {
   stop() { if (appState !== States.IDLE) stopAll(); },
   getCurrentBpm() { return session.currentBpm; },
   isRunning() { return appState !== States.IDLE; },
+
+  // Roguelite count-in support. A run's 2-bar count-in shouldn't burn the set's
+  // duration, so the roguelite layer holds the set countdown when a set starts and
+  // begins a fresh full-length countdown once gating goes live. No-ops outside a
+  // running set so they can't disturb the rest phase or an idle engine.
+  holdSetCountdown() {
+    if (appState === States.RUNNING_SET && countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  },
+  beginSetCountdown() {
+    if (appState !== States.RUNNING_SET) return;
+    session.timeRemaining = session.setDurationSecs;
+    session.totalDuration = session.setDurationSecs;
+    updateStatusDisplay();
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(countdownTick, 1000);
+  },
 };
