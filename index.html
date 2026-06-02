@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260602">
+  <link rel="stylesheet" href="style.css?v=20260602b">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -243,18 +243,23 @@
             <button class="rogue-mode-btn" data-rmode="gauntlet">GAUNTLET</button>
           </div>
 
-          <!-- TIME TRIAL / SUDDEN DEATH params: free BPM + duration -->
+          <!-- TIME TRIAL / SUDDEN DEATH params: BPM snaps to 10s (60–240); free minutes -->
           <div class="rogue-mode-params" id="rogueGameParams">
             <div class="rogue-field-row">
               <label class="rogue-field">
                 <span>BPM</span>
-                <input type="number" id="rogueGameBpm" min="20" max="400" value="120" class="config-input">
+                <div class="rogue-stepper">
+                  <button type="button" class="rogue-step-btn" id="rogueGameBpmDec" aria-label="Lower BPM">−</button>
+                  <span class="rogue-step-val" id="rogueGameBpmVal">120</span>
+                  <button type="button" class="rogue-step-btn" id="rogueGameBpmInc" aria-label="Raise BPM">+</button>
+                </div>
               </label>
               <label class="rogue-field">
                 <span>Minutes</span>
                 <input type="number" id="rogueGameMins" min="1" max="60" value="3" class="config-input">
               </label>
             </div>
+            <div class="rogue-field-hint" id="rogueGameModeHint">Time Trial: play the full duration; graded E–SS.</div>
           </div>
 
           <!-- GAUNTLET params: level climb (sudden death) -->
@@ -313,6 +318,6 @@
   <script src="sounds.js?v=20260524b"></script>
   <script src="metronome.js?v=20260524b"></script>
   <script src="app.js?v=20260602"></script>
-  <script src="roguelite.js?v=20260602"></script>
+  <script src="roguelite.js?v=20260602b"></script>
 </body>
 </html>

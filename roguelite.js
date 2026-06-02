@@ -228,6 +228,16 @@ const RogueliteMode = (() => {
     6: { bpmStart: 180, bpmCeiling: 200 },
   };
 
+  // Time Trial / Sudden Death pick a BPM from a fixed ladder: 60–240 in steps of 10
+  // (19 buckets). A finite ladder keeps "best rank per BPM" a small, comparable grid
+  // for progress + leaderboards. (300 can be added later by bumping GAME_BPM_MAX.)
+  // The pure metronome / Ramp / Stopwatch are untouched — still 20–400.
+  const GAME_BPM_MIN = 60, GAME_BPM_MAX = 240, GAME_BPM_STEP = 10;
+  const snapGameBpm = (n) => {
+    const v = Math.round(n / GAME_BPM_STEP) * GAME_BPM_STEP;
+    return Math.max(GAME_BPM_MIN, Math.min(GAME_BPM_MAX, v));
+  };
+
   // Calibration is a TWO-PASS process (same audible quarter-note click throughout):
   //   Pass 1 — you play QUARTERS. At 80 BPM the clicks are 750ms apart, so your
   //            ~100ms offset is unambiguous: this fixes the GROSS offset (hardware
@@ -310,6 +320,8 @@ const RogueliteMode = (() => {
     status: 'idle',             // 'idle'|'calibrating'|'running'|'failed'|'complete'
     suddenDeath: false,         // one bad beat ends the run (gauntlet always; game = Challenge)
     diedAtBpm: null,
+    survivalSec: 0,             // Sudden Death: gated time survived (capped at the chosen target)
+    gatingStartPerf: 0,         // perf-time the first gated beat went live (survival clock origin)
     hitsCleared: 0,             // cleared 16th-note slots this run
     totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
@@ -751,6 +763,8 @@ const RogueliteMode = (() => {
     runState.hitsCleared = 0;
     runState.tally = { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 };
     runState.diedAtBpm = null;
+    runState.survivalSec = 0;
+    runState.gatingStartPerf = 0;
     runState.status = 'running';
     window.__rogueSuppressDoneOverlay = false;
 
@@ -781,10 +795,11 @@ const RogueliteMode = (() => {
       for (let i = 0; i < RUN_NUM_SETS; i++) tb += RUN_SET_MINS * (level.bpmStart + i * RUN_BPM_INCREMENT);
       runState.totalRunBeats = tb;
     } else {
-      // TIME TRIAL / SUDDEN DEATH: one set at the user's chosen BPM for the chosen
-      // duration. No climb. Sudden death ends on one bad beat; time trial never fails.
-      const bpm  = Math.max(20, Math.min(400, parseIntOr(el.gameBpm, 120)));
-      const mins = Math.max(1, Math.min(60, parseIntOr(el.gameMins, 3)));
+      // TIME TRIAL / SUDDEN DEATH: one set at the chosen BPM (snapped to the 60–240
+      // ladder) for the chosen duration. No climb. Sudden death ends on one bad beat
+      // and scores survival time; time trial never fails and is graded E–SS.
+      const bpm  = snapGameBpm(runState.gameBpm);
+      const mins = Math.max(1, parseIntOr(el.gameMins, 3));
       runState.gameBpm = bpm;
       runState.gameMins = mins;
       runState.suddenDeath = (runState.mode === 'suddendeath');
@@ -873,6 +888,9 @@ const RogueliteMode = (() => {
           // against the first gated tick.
           events = [];
           pendingFirstGated = true;   // first scored 16th of this set gets early grace
+          // Start the survival clock on the first gated beat of the run (used by
+          // Sudden Death). Only the first set arms it; later sets don't reset it.
+          if (!runState.gatingStartPerf) runState.gatingStartPerf = performance.now();
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
           setRunBanner('Keep the 16ths going', 'live');
@@ -986,10 +1004,21 @@ const RogueliteMode = (() => {
     events = events.filter(e => !e.consumed && e.t >= beforePerf);
   }
 
+  // Survival = gated time elapsed since the first gated beat, capped at the chosen
+  // target (so dying at 4:36 of a 5:00 run records 4:36; surviving the full run
+  // records the target). Picking a longer target raises the ceiling on this score.
+  function recordSurvival() {
+    if (!runState.gatingStartPerf) { runState.survivalSec = 0; return; }
+    const elapsed = (performance.now() - runState.gatingStartPerf) / 1000;
+    const cap = (runState.mode === 'gauntlet') ? Infinity : runState.gameMins * 60;
+    runState.survivalSec = Math.max(0, Math.min(cap, elapsed));
+  }
+
   function failRun(classification) {
     if (runState.status !== 'running') return;
     runState.status = 'failed';
     runState.diedAtBpm = currentRunBpm();
+    recordSurvival();
     clearPendingEvals();
     MetronomeEngine.onSchedule(null);
     if (window.AppRamp) window.AppRamp.stop();   // stop the ramp; NOT the level-up path
@@ -1038,6 +1067,7 @@ const RogueliteMode = (() => {
   function completeRun(stopRamp) {
     if (runState.status !== 'running') return;
     runState.status = 'complete';
+    recordSurvival();   // survived the full target → caps at the chosen duration
     clearPendingEvals();
     MetronomeEngine.onSchedule(null);
 
@@ -1112,8 +1142,15 @@ const RogueliteMode = (() => {
       : 'Dropped a 16th — a kick went missing (a skip or a frozen foot).';
     el.overlayTitle.textContent = 'RUN OVER';
     el.overlayTitle.className = 'rogue-overlay-title fail';
+    // Sudden Death headlines SURVIVAL TIME (the leaderboard metric); other modes
+    // headline the BPM where it broke.
+    const headline = runState.suddenDeath
+      ? '<div class="rogue-diag-big">' + fmtMMSS(runState.survivalSec) + '</div>' +
+        '<div class="rogue-diag-sub">survived · ' + runState.diedAtBpm + ' BPM · target ' +
+        runState.gameMins + ':00</div>'
+      : '<div class="rogue-diag-big">' + runState.diedAtBpm + ' BPM</div>';
     el.overlayBody.innerHTML =
-      '<div class="rogue-diag-big">' + runState.diedAtBpm + ' BPM</div>' +
+      headline +
       '<div class="rogue-diag-line">' + line + '</div>' +
       resultTable();
     el.overlay.classList.add('visible');
@@ -1127,7 +1164,8 @@ const RogueliteMode = (() => {
       ctx = 'Survived all 5 sets to ' + LEVELS[runState.level].bpmCeiling + ' BPM';
     } else if (runState.suddenDeath) {
       el.overlayTitle.textContent = 'SUDDEN DEATH CLEARED';
-      ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min, no dropped beat';
+      ctx = 'Survived ' + fmtMMSS(runState.survivalSec) + ' · ' + runState.gameBpm +
+        ' BPM · no dropped beat';
     } else {
       el.overlayTitle.textContent = 'RESULTS';
       ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
@@ -1319,10 +1357,26 @@ const RogueliteMode = (() => {
     runState.mode = (m === 'gauntlet' || m === 'suddendeath') ? m : 'timetrial';
     const isGauntlet = runState.mode === 'gauntlet';
     el.modeBtns && el.modeBtns.forEach(b => b.classList.toggle('active', b.dataset.rmode === runState.mode));
-    // TIME TRIAL and SUDDEN DEATH both use the free BPM+duration params.
+    // TIME TRIAL and SUDDEN DEATH both use the BPM-ladder + duration params.
     if (el.gameParams)     el.gameParams.style.display     = isGauntlet ? 'none' : '';
     if (el.gauntletParams) el.gauntletParams.style.display = isGauntlet ? '' : 'none';
+    if (el.gameModeHint) {
+      el.gameModeHint.textContent = (runState.mode === 'suddendeath')
+        ? 'Sudden Death: one dropped 16th ends it — score is how long you survive (target caps it).'
+        : 'Time Trial: play the full duration; graded E–SS.';
+    }
     updateGates();
+  }
+
+  // BPM ladder stepper (Time Trial / Sudden Death): snaps to 10s, clamps 60–240.
+  function stepGameBpm(delta) {
+    runState.gameBpm = snapGameBpm(runState.gameBpm + delta);
+    renderGameBpm();
+  }
+  function renderGameBpm() {
+    if (el.gameBpmVal) el.gameBpmVal.textContent = runState.gameBpm;
+    if (el.gameBpmDec) el.gameBpmDec.disabled = runState.gameBpm <= GAME_BPM_MIN;
+    if (el.gameBpmInc) el.gameBpmInc.disabled = runState.gameBpm >= GAME_BPM_MAX;
   }
 
   function initUI() {
@@ -1332,7 +1386,10 @@ const RogueliteMode = (() => {
       modeBtns:       Array.from(document.querySelectorAll('.rogue-mode-btn')),
       gameParams:     document.getElementById('rogueGameParams'),
       gauntletParams: document.getElementById('rogueGauntletParams'),
-      gameBpm:        document.getElementById('rogueGameBpm'),
+      gameBpmVal:     document.getElementById('rogueGameBpmVal'),
+      gameBpmDec:     document.getElementById('rogueGameBpmDec'),
+      gameBpmInc:     document.getElementById('rogueGameBpmInc'),
+      gameModeHint:   document.getElementById('rogueGameModeHint'),
       gameMins:       document.getElementById('rogueGameMins'),
       midiBtn:      document.getElementById('rogueMidiBtn'),
       deviceSelect: document.getElementById('rogueDeviceSelect'),
@@ -1380,6 +1437,9 @@ const RogueliteMode = (() => {
     el.deviceSelect && el.deviceSelect.addEventListener('change', () => selectInput(el.deviceSelect.value));
     el.levelBtns.forEach(b => b.addEventListener('click', () => selectLevel(parseInt(b.dataset.level, 10))));
     el.modeBtns.forEach(b => b.addEventListener('click', () => selectMode(b.dataset.rmode)));
+    el.gameBpmDec && el.gameBpmDec.addEventListener('click', () => stepGameBpm(-GAME_BPM_STEP));
+    el.gameBpmInc && el.gameBpmInc.addEventListener('click', () => stepGameBpm(+GAME_BPM_STEP));
+    renderGameBpm();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
       el.overlay.classList.remove('visible');
       runState.status = 'idle';
@@ -1404,6 +1464,10 @@ const RogueliteMode = (() => {
     return Number.isNaN(v) ? fallback : v;
   }
   function signed(n) { return (n >= 0 ? '+' : '') + n.toFixed(1); }
+  function fmtMMSS(sec) {
+    const s = Math.max(0, Math.round(sec));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
