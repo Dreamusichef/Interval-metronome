@@ -1458,6 +1458,16 @@ const RogueliteMode = (() => {
     const lbl = el.toggle.closest('.toggle-switch');
     if (lbl) lbl.addEventListener('click', () => setTimeout(applyToggle, 0));
 
+    // Returning from a Google sign-in redirect reloads the page; re-open Game Mode
+    // so the user lands back where they were (the sign-in button lives in here).
+    try {
+      if (sessionStorage.getItem('cloud:reopenGameMode') === '1') {
+        sessionStorage.removeItem('cloud:reopenGameMode');
+        el.toggle.checked = true;
+        applyToggle();
+      }
+    } catch (e) {}
+
     el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
     el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
     el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());

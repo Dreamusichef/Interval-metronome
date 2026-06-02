@@ -59,6 +59,10 @@ const Cloud = (() => {
 
   async function signIn() {
     if (!init()) return;
+    // Sign-in is a full-page redirect (out to Google and back), so the page
+    // reloads fresh. Leave a breadcrumb so the app can restore the view the user
+    // was in (e.g. re-open the Game Mode panel) instead of collapsing to default.
+    try { sessionStorage.setItem('cloud:reopenGameMode', '1'); } catch (e) {}
     // Return to the page the user signed in from (must be in Supabase's redirect
     // allow-list — add the "/**" wildcard for your domains).
     await client.auth.signInWithOAuth({
