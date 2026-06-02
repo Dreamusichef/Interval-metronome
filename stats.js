@@ -1,0 +1,182 @@
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STATS PAGE — personal records + global leaderboard.
+
+   Toggle: Personal | Global. Mode buttons: Time Trial / Sudden Death / Gauntlet.
+   - Personal aggregates the signed-in user's own runs (read directly; RLS allows
+     reading your own rows): per-BPM (free modes) or per-level (gauntlet) best
+     rank, best green%, longest survival, run counts, total runs.
+   - Global calls the get_leaderboard RPC for a chosen BPM (free) or level
+     (gauntlet) and lists the top players.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
+const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
+const GAME_BPM_MIN = 60, GAME_BPM_MAX = 240, GAME_BPM_STEP = 10;
+
+const state = { view: 'personal', mode: 'timetrial', bpm: 120, level: 1 };
+let myRunsCache = null;
+
+const $ = (id) => document.getElementById(id);
+
+function fmtMMSS(sec) {
+  const s = Math.max(0, Math.round(sec || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function rankBetter(a, b) { return (RANK_ORDER[a] ?? -1) > (RANK_ORDER[b] ?? -1) ? a : b; }
+function rankPill(rank) {
+  return '<span class="stats-rank" style="color:' + (RANK_COLOR[rank] || '#fff') + '">' + (rank || '–') + '</span>';
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ── Auth wiring ──────────────────────────────────────────────────────────────
+function initAuthBars() {
+  if (!window.Cloud) { setTimeout(initAuthBars, 100); return; }
+  window.Cloud.mountAuthBar($('cloudAuthBar'));
+  window.Cloud.mountAuthBar($('cloudAuthBar2'));
+  window.Cloud.onAuth((user) => {
+    const signedIn = !!user;
+    $('statsSignedOut').hidden = signedIn;
+    $('statsMain').hidden = !signedIn;
+    myRunsCache = null;
+    if (signedIn) render();
+  });
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+function wireControls() {
+  document.querySelectorAll('.stats-view-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      state.view = b.dataset.view;
+      document.querySelectorAll('.stats-view-btn').forEach(x => x.classList.toggle('active', x === b));
+      render();
+    }));
+  document.querySelectorAll('.stats-mode-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      state.mode = b.dataset.mode;
+      document.querySelectorAll('.stats-mode-btn').forEach(x => x.classList.toggle('active', x === b));
+      render();
+    }));
+  $('statsSubSelectEl').addEventListener('change', (e) => {
+    if (state.mode === 'gauntlet') state.level = parseInt(e.target.value, 10);
+    else state.bpm = parseInt(e.target.value, 10);
+    render();
+  });
+}
+
+// Populate the Global secondary selector for the current mode.
+function populateSubSelect() {
+  const sel = $('statsSubSelectEl');
+  sel.innerHTML = '';
+  if (state.mode === 'gauntlet') {
+    $('statsSubLabel').textContent = 'Level';
+    for (let l = 1; l <= 6; l++) sel.appendChild(opt(l, 'Level ' + l));
+    sel.value = String(state.level);
+  } else {
+    $('statsSubLabel').textContent = 'BPM';
+    for (let b = GAME_BPM_MIN; b <= GAME_BPM_MAX; b += GAME_BPM_STEP) sel.appendChild(opt(b, b + ' BPM'));
+    sel.value = String(state.bpm);
+  }
+}
+function opt(val, label) { const o = document.createElement('option'); o.value = String(val); o.textContent = label; return o; }
+
+// ── Render ───────────────────────────────────────────────────────────────────
+async function render() {
+  $('statsSubSelect').hidden = (state.view !== 'global');
+  if (state.view === 'global') populateSubSelect();
+  if (state.view === 'personal') await renderPersonal();
+  else await renderGlobal();
+}
+
+async function renderPersonal() {
+  $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
+  if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
+  const runs = myRunsCache;
+  const totalRuns = runs.length;
+  const modeRuns = runs.filter(r => r.mode === state.mode);
+
+  $('statsSummary').innerHTML =
+    '<span class="stats-stat"><b>' + totalRuns + '</b> total runs</span>' +
+    '<span class="stats-stat"><b>' + modeRuns.length + '</b> in ' + modeLabel(state.mode) + '</span>';
+
+  if (!modeRuns.length) {
+    $('statsContent').innerHTML = '<div class="stats-empty">No ' + modeLabel(state.mode) + ' runs yet — go set a record.</div>';
+    return;
+  }
+
+  if (state.mode === 'gauntlet') {
+    const by = {};
+    modeRuns.forEach(r => {
+      const o = by[r.level] || (by[r.level] = { level: r.level, count: 0, rank: 'E', green: 0, cleared: false });
+      o.count++; o.rank = rankBetter(o.rank, r.rank); o.green = Math.max(o.green, r.green_pct); o.cleared = o.cleared || r.cleared;
+    });
+    const rows = Object.values(by).sort((a, b) => a.level - b.level).map(o =>
+      tr([ 'Level ' + o.level, rankPill(o.rank), o.green + '%', o.cleared ? '✓' : '—', o.count ]));
+    $('statsContent').innerHTML = table(['Level', 'Best rank', 'Best %', 'Cleared', 'Runs'], rows);
+  } else {
+    const by = {};
+    modeRuns.forEach(r => {
+      const o = by[r.bpm] || (by[r.bpm] = { bpm: r.bpm, count: 0, rank: 'E', green: 0, longest: 0 });
+      o.count++; o.rank = rankBetter(o.rank, r.rank); o.green = Math.max(o.green, r.green_pct);
+      o.longest = Math.max(o.longest, r.survival_sec || 0);
+    });
+    const ordered = Object.values(by).sort((a, b) => a.bpm - b.bpm);
+    if (state.mode === 'suddendeath') {
+      const rows = ordered.map(o => tr([ o.bpm + ' BPM', fmtMMSS(o.longest), rankPill(o.rank), o.count ]));
+      $('statsContent').innerHTML = table(['BPM', 'Longest survived', 'Best rank', 'Runs'], rows);
+    } else {
+      const rows = ordered.map(o => tr([ o.bpm + ' BPM', rankPill(o.rank), o.green + '%', o.count ]));
+      $('statsContent').innerHTML = table(['BPM', 'Best rank', 'Best %', 'Runs'], rows);
+    }
+  }
+}
+
+async function renderGlobal() {
+  $('statsSummary').innerHTML = '';
+  $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
+  const isGauntlet = state.mode === 'gauntlet';
+  const rows = await window.Cloud.leaderboard(
+    state.mode,
+    isGauntlet ? null : state.bpm,
+    isGauntlet ? state.level : null
+  );
+  const where = isGauntlet ? ('Level ' + state.level) : (state.bpm + ' BPM');
+
+  if (!rows.length) {
+    $('statsContent').innerHTML = '<div class="stats-empty">No scores yet for ' + modeLabel(state.mode) + ' · ' + where + '. Be the first.</div>';
+    return;
+  }
+
+  const body = rows.map((r, i) => {
+    const who = '<span class="stats-player">' +
+      (r.avatar_url ? '<img class="cloud-avatar sm" src="' + esc(r.avatar_url) + '" referrerpolicy="no-referrer">' : '') +
+      esc(r.display_name || 'Drummer') + '</span>';
+    const pos = '<span class="stats-pos' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span>';
+    if (state.mode === 'suddendeath') return tr([ pos, who, fmtMMSS(r.survival_sec) ]);
+    if (state.mode === 'gauntlet')    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', r.cleared ? '✓' : '—' ]);
+    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', fmtMMSS(r.duration_sec) ]); // time trial
+  });
+
+  const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Survived']
+    : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Green', 'Cleared']
+    : ['#', 'Player', 'Grade', 'Green', 'Duration'];
+  $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + where + '</div>' +
+    table(head, body);
+}
+
+// ── tiny table helpers ───────────────────────────────────────────────────────
+function table(headers, rows) {
+  return '<table class="stats-table"><thead><tr>' +
+    headers.map(h => '<th>' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+}
+function tr(cells) { return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>'; }
+function modeLabel(m) { return m === 'suddendeath' ? 'Sudden Death' : m === 'gauntlet' ? 'Gauntlet' : 'Time Trial'; }
+
+// ── boot ─────────────────────────────────────────────────────────────────────
+wireControls();
+initAuthBars();

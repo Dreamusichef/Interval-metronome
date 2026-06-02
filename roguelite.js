@@ -1028,6 +1028,7 @@ const RogueliteMode = (() => {
     try { MetronomeEngine.playSetEndCue(); } catch (e) {}
 
     showGameOver(classification);
+    saveRunRecord();
     updateGates();
   }
 
@@ -1081,6 +1082,7 @@ const RogueliteMode = (() => {
     // For the natural-finish path the cue already fired in finishSession().
 
     showComplete();
+    saveRunRecord();
     updateGates();
   }
 
@@ -1109,6 +1111,36 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // DIAGNOSTICS / overlays  (factual and clinical — the number is the feedback)
   // ───────────────────────────────────────────────────────────────────────────
+  // Single source of truth for a run's final grade. Flawless (every beat GOOD)
+  // → SS; one neutral/bad caps the grade at S (via rankFor).
+  function runResultRankPct() {
+    const t = runState.tally;
+    const total = t.good + t.neutral + t.bad;
+    const pct = total ? Math.round(t.good / total * 100) : 0;
+    const flawless = total > 0 && t.neutral === 0 && t.bad === 0;
+    const rank = flawless ? 'SS' : rankFor(Math.floor(pct));
+    return { rank, pct };
+  }
+
+  // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent).
+  function saveRunRecord() {
+    if (typeof window === 'undefined' || !window.Cloud || !window.Cloud.saveRun) return;
+    const { rank, pct } = runResultRankPct();
+    const isGauntlet = runState.mode === 'gauntlet';
+    try {
+      window.Cloud.saveRun({
+        mode: runState.mode,
+        bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
+        level: isGauntlet ? runState.level : null,
+        rank: rank,
+        green_pct: pct,
+        duration_sec: isGauntlet ? null : runState.gameMins * 60,
+        survival_sec: (runState.mode === 'suddendeath') ? Math.round(runState.survivalSec) : null,
+        cleared: runState.status === 'complete',
+      });
+    } catch (e) { /* never let a save error break the game */ }
+  }
+
   // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
   // green percentage. Neutral row also shows the rush/drag split.
   function resultTable() {
@@ -1122,9 +1154,7 @@ const RogueliteMode = (() => {
         '<span class="rl-lbl">' + label + (extra || '') + '</span>' +
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
-    // Flawless run (every beat GOOD) → SS; one neutral/bad caps the grade at S.
-    const flawless = total > 0 && t.neutral === 0 && t.bad === 0;
-    const rank = flawless ? 'SS' : rankFor(Math.floor(total ? t.good / total * 100 : 0));
+    const { rank } = runResultRankPct();
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
         row('rogue-drag', 'Neutral', t.neutral, split) +

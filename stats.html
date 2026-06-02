@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stats & Leaderboard — Interval Metronome</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260602b">
+</head>
+<body>
+  <div class="app-container">
+    <section class="rogue-section stats-section">
+      <div class="stats-top">
+        <a class="cloud-stats-link" href="index.html">◂ Back to app</a>
+        <div class="cloud-authbar" id="cloudAuthBar"></div>
+      </div>
+
+      <h1 class="stats-title">Stats &amp; Leaderboard</h1>
+
+      <!-- Signed-out prompt -->
+      <div class="stats-signedout" id="statsSignedOut">
+        <p>Sign in with Google to log your runs, track your stats, and appear on the global leaderboard.</p>
+        <div class="cloud-authbar" id="cloudAuthBar2"></div>
+      </div>
+
+      <!-- Main (signed-in) -->
+      <div class="stats-main" id="statsMain" hidden>
+        <!-- Personal / Global toggle -->
+        <div class="stats-viewtoggle">
+          <button class="stats-view-btn active" data-view="personal">Personal Stats</button>
+          <button class="stats-view-btn" data-view="global">Global Leaderboard</button>
+        </div>
+
+        <!-- Mode buttons -->
+        <div class="stats-modes">
+          <button class="stats-mode-btn active" data-mode="timetrial">Time Trial</button>
+          <button class="stats-mode-btn" data-mode="suddendeath">Sudden Death</button>
+          <button class="stats-mode-btn" data-mode="gauntlet">Gauntlet</button>
+        </div>
+
+        <!-- Secondary selector (Global only): pick BPM (free modes) or Level (gauntlet) -->
+        <div class="stats-subselect" id="statsSubSelect" hidden>
+          <label class="stats-sub-label" id="statsSubLabel">BPM</label>
+          <select class="rogue-select" id="statsSubSelectEl"></select>
+        </div>
+
+        <div class="stats-summary" id="statsSummary"></div>
+        <div class="stats-content" id="statsContent"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="cloud.js?v=20260602"></script>
+  <script src="stats.js?v=20260602"></script>
+</body>
+</html>

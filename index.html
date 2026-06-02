@@ -194,6 +194,12 @@
           made of.
         </p>
 
+        <!-- Account: sign in to log progress + appear on the leaderboard -->
+        <div class="cloud-bar">
+          <div class="cloud-authbar" id="cloudAuthBar"></div>
+          <a class="cloud-stats-link" href="stats.html">Stats &amp; Leaderboard ▸</a>
+        </div>
+
         <!-- Step 1: MIDI -->
         <div class="rogue-step">
           <span class="rogue-step-label">1 · MIDI Device</span>
@@ -319,5 +325,16 @@
   <script src="metronome.js?v=20260524b"></script>
   <script src="app.js?v=20260602"></script>
   <script src="roguelite.js?v=20260602b"></script>
+  <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
+       works fully without it; signing in just logs progress + leaderboard. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="cloud.js?v=20260602"></script>
+  <script>
+    (function mountAuth() {
+      var el = document.getElementById('cloudAuthBar');
+      if (window.Cloud && el) window.Cloud.mountAuthBar(el);
+      else setTimeout(mountAuth, 100);
+    })();
+  </script>
 </body>
 </html>
