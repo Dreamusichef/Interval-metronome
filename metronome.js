@@ -137,12 +137,21 @@ const MetronomeEngine = (() => {
   function init() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    loadSoundBank();   // populates buffers if sounds.js is already loaded (else no-op)
+  }
 
-    loadAudio(typeof SOUND_SET_END_B64           !== 'undefined' ? SOUND_SET_END_B64           : null, b => { setEndBuffer           = b; });
-    loadAudio(typeof SOUND_SET_START_B64         !== 'undefined' ? SOUND_SET_START_B64         : null, b => { setStartBuffer         = b; });
-    loadAudio(typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' ? SOUND_PRACTICE_COMPLETE_B64 : null, b => { practiceCompleteBuffer = b; });
-    loadAudio(typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' ? SOUND_COWBELL_BEAT_B64      : null, b => { cowbellBeatBuffer      = b; });
-    loadAudio(typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' ? SOUND_COWBELL_ACCENT_B64    : null, b => { cowbellAccentBuffer    = b; });
+  // Decode the cue/cowbell buffers from the (lazily loaded) sounds.js base64 blobs.
+  // Idempotent + safe to call before sounds.js exists: each buffer is only decoded
+  // once, and missing SOUND_*_B64 globals are skipped (the metronome click itself is
+  // synthesized, so the core app never waits on these). Called from init() and again
+  // by the background loader once sounds.js arrives.
+  function loadSoundBank() {
+    if (!audioCtx) return;
+    if (!setEndBuffer)           loadAudio(typeof SOUND_SET_END_B64           !== 'undefined' ? SOUND_SET_END_B64           : null, b => { setEndBuffer           = b; });
+    if (!setStartBuffer)         loadAudio(typeof SOUND_SET_START_B64         !== 'undefined' ? SOUND_SET_START_B64         : null, b => { setStartBuffer         = b; });
+    if (!practiceCompleteBuffer) loadAudio(typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' ? SOUND_PRACTICE_COMPLETE_B64 : null, b => { practiceCompleteBuffer = b; });
+    if (!cowbellBeatBuffer)      loadAudio(typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' ? SOUND_COWBELL_BEAT_B64      : null, b => { cowbellBeatBuffer      = b; });
+    if (!cowbellAccentBuffer)    loadAudio(typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' ? SOUND_COWBELL_ACCENT_B64    : null, b => { cowbellAccentBuffer    = b; });
   }
 
   let welcomePlayed = false;
@@ -296,6 +305,6 @@ const MetronomeEngine = (() => {
     setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
     setSoundMode, getSoundMode, playWelcomeGreeting,
-    onSchedule, getAudioContext,
+    onSchedule, getAudioContext, loadSoundBank,
   };
 })();

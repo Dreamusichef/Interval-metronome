@@ -329,20 +329,34 @@
     </div>
   </div>
 
-  <script src="sounds.js?v=20260524b"></script>
-  <script src="metronome.js?v=20260524b"></script>
-  <script src="app.js?v=20260602"></script>
-  <script src="roguelite.js?v=20260602c"></script>
+  <!-- All deferred so HTML/CSS paint immediately. sounds.js (2.4MB of cue audio)
+       is NOT here — it's loaded lazily after the page is interactive (see below),
+       since the metronome click is synthesized and needs no audio files. -->
+  <script defer src="metronome.js?v=20260603"></script>
+  <script defer src="app.js?v=20260603"></script>
+  <script defer src="roguelite.js?v=20260603"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="cloud.js?v=20260602c"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="cloud.js?v=20260603"></script>
   <script>
+    // Mount the auth bar once Cloud is ready (deferred scripts run after this).
     (function mountAuth() {
       var el = document.getElementById('cloudAuthBar');
       if (window.Cloud && el) window.Cloud.mountAuthBar(el);
-      else setTimeout(mountAuth, 100);
+      else setTimeout(mountAuth, 120);
     })();
+    // Lazily fetch the cue/cowbell audio bank after the page has loaded, so the
+    // 2.4MB never blocks first paint or time-to-interactive. Buffers populate in
+    // the background; until then the synthesized click + synth cues are used.
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        var s = document.createElement('script');
+        s.src = 'sounds.js?v=20260524b';
+        s.onload = function () { try { MetronomeEngine.loadSoundBank(); } catch (e) {} };
+        document.body.appendChild(s);
+      }, 200);
+    });
   </script>
 </body>
 </html>
