@@ -16,6 +16,11 @@ const MetronomeEngine = (() => {
 
   let soundMode = 'click'; // 'click' | 'cowbell'
 
+  // Per-sound level trims (linear gain = 10^(dB/20)).
+  const WELCOME_GAIN = 0.708;   // welcome greeting  −3dB
+  const COWBELL_GAIN = 1.122;   // cowbell click     +1dB
+  const CUE_GAIN     = 0.891;   // set start/end + practice-complete cues  −1dB
+
   let audioCtx = null;
   let setEndBuffer = null;
   let setStartBuffer = null;
@@ -36,10 +41,16 @@ const MetronomeEngine = (() => {
   let pendingVisuals = [];
   let rafId = null;
 
-  function scheduleBufferAt(buffer, time) {
+  function scheduleBufferAt(buffer, time, gain) {
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
-    src.connect(audioCtx.destination);
+    if (gain != null && gain !== 1) {
+      const g = audioCtx.createGain();
+      g.gain.value = gain;
+      src.connect(g); g.connect(audioCtx.destination);
+    } else {
+      src.connect(audioCtx.destination);
+    }
     src.start(time);
   }
 
@@ -48,13 +59,15 @@ const MetronomeEngine = (() => {
 
     if (soundMode === 'cowbell') {
       const buf = soundType === 'accent' ? cowbellAccentBuffer : cowbellBeatBuffer;
-      if (buf) { scheduleBufferAt(buf, time); return; }
+      if (buf) { scheduleBufferAt(buf, time, COWBELL_GAIN); return; }   // +1dB
       // fall through to click if buffers not yet loaded
     }
 
+    // Click +2dB (0.62→0.78). Accent stays at 1.0 (already at the safe ceiling —
+    // boosting it would clip the downbeat transient).
     let freq, gainPeak, duration;
     if (soundType === 'accent') { freq = 880; gainPeak = 1.0;  duration = 0.06; }
-    else                        { freq = 540; gainPeak = 0.62; duration = 0.04; } // click
+    else                        { freq = 540; gainPeak = 0.78; duration = 0.04; } // click
 
     const osc    = audioCtx.createOscillator();
     const filter = audioCtx.createBiquadFilter();
@@ -168,7 +181,7 @@ const MetronomeEngine = (() => {
         const buf = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
         audioCtx.decodeAudioData(buf.buffer.slice(0))
-          .then(b => playBuffer(b))
+          .then(b => playBuffer(b, WELCOME_GAIN))
           .catch(() => { welcomePlayed = false; });
       } catch (e) { welcomePlayed = false; }
     };
@@ -255,7 +268,7 @@ const MetronomeEngine = (() => {
       osc.type = 'sine';
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.55, t + 0.005);
+      gain.gain.linearRampToValueAtTime(0.49, t + 0.005);   // −1dB, matches the cue buffers
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -264,17 +277,23 @@ const MetronomeEngine = (() => {
     });
   }
 
-  function playBuffer(buffer) {
+  function playBuffer(buffer, gain) {
     if (!audioCtx || !buffer) return;
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
-    src.connect(audioCtx.destination);
+    if (gain != null && gain !== 1) {
+      const g = audioCtx.createGain();
+      g.gain.value = gain;
+      src.connect(g); g.connect(audioCtx.destination);
+    } else {
+      src.connect(audioCtx.destination);
+    }
     src.start();
   }
 
-  function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer);           else playSyntheticCue([880, 660, 440],       0.18); }
-  function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer);         else playSyntheticCue([440, 660, 880],       0.18); }
-  function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer); else playSyntheticCue([440, 550, 660, 880], 0.15); }
+  function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer,           CUE_GAIN); else playSyntheticCue([880, 660, 440],       0.18); }
+  function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer,         CUE_GAIN); else playSyntheticCue([440, 660, 880],       0.18); }
+  function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer, CUE_GAIN); else playSyntheticCue([440, 550, 660, 880], 0.15); }
 
   function setSoundMode(mode) { if (mode === 'click' || mode === 'cowbell') soundMode = mode; }
   function getSoundMode()     { return soundMode; }
