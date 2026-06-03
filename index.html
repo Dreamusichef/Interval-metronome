@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603f">
+  <link rel="stylesheet" href="style.css?v=20260603g">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -248,7 +248,11 @@
               <button class="rogue-btn" id="rogueAudioEnableBtn" disabled>Enable mic / interface</button>
               <select class="rogue-select" id="rogueAudioDeviceSelect" style="display:none"></select>
             </div>
-            <div class="rogue-meter" id="rogueAudioMeter"><i class="rogue-meter-fill" id="rogueAudioMeterFill"></i></div>
+            <div class="rogue-meter" id="rogueAudioMeter">
+              <i class="rogue-meter-fill" id="rogueAudioMeterFill"></i>
+              <i class="rogue-meter-peak" id="rogueAudioMeterPeak"></i>
+            </div>
+            <div class="rogue-gain-hint" id="rogueAudioGain">Play a few hits and set your interface gain so the bar lands in the green — raise it if it barely moves, lower it if it hits the red.</div>
             <div class="rogue-row" style="margin-top:8px">
               <button class="rogue-btn" id="rogueAudioSensBtn" disabled>Set sensitivity</button>
             </div>
@@ -367,7 +371,7 @@
   <script defer src="metronome.js?v=20260603c"></script>
   <script defer src="app.js?v=20260603b"></script>
   <script defer src="audio-input.js?v=4"></script>
-  <script defer src="roguelite.js?v=20260603k"></script>
+  <script defer src="roguelite.js?v=20260603l"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

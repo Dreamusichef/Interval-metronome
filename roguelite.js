@@ -551,6 +551,7 @@ const RogueliteMode = (() => {
   let sensitivityArmed = false;     // true while "set sensitivity" is listening
   let sensHits = 0;                 // onsets seen during sensitivity calibration
   let sensLevels = [];              // meter levels seen during it (to estimate the noise floor)
+  let meterPeakHold = 0;            // decaying peak for the input/gain meter
   const AUDIO_DEFAULT_THRESHOLD = 0.03;
 
   // Switch between MIDI and Audio. Offset calibration is per-source (the audio path
@@ -623,9 +624,31 @@ const RogueliteMode = (() => {
   }
   function onAudioLevel(peak) {
     if (sensitivityArmed) sensLevels.push(peak);   // sample the level (incl. the quiet between hits)
-    if (!el.audioMeterFill) return;
-    const pct = Math.max(0, Math.min(100, Math.round(peak * 140)));   // ~0.7 peak → full
-    el.audioMeterFill.style.width = pct + '%';
+
+    // Peak-hold: jumps to the level instantly, decays slowly so a hit's transient
+    // peak stays readable for ~1s instead of flickering.
+    meterPeakHold = Math.max(peak, meterPeakHold * 0.95);
+
+    if (el.audioMeterFill) {
+      // Full-scale (0→1): the right edge of the bar IS clipping.
+      el.audioMeterFill.style.width = Math.max(0, Math.min(100, peak * 100)) + '%';
+      el.audioMeterFill.classList.toggle('hot',  peak >= 0.85 && peak < 0.97);
+      el.audioMeterFill.classList.toggle('clip', peak >= 0.97);
+    }
+    if (el.audioMeterPeak) el.audioMeterPeak.style.left = Math.min(100, meterPeakHold * 100) + '%';
+
+    // Gain-staging guidance, read off the held peak (stable). Helps the user set
+    // their interface gain knob before the sensitivity test.
+    if (el.audioGain) {
+      const ph = meterPeakHold;
+      let msg, cls;
+      if (ph < 0.06)      { msg = 'Play a few hits — raise your interface gain if the bar barely moves.'; cls = ''; }
+      else if (ph < 0.85) { msg = 'Good level ✓ — your hardest hits sit in the green.'; cls = 'good'; }
+      else if (ph < 0.97) { msg = 'Hot — ease the interface gain down a little.'; cls = 'hot'; }
+      else                { msg = 'Clipping — turn the gain down (distortion hurts detection).'; cls = 'clip'; }
+      el.audioGain.textContent = msg;
+      el.audioGain.className = 'rogue-gain-hint' + (cls ? ' ' + cls : '');
+    }
   }
 
   // Sensitivity = set the noise GATE just above the quiet level (the floor), NOT
@@ -1573,6 +1596,8 @@ const RogueliteMode = (() => {
       audioStatus:    document.getElementById('rogueAudioStatus'),
       audioMeter:     document.getElementById('rogueAudioMeter'),
       audioMeterFill: document.getElementById('rogueAudioMeterFill'),
+      audioMeterPeak: document.getElementById('rogueAudioMeterPeak'),
+      audioGain:      document.getElementById('rogueAudioGain'),
       modeBtns:       Array.from(document.querySelectorAll('.rogue-mode-btn')),
       gameParams:     document.getElementById('rogueGameParams'),
       gauntletParams: document.getElementById('rogueGauntletParams'),
