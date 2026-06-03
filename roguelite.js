@@ -1208,8 +1208,8 @@ const RogueliteMode = (() => {
     // app owns (there is no dedicated game-over asset in this build).
     try { MetronomeEngine.playSetEndCue(); } catch (e) {}
 
+    saveRunRecord();          // saves + computes any newly-unlocked trophies first
     showGameOver(classification);
-    saveRunRecord();
     updateGates();
   }
 
@@ -1262,8 +1262,8 @@ const RogueliteMode = (() => {
     }
     // For the natural-finish path the cue already fired in finishSession().
 
+    saveRunRecord();          // saves + computes any newly-unlocked trophies first
     showComplete();
-    saveRunRecord();
     updateGates();
   }
 
@@ -1300,24 +1300,68 @@ const RogueliteMode = (() => {
     return { rank: rankFor(pct), pct };
   }
 
-  // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent).
+  // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent),
+  // and compute any newly-unlocked trophies for the run-end popup.
   function saveRunRecord() {
     if (typeof window === 'undefined' || !window.Cloud || !window.Cloud.saveRun) return;
     const { rank, pct } = runResultRankPct();
     const isGauntlet = runState.mode === 'gauntlet';
-    try {
-      window.Cloud.saveRun({
-        instrument: runState.instrument || 'kick',
-        mode: runState.mode,
-        bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
-        level: isGauntlet ? runState.level : null,
-        rank: rank,
-        green_pct: pct,
-        duration_sec: isGauntlet ? null : runState.gameMins * 60,
-        survival_sec: (runState.mode === 'suddendeath') ? Math.round(runState.survivalSec) : null,
-        cleared: runState.status === 'complete',
-      });
-    } catch (e) { /* never let a save error break the game */ }
+    const rec = {
+      instrument: runState.instrument || 'kick',
+      mode: runState.mode,
+      bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
+      level: isGauntlet ? runState.level : null,
+      rank: rank,
+      green_pct: pct,
+      duration_sec: isGauntlet ? null : runState.gameMins * 60,
+      survival_sec: (runState.mode === 'suddendeath') ? Math.round(runState.survivalSec) : null,
+      cleared: runState.status === 'complete',
+      created_at: new Date().toISOString(),
+    };
+    evaluateTrophies(rec);                       // local diff → pendingTrophies (for the popup)
+    try { window.Cloud.saveRun(rec); } catch (e) { /* never let a save error break the game */ }
+  }
+
+  // ── Trophy notifications ─────────────────────────────────────────────────────
+  // Keep a local copy of the signed-in user's runs + their trophy tier-state. On
+  // each finished run we append the record locally and diff, so newly-unlocked
+  // trophies (and tier-ups) can be celebrated immediately — no refetch needed.
+  let trophyRuns = null;        // null until signed-in + loaded
+  let trophyBaseline = null;    // { id: reachedTier } before this run
+  let pendingTrophies = [];     // newly-unlocked this run, consumed by the overlay
+
+  function loadTrophyBaseline(user) {
+    if (!window.Achievements) return;
+    if (!user || !window.Cloud) { trophyRuns = null; trophyBaseline = null; return; }
+    window.Cloud.myRuns().then(runs => {
+      trophyRuns = runs.slice();
+      trophyBaseline = window.Achievements.reachedMap(runs);
+    }).catch(() => {});
+  }
+
+  function evaluateTrophies(rec) {
+    if (!window.Achievements || !trophyRuns) return;   // signed out / not loaded yet
+    trophyRuns.push(rec);
+    const after = window.Achievements.reachedMap(trophyRuns);
+    pendingTrophies = window.Achievements.diff(trophyBaseline || {}, after);
+    trophyBaseline = after;
+  }
+
+  // Markup for the "trophy unlocked" block appended to the run-end overlay.
+  function trophiesWonHtml() {
+    if (!pendingTrophies.length || !window.Achievements) return '';
+    const A = window.Achievements;
+    const items = pendingTrophies.map(t => {
+      const tierName = (t.ach.tiers.length > 1)
+        ? (A.TIER_NAMES[Math.min(t.reached, 4)] || ('Tier ' + t.reached))
+        : 'Unlocked';
+      return '<div class="rtw-item">' + A.badgeHtml(t.ach, t.reached, true) +
+        '<div class="rtw-text"><div class="rtw-name">' + escapeHtml(t.ach.name) + '</div>' +
+        '<div class="rtw-tier">' + escapeHtml(tierName) + '</div></div></div>';
+    }).join('');
+    const title = pendingTrophies.length > 1 ? 'Trophies Unlocked!' : 'Trophy Unlocked!';
+    pendingTrophies = [];
+    return '<div class="rogue-trophies-won"><div class="rtw-title">🏆 ' + title + '</div>' + items + '</div>';
   }
 
   // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
@@ -1361,7 +1405,7 @@ const RogueliteMode = (() => {
     el.overlayBody.innerHTML =
       headline +
       '<div class="rogue-diag-line">' + line + '</div>' +
-      resultTable();
+      resultTable() + trophiesWonHtml();
     el.overlay.classList.add('visible');
   }
 
@@ -1380,7 +1424,7 @@ const RogueliteMode = (() => {
       ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
     }
     el.overlayBody.innerHTML =
-      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
+      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable() + trophiesWonHtml();
     el.overlay.classList.add('visible');
   }
 
@@ -1700,6 +1744,13 @@ const RogueliteMode = (() => {
       updateGates();
     });
 
+    // Load the trophy baseline once Cloud is ready (it loads after this script);
+    // refreshes whenever auth changes.
+    (function wireTrophies() {
+      if (window.Cloud && window.Cloud.onAuth) window.Cloud.onAuth(loadTrophyBaseline);
+      else setTimeout(wireTrophies, 200);
+    })();
+
     // Ramp lifecycle from app.js.
     document.addEventListener('ramp:start',     e => maybeCompleteOnBpm(e.detail && e.detail.bpm));
     document.addEventListener('ramp:bpmchange', e => maybeCompleteOnBpm(e.detail && e.detail.bpm));
@@ -1735,6 +1786,6 @@ const RogueliteMode = (() => {
   return {
     // public surface (mostly for debugging / future wiring)
     LEVELS, runState, enableMidi, learnKick, selectInstrument, startCalQuarters, startCal16, startRun,
-    _math: RL_TimingMath,
+    _math: RL_TimingMath, _loadTrophyBaseline: loadTrophyBaseline,
   };
 })();

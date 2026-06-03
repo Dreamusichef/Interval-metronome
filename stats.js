@@ -186,96 +186,31 @@ async function renderGlobal() {
     table(head, body);
 }
 
-// ── Trophies / achievements ──────────────────────────────────────────────────
-// Everything is derived from the user's own runs (no extra storage). Each trophy
-// is "tiered": one-offs are just a single tier of 1. icon is an emoji placeholder —
-// swap for an <img src> later to drop in custom badge art without touching logic.
-const TIER_NAMES  = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];
-
-const ACHIEVEMENTS = [
-  { id: 'mileage',  name: 'Mileage',        icon: '🥁', key: 'total',          tiers: [10, 50, 100, 500], unit: ' runs' },
-  { id: 'sharp',    name: 'Sharpshooter',   icon: '🎯', key: 'sOrBetter',      tiers: [1, 10, 50],        unit: ' S+ ranks' },
-  { id: 'untouch',  name: 'Untouchable',    icon: '💎', key: 'ss',             tiers: [1, 10, 25],        unit: ' SS ranks' },
-  { id: 'speed',    name: 'Speed Demon',    icon: '⚡', key: 'maxBpm',         tiers: [120, 160, 200, 240], fmt: v => v + ' BPM' },
-  { id: 'iron',     name: 'Iron Endurance', icon: '🔥', key: 'bestSurvival',   tiers: [60, 180, 300, 600],  fmt: v => fmtMMSS(v) + ' survived' },
-  { id: 'streak',   name: 'Consistency',    icon: '📅', key: 'dayStreak',      tiers: [3, 7, 30],         fmt: v => v + '-day streak' },
-  { id: 'first',    name: 'First Blood',    icon: '✅', key: 'total',          tiers: [1],  desc: 'Complete your first run.' },
-  { id: 'perfect',  name: 'Perfectionist',  icon: '✨', key: 'flawless',       tiers: [1],  desc: 'Land a 100% green run.' },
-  { id: 'gaunt',    name: 'Gauntlet Slayer',icon: '🏆', key: 'gauntletCleared',tiers: [1],  desc: 'Clear a Gauntlet.' },
-  { id: 'ambi',     name: 'Ambidextrous',   icon: '🤹', key: 'instruments',    tiers: [2],  desc: 'Log runs on both Kick and Snare.' },
-  { id: 'marathon', name: 'Marathon',       icon: '⏱️', key: 'longestRun',     tiers: [600],desc: 'A single run of 10+ minutes.' },
-  { id: 'range',    name: 'Full Spectrum',  icon: '🎚️', key: 'distinctBpms',   tiers: [5],  desc: 'Play at 5 different tempos.' },
-];
-
-function deriveMetrics(runs) {
-  const days = [...new Set(runs.map(r => (r.created_at || '').slice(0, 10)).filter(Boolean))].sort();
-  return {
-    total: runs.length,
-    sOrBetter: runs.filter(r => (RANK_ORDER[r.rank] ?? -1) >= RANK_ORDER.S).length,
-    ss: runs.filter(r => r.rank === 'SS').length,
-    maxBpm: runs.reduce((m, r) => Math.max(m, r.bpm || 0), 0),
-    bestSurvival: runs.reduce((m, r) => Math.max(m, r.survival_sec || 0), 0),
-    flawless: runs.some(r => (r.green_pct || 0) >= 100) ? 1 : 0,
-    gauntletCleared: runs.some(r => r.mode === 'gauntlet' && r.cleared) ? 1 : 0,
-    instruments: new Set(runs.map(r => r.instrument || 'kick')).size,
-    longestRun: runs.reduce((m, r) => Math.max(m, r.duration_sec || 0), 0),
-    distinctBpms: new Set(runs.filter(r => r.bpm).map(r => r.bpm)).size,
-    dayStreak: longestDayStreak(days),
-  };
-}
-
-// Longest run of consecutive calendar days (YYYY-MM-DD strings, pre-sorted).
-function longestDayStreak(days) {
-  let best = 0, cur = 0, prev = null;
-  for (const d of days) {
-    const t = Date.parse(d + 'T00:00:00');
-    if (prev !== null && t - prev === 86400000) cur++;
-    else cur = 1;
-    prev = t;
-    if (cur > best) best = cur;
-  }
-  return best;
-}
-
+// ── Trophies / achievements (definitions live in achievements.js — shared with
+//    the game page so the run-end popup uses the exact same trophies) ───────────
 async function renderTrophies() {
   $('statsSummary').innerHTML = '';
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
+  if (!window.Achievements) { $('statsContent').innerHTML = '<div class="stats-empty">Trophies unavailable.</div>'; return; }
   if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
-  const m = deriveMetrics(myRunsCache);
+  const A = window.Achievements;
+  const m = A.deriveMetrics(myRunsCache);
 
   let unlocked = 0;
-  const cards = ACHIEVEMENTS.map(a => {
-    const value = m[a.key] || 0;
-    const reached = a.tiers.filter(t => value >= t).length;   // highest tier index reached
-    const maxed = reached >= a.tiers.length;
-    const earned = reached > 0;
-    if (earned) unlocked++;
-    const next = maxed ? null : a.tiers[reached];
-    const tierColorIdx = Math.min(reached, 4);
-    const showVal = a.fmt ? a.fmt : (v => v + (a.unit || ''));
-
-    // Sub-line: tier label for multi-tier; progress / desc otherwise.
-    let tierLabel = '';
-    if (a.tiers.length > 1) tierLabel = earned ? (TIER_NAMES[Math.min(reached, 4)] || ('Tier ' + reached)) : 'Locked';
-    else tierLabel = earned ? 'Unlocked' : 'Locked';
-
-    let prog, pct;
-    if (maxed) { prog = '★ Maxed · ' + showVal(a.tiers[a.tiers.length - 1]); pct = 100; }
-    else if (a.tiers.length === 1) { prog = a.desc || ('Reach ' + showVal(a.tiers[0])); pct = Math.min(100, value / a.tiers[0] * 100); }
-    else { prog = showVal(value) + '  →  next ' + showVal(next); pct = Math.min(100, value / next * 100); }
-
-    return '<div class="trophy ' + (earned ? 'earned' : 'locked') + ' tier-' + tierColorIdx + '">' +
-        '<div class="trophy-badge"><span class="trophy-icon">' + a.icon + '</span>' +
-          (earned ? '' : '<span class="trophy-lock">🔒</span>') + '</div>' +
+  const cards = A.LIST.map(a => {
+    const e = A.evaluate(a, m);
+    if (e.earned) unlocked++;
+    return '<div class="trophy ' + (e.earned ? 'earned' : 'locked') + ' tier-' + e.tierColorIdx + '">' +
+        A.badgeHtml(a, e.reached) +
         '<div class="trophy-name">' + esc(a.name) + '</div>' +
-        '<div class="trophy-tier">' + tierLabel + (a.tiers.length > 1 && earned && !maxed ? ' · ' + reached + '/' + a.tiers.length : '') + '</div>' +
-        '<div class="trophy-bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="trophy-prog">' + esc(prog) + '</div>' +
+        '<div class="trophy-tier">' + e.tierLabel + (a.tiers.length > 1 && e.earned && !e.maxed ? ' · ' + e.reached + '/' + a.tiers.length : '') + '</div>' +
+        '<div class="trophy-bar"><i style="width:' + e.pct + '%"></i></div>' +
+        '<div class="trophy-prog">' + esc(e.prog) + '</div>' +
       '</div>';
   });
 
   $('statsContent').innerHTML =
-    '<div class="trophy-summary"><b>' + unlocked + '</b> / ' + ACHIEVEMENTS.length + ' trophies unlocked</div>' +
+    '<div class="trophy-summary"><b>' + unlocked + '</b> / ' + A.LIST.length + ' trophies unlocked</div>' +
     '<div class="trophy-grid">' + cards.join('') + '</div>';
 }
 
