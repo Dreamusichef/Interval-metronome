@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603h">
+  <link rel="stylesheet" href="style.css?v=20260603i">
 </head>
 <body>
   <div class="app-container">
@@ -31,20 +31,21 @@
 
       <!-- Main (signed-in) -->
       <div class="stats-main" id="statsMain" hidden>
-        <!-- Personal / Global toggle -->
+        <!-- Personal / Global / Trophies toggle -->
         <div class="stats-viewtoggle">
-          <button class="stats-view-btn active" data-view="personal">Personal Stats</button>
-          <button class="stats-view-btn" data-view="global">Global Leaderboard</button>
+          <button class="stats-view-btn active" data-view="personal">Personal</button>
+          <button class="stats-view-btn" data-view="global">Global</button>
+          <button class="stats-view-btn" data-view="trophies">Trophies</button>
         </div>
 
         <!-- Instrument: Kick / Snare are separate boards -->
-        <div class="stats-instr">
+        <div class="stats-instr" id="statsInstrRow">
           <button class="stats-instr-btn active" data-instr="kick">Kick</button>
           <button class="stats-instr-btn" data-instr="snare">Snare</button>
         </div>
 
         <!-- Mode buttons -->
-        <div class="stats-modes">
+        <div class="stats-modes" id="statsModesRow">
           <button class="stats-mode-btn active" data-mode="timetrial">Time Trial</button>
           <button class="stats-mode-btn" data-mode="suddendeath">Sudden Death</button>
           <button class="stats-mode-btn" data-mode="gauntlet">Gauntlet</button>
@@ -64,6 +65,6 @@
 
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="cloud.js?v=20260603d"></script>
-  <script defer src="stats.js?v=20260603d"></script>
+  <script defer src="stats.js?v=20260603f"></script>
 </body>
 </html>
