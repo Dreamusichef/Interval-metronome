@@ -549,8 +549,9 @@ const RogueliteMode = (() => {
   // INPUT SOURCE  (MIDI vs Audio)
   // ───────────────────────────────────────────────────────────────────────────
   let sensitivityArmed = false;     // true while "set sensitivity" is listening
-  let sensPeaks = [];               // collected onset peaks during sensitivity calibration
-  const AUDIO_DEFAULT_THRESHOLD = 0.06;
+  let sensHits = 0;                 // onsets seen during sensitivity calibration
+  let sensMaxLevel = 0;             // loudest meter level seen during it (sets the gate)
+  const AUDIO_DEFAULT_THRESHOLD = 0.04;
 
   // Switch between MIDI and Audio. Offset calibration is per-source (the audio path
   // has different latency), so switching invalidates it — you recalibrate.
@@ -611,36 +612,37 @@ const RogueliteMode = (() => {
   // the peak. During calibration/run it also feeds the detection buffer.
   function onAudioOnset(perfMs, peak) {
     if (sensitivityArmed) {
-      sensPeaks.push(peak);
-      setAudioStatus('Sensitivity: ' + sensPeaks.length + ' hits captured…');
+      sensHits++;
+      setAudioStatus('Sensitivity: ' + sensHits + ' hits captured…');
     }
     if (el.audioMeter) { el.audioMeter.classList.add('hit'); setTimeout(() => el.audioMeter && el.audioMeter.classList.remove('hit'), 90); }
-    // Debounce (worklet already applies a refractory; this guards the shared buffer).
+    // Debounce (worklet already masks retriggers; this guards the shared buffer).
     if (perfMs - lastKickTs < KICK_DEBOUNCE_MS) return;
     lastKickTs = perfMs;
     pushKickEvent(perfMs);
   }
   function onAudioLevel(peak) {
+    if (sensitivityArmed && peak > sensMaxLevel) sensMaxLevel = peak;   // track true peak level
     if (!el.audioMeterFill) return;
     const pct = Math.max(0, Math.min(100, Math.round(peak * 140)));   // ~0.7 peak → full
     el.audioMeterFill.style.width = pct + '%';
   }
 
-  // Sensitivity calibration: listen for a handful of hits, then set the trigger
-  // threshold to ~55% of the median peak (between noise floor and hit level).
+  // Sensitivity calibration: listen for a handful of hits, then set the noise-gate
+  // threshold to ~35% of the LOUDEST level seen (well below hit peaks, above noise).
+  // The worklet's retrigger-cancel mask handles ring rejection independently.
   function setSensitivity() {
     if (!runState.audioReady) { setAudioStatus('Enable audio first.', true); return; }
-    sensPeaks = [];
+    sensHits = 0;
+    sensMaxLevel = 0;
     sensitivityArmed = true;
     setAudioStatus('Hit your ' + instrLabel().toLowerCase() + ' ~6 times at playing volume…');
     setTimeout(() => {
       sensitivityArmed = false;
-      if (sensPeaks.length < 3) { setAudioStatus('Only ' + sensPeaks.length + ' hits — try again, a bit louder.', true); return; }
-      const sorted = sensPeaks.slice().sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
-      const thresh = Math.max(0.01, median * 0.55);
+      if (sensHits < 3 || sensMaxLevel < 0.02) { setAudioStatus('Only ' + sensHits + ' clear hits — turn up your interface gain or hit a bit harder, then retry.', true); return; }
+      const thresh = Math.max(0.015, sensMaxLevel * 0.35);
       AudioInput.setThreshold(thresh);
-      setAudioStatus('Sensitivity set from ' + sensPeaks.length + ' hits. Now calibrate, then run.');
+      setAudioStatus('Sensitivity set from ' + sensHits + ' hits. Now calibrate, then run.');
       updateGates();
     }, 6000);
   }
