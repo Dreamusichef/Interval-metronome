@@ -305,11 +305,14 @@ const RogueliteMode = (() => {
   // kick events. Off for release (flip to true to debug timing/clock issues).
   const RL_DEBUG = false;
 
-  // Default single combined-kick MIDI note (GM kick). Overridable via "learn".
+  // Default GM note per drum (kick 36, acoustic snare 38). Overridable via "learn".
   const DEFAULT_KICK_NOTE = 36;
+  const DEFAULT_NOTE = { kick: 36, snare: 38 };
+  const INSTR_LABEL = { kick: 'Kick', snare: 'Snare' };
 
   // ── Run / session state ──────────────────────────────────────────────────
   const runState = {
+    instrument: null,           // 'kick' | 'snare' — COMPULSORY before a run; keeps boards separate
     mode: 'timetrial',          // 'timetrial' | 'suddendeath' (both free BPM+duration) | 'gauntlet'
     level: null,                // 1..6 (gauntlet only)
     gameBpm: 120,               // game mode: chosen BPM
@@ -502,7 +505,7 @@ const RogueliteMode = (() => {
     if (learning) {
       learning = false;
       runState.kickNote = note;
-      el.kickNote && (el.kickNote.textContent = 'Kick note: ' + note);
+      el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + note);
       if (onLearned) { const cb = onLearned; onLearned = null; cb(note); }
       updateGates();
       return;
@@ -519,9 +522,25 @@ const RogueliteMode = (() => {
   }
 
   function learnKick() {
+    if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return; }
     if (!midiAccess) { setMidiStatus('Connect MIDI first.', true); return; }
     learning = true;
-    el.kickNote && (el.kickNote.textContent = 'Hit your kick…');
+    el.kickNote && (el.kickNote.textContent = 'Hit your ' + instrLabel().toLowerCase() + '…');
+  }
+
+  // Current drum label ('Kick' | 'Snare'); falls back to 'Note' before a choice.
+  function instrLabel() { return INSTR_LABEL[runState.instrument] || 'Note'; }
+
+  // Compulsory drum choice. Sets the GM default note for that drum (until learned),
+  // updates labels/gates. Switching drum resets the listened note to the default.
+  function selectInstrument(instr) {
+    if (instr !== 'kick' && instr !== 'snare') return;
+    runState.instrument = instr;
+    runState.kickNote = DEFAULT_NOTE[instr];
+    el.instrBtns && el.instrBtns.forEach(b => b.classList.toggle('active', b.dataset.instr === instr));
+    el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + runState.kickNote + ' (default)');
+    setMidiStatus(midiAccess ? 'Now learn your ' + instrLabel().toLowerCase() + " note, or use the default." : 'Connect MIDI, then learn your ' + instrLabel().toLowerCase() + ' note.');
+    updateGates();
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -539,7 +558,8 @@ const RogueliteMode = (() => {
   // Shared setup for either calibration step. Returns false if it couldn't start.
   async function beginCalStep() {
     if (typeof MetronomeEngine === 'undefined') return false;
-    if (runState.kickNote == null) { setMidiStatus('Learn your kick note first.', true); return false; }
+    if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return false; }
+    if (runState.kickNote == null) { setMidiStatus('Learn your note first.', true); return false; }
     if (window.AppRamp && window.AppRamp.isRunning()) window.AppRamp.stop();
     MetronomeEngine.init();
     if (!(await captureSync())) { setCalStatus('Audio not ready — try again.', true); return false; }
@@ -665,7 +685,7 @@ const RogueliteMode = (() => {
       const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
       if (gross.sampleCount < CAL_MIN_SAMPLES) {
         abortCalibration('Quarters: only ' + gross.sampleCount + ' hits detected — ' +
-          'play a kick on every click, then try again.');
+          'play a hit on every click, then try again.');
         return;
       }
       const G = gross.meanOffset;
@@ -1129,6 +1149,7 @@ const RogueliteMode = (() => {
     const isGauntlet = runState.mode === 'gauntlet';
     try {
       window.Cloud.saveRun({
+        instrument: runState.instrument || 'kick',
         mode: runState.mode,
         bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
         level: isGauntlet ? runState.level : null,
@@ -1168,8 +1189,8 @@ const RogueliteMode = (() => {
 
   function showGameOver(c) {
     const line = (c && c.result === 'cram')
-      ? 'Crammed an extra kick into one 16th — rushed too hard.'
-      : 'Dropped a 16th — a kick went missing (a skip or a frozen foot).';
+      ? 'Crammed an extra hit into one 16th — rushed too hard.'
+      : 'Dropped a 16th — a hit went missing (a skip, a frozen limb, or too soft).';
     el.overlayTitle.textContent = 'RUN OVER';
     el.overlayTitle.className = 'rogue-overlay-title fail';
     // Sudden Death headlines SURVIVAL TIME (the leaderboard metric); other modes
@@ -1356,25 +1377,27 @@ const RogueliteMode = (() => {
   }
 
   // Enable/disable the step buttons so the flow is enforced:
-  // MIDI → learn kick → calibrate → choose mode/params → run.
+  // pick drum → MIDI → learn note → calibrate → choose mode/params → run.
   function updateGates() {
+    const hasInstr = !!runState.instrument;     // compulsory
     const hasMidi = !!midiAccess && midiInputs.length > 0;
-    const hasKick = hasMidi && runState.kickNote != null;
+    const hasKick = hasInstr && hasMidi && runState.kickNote != null;
     const hasCal = runState.calibration != null;
     const hasAnchor = hasCal && runState.calibration.grossOffset != null;   // enables 16ths refine
     // Free modes always have params (BPM input defaults); GAUNTLET needs a level picked.
     const hasTarget = (runState.mode !== 'gauntlet') || (runState.level != null);
     const busy = runState.status === 'calibrating' || runState.status === 'running';
 
-    if (el.learnBtn)      el.learnBtn.disabled      = !hasMidi || busy;
+    if (el.learnBtn)      el.learnBtn.disabled      = !hasMidi || !hasInstr || busy;
     if (el.calQuartersBtn) el.calQuartersBtn.disabled = !hasKick || busy;
     if (el.cal16Btn)      el.cal16Btn.disabled      = !hasKick || !hasAnchor || busy;
-    if (el.manualBtn)     el.manualBtn.disabled     = busy;
-    // Run needs the offset (calibrated or manual), a target, AND a live MIDI input
-    // (manual offset can be set with no kit attached, so check MIDI explicitly).
-    if (el.runBtn)   el.runBtn.disabled   = !(hasCal && hasTarget && hasMidi) || busy;
+    if (el.manualBtn)     el.manualBtn.disabled     = !hasInstr || busy;
+    // Run needs a drum chosen, the offset (calibrated or manual), a target, AND a
+    // live MIDI input (manual offset can be set with no kit attached).
+    if (el.runBtn)   el.runBtn.disabled   = !(hasInstr && hasCal && hasTarget && hasMidi) || busy;
     el.levelBtns && el.levelBtns.forEach(b => { b.disabled = busy; });
     el.modeBtns   && el.modeBtns.forEach(b => { b.disabled = busy; });
+    el.instrBtns  && el.instrBtns.forEach(b => { b.disabled = busy; });
   }
 
   function selectLevel(n) {
@@ -1413,6 +1436,8 @@ const RogueliteMode = (() => {
     el = {
       toggle:       document.getElementById('rogueToggle'),
       body:         document.getElementById('rogueBody'),
+      instrBtns:    Array.from(document.querySelectorAll('.rogue-instr-btn')),
+      instrStatus:  document.getElementById('rogueInstrStatus'),
       modeBtns:       Array.from(document.querySelectorAll('.rogue-mode-btn')),
       gameParams:     document.getElementById('rogueGameParams'),
       gauntletParams: document.getElementById('rogueGauntletParams'),
@@ -1448,7 +1473,7 @@ const RogueliteMode = (() => {
     };
     if (!el.toggle) return; // markup not present — nothing to wire
 
-    el.kickNote && (el.kickNote.textContent = 'Kick note: ' + runState.kickNote + ' (default)');
+    el.kickNote && (el.kickNote.textContent = 'Note: pick a drum first');
 
     const applyToggle = () => {
       el.body.classList.toggle('visible', el.toggle.checked);
@@ -1468,6 +1493,7 @@ const RogueliteMode = (() => {
       }
     } catch (e) {}
 
+    el.instrBtns.forEach(b => b.addEventListener('click', () => selectInstrument(b.dataset.instr)));
     el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
     el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
     el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
@@ -1523,7 +1549,7 @@ const RogueliteMode = (() => {
 
   return {
     // public surface (mostly for debugging / future wiring)
-    LEVELS, runState, enableMidi, learnKick, startCalQuarters, startCal16, startRun,
+    LEVELS, runState, enableMidi, learnKick, selectInstrument, startCalQuarters, startCal16, startRun,
     _math: RL_TimingMath,
   };
 })();

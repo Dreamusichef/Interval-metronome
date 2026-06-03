@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603b">
+  <link rel="stylesheet" href="style.css?v=20260603d">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -208,9 +208,19 @@
           <a class="cloud-stats-link" href="stats.html">Stats &amp; Leaderboard ▸</a>
         </div>
 
-        <!-- Step 1: MIDI -->
+        <!-- Step 1: Drum (compulsory — runs + leaderboards are separate per drum) -->
         <div class="rogue-step">
-          <span class="rogue-step-label">1 · MIDI Device</span>
+          <span class="rogue-step-label">1 · Drum</span>
+          <div class="rogue-instrument-row">
+            <button class="rogue-instr-btn" data-instr="kick">Kick</button>
+            <button class="rogue-instr-btn" data-instr="snare">Snare</button>
+          </div>
+          <div class="rogue-status" id="rogueInstrStatus">Pick what you're training — Kick and Snare have separate runs &amp; leaderboards.</div>
+        </div>
+
+        <!-- Step 2: MIDI -->
+        <div class="rogue-step">
+          <span class="rogue-step-label">2 · MIDI Device</span>
           <div class="rogue-row">
             <button class="rogue-btn" id="rogueMidiBtn">Connect MIDI</button>
             <select class="rogue-select" id="rogueDeviceSelect" style="display:none"></select>
@@ -218,18 +228,18 @@
           <div class="rogue-status" id="rogueMidiStatus">Not connected.</div>
         </div>
 
-        <!-- Step 2: Learn kick -->
+        <!-- Step 3: Learn note -->
         <div class="rogue-step">
-          <span class="rogue-step-label">2 · Kick Note</span>
+          <span class="rogue-step-label">3 · Note</span>
           <div class="rogue-row">
-            <button class="rogue-btn" id="rogueLearnBtn" disabled>Learn Kick</button>
-            <span class="rogue-kicknote" id="rogueKickNote">Kick note: 36 (default)</span>
+            <button class="rogue-btn" id="rogueLearnBtn" disabled>Learn Note</button>
+            <span class="rogue-kicknote" id="rogueKickNote">Note: 36 (default)</span>
           </div>
         </div>
 
-        <!-- Step 3: Calibrate -->
+        <!-- Step 4: Calibrate -->
         <div class="rogue-step">
-          <span class="rogue-step-label">3 · Calibrate</span>
+          <span class="rogue-step-label">4 · Calibrate</span>
           <label class="rogue-cal-tempo">
             <span class="rogue-field-label">Fastest comfortable tempo for 16ths</span>
             <span class="rogue-input-unit">
@@ -250,7 +260,7 @@
 
         <!-- Step 4: Mode -->
         <div class="rogue-step">
-          <span class="rogue-step-label">4 · Mode</span>
+          <span class="rogue-step-label">5 · Mode</span>
           <div class="rogue-mode-select">
             <button class="rogue-mode-btn active" data-rmode="timetrial">TIME TRIAL</button>
             <button class="rogue-mode-btn" data-rmode="suddendeath">SUDDEN DEATH</button>
@@ -303,7 +313,7 @@
 
         <!-- Step 5: Run -->
         <div class="rogue-step">
-          <span class="rogue-step-label">5 · Run</span>
+          <span class="rogue-step-label">6 · Run</span>
           <button class="rogue-btn rogue-run-btn" id="rogueRunBtn" disabled>Start Run</button>
           <div class="rogue-status" id="rogueRunStatus">Calibrate, then start.</div>
         </div>
@@ -334,11 +344,11 @@
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="metronome.js?v=20260603"></script>
   <script defer src="app.js?v=20260603"></script>
-  <script defer src="roguelite.js?v=20260603"></script>
+  <script defer src="roguelite.js?v=20260603d"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="cloud.js?v=20260603"></script>
+  <script defer src="cloud.js?v=20260603d"></script>
   <script>
     // Mount the auth bar once Cloud is ready (deferred scripts run after this).
     (function mountAuth() {

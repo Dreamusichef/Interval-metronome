@@ -15,7 +15,7 @@ const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
 const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
 const GAME_BPM_MIN = 60, GAME_BPM_MAX = 240, GAME_BPM_STEP = 10;
 
-const state = { view: 'personal', mode: 'timetrial', bpm: 120, level: 1 };
+const state = { view: 'personal', mode: 'timetrial', instrument: 'kick', bpm: 120, level: 1 };
 let myRunsCache = null;
 
 const $ = (id) => document.getElementById(id);
@@ -61,6 +61,12 @@ function wireControls() {
       document.querySelectorAll('.stats-mode-btn').forEach(x => x.classList.toggle('active', x === b));
       render();
     }));
+  document.querySelectorAll('.stats-instr-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      state.instrument = b.dataset.instr;
+      document.querySelectorAll('.stats-instr-btn').forEach(x => x.classList.toggle('active', x === b));
+      render();
+    }));
   $('statsSubSelectEl').addEventListener('change', (e) => {
     if (state.mode === 'gauntlet') state.level = parseInt(e.target.value, 10);
     else state.bpm = parseInt(e.target.value, 10);
@@ -97,14 +103,17 @@ async function renderPersonal() {
   if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
   const runs = myRunsCache;
   const totalRuns = runs.length;
-  const modeRuns = runs.filter(r => r.mode === state.mode);
+  const instr = state.instrument;
+  const instrRuns = runs.filter(r => (r.instrument || 'kick') === instr);
+  const modeRuns = instrRuns.filter(r => r.mode === state.mode);
 
   $('statsSummary').innerHTML =
     '<span class="stats-stat"><b>' + totalRuns + '</b> total runs</span>' +
+    '<span class="stats-stat"><b>' + instrRuns.length + '</b> on ' + instrLabel(instr) + '</span>' +
     '<span class="stats-stat"><b>' + modeRuns.length + '</b> in ' + modeLabel(state.mode) + '</span>';
 
   if (!modeRuns.length) {
-    $('statsContent').innerHTML = '<div class="stats-empty">No ' + modeLabel(state.mode) + ' runs yet — go set a record.</div>';
+    $('statsContent').innerHTML = '<div class="stats-empty">No ' + instrLabel(instr) + ' ' + modeLabel(state.mode) + ' runs yet — go set a record.</div>';
     return;
   }
 
@@ -142,9 +151,10 @@ async function renderGlobal() {
   const rows = await window.Cloud.leaderboard(
     state.mode,
     isGauntlet ? null : state.bpm,
-    isGauntlet ? state.level : null
+    isGauntlet ? state.level : null,
+    state.instrument
   );
-  const where = isGauntlet ? ('Level ' + state.level) : (state.bpm + ' BPM');
+  const where = instrLabel(state.instrument) + ' · ' + (isGauntlet ? ('Level ' + state.level) : (state.bpm + ' BPM'));
 
   if (!rows.length) {
     $('statsContent').innerHTML = '<div class="stats-empty">No scores yet for ' + modeLabel(state.mode) + ' · ' + where + '. Be the first.</div>';
@@ -176,6 +186,7 @@ function table(headers, rows) {
 }
 function tr(cells) { return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>'; }
 function modeLabel(m) { return m === 'suddendeath' ? 'Sudden Death' : m === 'gauntlet' ? 'Gauntlet' : 'Time Trial'; }
+function instrLabel(i) { return i === 'snare' ? 'Snare' : 'Kick'; }
 
 // ── boot ─────────────────────────────────────────────────────────────────────
 wireControls();

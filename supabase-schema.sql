@@ -32,6 +32,7 @@ create table if not exists public.runs (
   user_id      uuid not null references auth.users on delete cascade,
   created_at   timestamptz not null default now(),
   mode         text not null check (mode in ('timetrial','suddendeath','gauntlet')),
+  instrument   text not null default 'kick' check (instrument in ('kick','snare')),
   bpm          int,            -- free modes (60–240); null for gauntlet
   level        int,            -- gauntlet (1–6); null for free modes
   rank         text not null,  -- 'E','D','C','B','A','S','SS'
@@ -61,7 +62,13 @@ create index if not exists runs_mode_level_idx on public.runs (mode, level);
 -- no user_id, no email). Time Trial / Gauntlet rank by green%, tie-broken by a
 -- longer duration; Sudden Death ranks by survival time.
 drop function if exists public.get_leaderboard(text, int, int);
-create function public.get_leaderboard(p_mode text, p_bpm int default null, p_level int default null)
+drop function if exists public.get_leaderboard(text, int, int, text);
+create function public.get_leaderboard(
+  p_mode text,
+  p_bpm int default null,
+  p_level int default null,
+  p_instrument text default null
+)
 returns table (
   display_name text,
   avatar_url   text,
@@ -80,8 +87,9 @@ as $$
     from runs r
     left join profiles p on p.id = r.user_id
     where r.mode = p_mode
-      and (p_bpm   is null or r.bpm   = p_bpm)
-      and (p_level is null or r.level = p_level)
+      and (p_bpm        is null or r.bpm        = p_bpm)
+      and (p_level      is null or r.level      = p_level)
+      and (p_instrument is null or r.instrument = p_instrument)
   ),
   best_per_user as (
     select *,
@@ -104,4 +112,4 @@ as $$
   limit 100;
 $$;
 
-grant execute on function public.get_leaderboard(text, int, int) to anon, authenticated;
+grant execute on function public.get_leaderboard(text, int, int, text) to anon, authenticated;

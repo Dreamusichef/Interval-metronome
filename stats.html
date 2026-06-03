@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603b">
+  <link rel="stylesheet" href="style.css?v=20260603d">
 </head>
 <body>
   <div class="app-container">
@@ -35,6 +35,12 @@
           <button class="stats-view-btn" data-view="global">Global Leaderboard</button>
         </div>
 
+        <!-- Instrument: Kick / Snare are separate boards -->
+        <div class="stats-instr">
+          <button class="stats-instr-btn active" data-instr="kick">Kick</button>
+          <button class="stats-instr-btn" data-instr="snare">Snare</button>
+        </div>
+
         <!-- Mode buttons -->
         <div class="stats-modes">
           <button class="stats-mode-btn active" data-mode="timetrial">Time Trial</button>
@@ -55,7 +61,7 @@
   </div>
 
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="cloud.js?v=20260603"></script>
-  <script defer src="stats.js?v=20260603"></script>
+  <script defer src="cloud.js?v=20260603d"></script>
+  <script defer src="stats.js?v=20260603d"></script>
 </body>
 </html>

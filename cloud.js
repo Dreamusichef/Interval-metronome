@@ -104,12 +104,13 @@ const Cloud = (() => {
     return data || [];
   }
 
-  async function leaderboard(mode, bpm, level) {
+  async function leaderboard(mode, bpm, level, instrument) {
     if (!init()) return [];
     const { data, error } = await client.rpc('get_leaderboard', {
       p_mode: mode,
       p_bpm: (bpm == null ? null : bpm),
       p_level: (level == null ? null : level),
+      p_instrument: (instrument == null ? null : instrument),
     });
     if (error) { console.warn('[cloud] leaderboard', error.message); return []; }
     return data || [];
