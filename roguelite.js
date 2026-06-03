@@ -1256,15 +1256,12 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // DIAGNOSTICS / overlays  (factual and clinical — the number is the feedback)
   // ───────────────────────────────────────────────────────────────────────────
-  // Single source of truth for a run's final grade. Flawless (every beat GOOD)
-  // → SS; one neutral/bad caps the grade at S (via rankFor).
+  // Single source of truth for a run's final grade: green % → rankFor (SS at 99%+).
   function runResultRankPct() {
     const t = runState.tally;
     const total = t.good + t.neutral + t.bad;
     const pct = total ? Math.round(t.good / total * 100) : 0;
-    const flawless = total > 0 && t.neutral === 0 && t.bad === 0;
-    const rank = flawless ? 'SS' : rankFor(Math.floor(pct));
-    return { rank, pct };
+    return { rank: rankFor(pct), pct };
   }
 
   // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent).
@@ -1394,15 +1391,15 @@ const RogueliteMode = (() => {
     return 'GOOD';
   }
 
-  // Rank bands for the descending grades. SS is NOT here — it's reserved for a
-  // FLAWLESS run (no neutral/bad beats) and applied separately, so a single missed
-  // beat caps you at S for the whole level.
+  // Rank bands by green % (forgiving — SS no longer needs a flawless run, just 99%+):
+  //   SS ≥99 · S 91–98 · A 81–90 · B 66–80 · C 50–65 · D 26–49 · E 0–25
   function rankFor(pct) {
+    if (pct >= 99)  return 'SS';
     if (pct >= 91)  return 'S';
     if (pct >= 81)  return 'A';
     if (pct >= 66)  return 'B';
-    if (pct >= 51)  return 'C';
-    if (pct >= 36)  return 'D';
+    if (pct >= 50)  return 'C';
+    if (pct >= 26)  return 'D';
     return 'E';
   }
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
@@ -1410,14 +1407,11 @@ const RogueliteMode = (() => {
 
   // Style gauge = GOOD beats ÷ total beats in the run, as a %. It only ever FILLS
   // (good beats add; neutral/bad just don't), so it climbs from E and never drops.
-  // SS requires filling it completely — i.e. every beat of the run was GOOD; one
-  // neutral/bad beat makes 100% unreachable, capping the run at S.
+  // Rank comes straight from the gauge via rankFor (SS at 99%+).
   function scoreRank() {
     const t = runState.tally;
     const g = Math.max(0, Math.min(100, Math.round(t.good / (runState.totalRunBeats || 1) * 100)));
-    const flawless = (t.neutral === 0 && t.bad === 0);
-    const rank = (flawless && g >= 91) ? 'SS' : rankFor(g);
-    return { gauge: g, rank };
+    return { gauge: g, rank: rankFor(g) };
   }
 
   // Drive both the setup-panel banner (hidden in HUD mode) and the big HUD banner.
