@@ -228,11 +228,11 @@ const RogueliteMode = (() => {
     6: { bpmStart: 180, bpmCeiling: 200 },
   };
 
-  // Time Trial / Sudden Death pick a BPM from a fixed ladder: 60–240 in steps of 10
-  // (19 buckets). A finite ladder keeps "best rank per BPM" a small, comparable grid
-  // for progress + leaderboards. (300 can be added later by bumping GAME_BPM_MAX.)
+  // Time Trial / Sudden Death pick a BPM from a fixed ladder: 50–250 in steps of 5
+  // (41 buckets). Finer steps because players want to drill at small increments;
+  // the resulting leaderboard density is a display concern handled on the stats page.
   // The pure metronome / Ramp / Stopwatch are untouched — still 20–400.
-  const GAME_BPM_MIN = 60, GAME_BPM_MAX = 240, GAME_BPM_STEP = 10;
+  const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
   const snapGameBpm = (n) => {
     const v = Math.round(n / GAME_BPM_STEP) * GAME_BPM_STEP;
     return Math.max(GAME_BPM_MIN, Math.min(GAME_BPM_MAX, v));

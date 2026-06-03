@@ -13,7 +13,7 @@
 
 const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
 const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
-const GAME_BPM_MIN = 60, GAME_BPM_MAX = 240, GAME_BPM_STEP = 10;
+const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
 
 const state = { view: 'personal', mode: 'timetrial', instrument: 'kick', bpm: 120, level: 1 };
 let myRunsCache = null;
