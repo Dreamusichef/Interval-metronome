@@ -1352,12 +1352,10 @@ const RogueliteMode = (() => {
     if (!pendingTrophies.length || !window.Achievements) return '';
     const A = window.Achievements;
     const items = pendingTrophies.map(t => {
-      const tierName = (t.ach.tiers.length > 1)
-        ? (A.TIER_NAMES[Math.min(t.reached, 4)] || ('Tier ' + t.reached))
-        : 'Unlocked';
+      const tn = A.tierName(t.ach, t.reached);
       return '<div class="rtw-item">' + A.badgeHtml(t.ach, t.reached, true) +
         '<div class="rtw-text"><div class="rtw-name">' + escapeHtml(t.ach.name) + '</div>' +
-        '<div class="rtw-tier">' + escapeHtml(tierName) + '</div></div></div>';
+        '<div class="rtw-tier">' + escapeHtml(tn) + '</div></div></div>';
     }).join('');
     const title = pendingTrophies.length > 1 ? 'Trophies Unlocked!' : 'Trophy Unlocked!';
     pendingTrophies = [];

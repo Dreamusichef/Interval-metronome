@@ -1743,10 +1743,25 @@ body.rogue-run .rogue-section { display: none !important; }
 .trophy-badge.tier-2 { background: linear-gradient(145deg, #ffffff, #c0c0c0 55%, #6e7479); filter: drop-shadow(0 0 10px rgba(200,210,220,0.6)); }
 .trophy-badge.tier-3 { background: linear-gradient(145deg, #fff1a8, #ffd24a 52%, #9a6e16); filter: drop-shadow(0 0 13px rgba(255,210,74,0.7)); }
 .trophy-badge.tier-4 { background: linear-gradient(145deg, #eaffff, #9fe7ff 50%, #3f8fb0); filter: drop-shadow(0 0 16px rgba(120,225,255,0.85)); }
-.trophy-badge.tier-1 .trophy-icon, .trophy-badge.tier-2 .trophy-icon,
-.trophy-badge.tier-3 .trophy-icon, .trophy-badge.tier-4 .trophy-icon {
+/* Higher rungs of the 10-tier ladder (Speed Demon): Platinum → Challenger. */
+.trophy-badge.tier-5  { background: linear-gradient(145deg, #d7fff0, #4fe0c0 52%, #1d7e6a); filter: drop-shadow(0 0 16px rgba(79,224,192,0.8)); }
+.trophy-badge.tier-6  { background: linear-gradient(145deg, #c7ffd9, #2ecc71 52%, #15823f); filter: drop-shadow(0 0 16px rgba(46,204,113,0.8)); }
+.trophy-badge.tier-7  { background: linear-gradient(145deg, #dff3ff, #6fd0ff 52%, #2f73a8); filter: drop-shadow(0 0 17px rgba(111,208,255,0.85)); }
+.trophy-badge.tier-8  { background: linear-gradient(145deg, #efe2ff, #b06fff 52%, #5a2ca8); filter: drop-shadow(0 0 18px rgba(176,111,255,0.9)); }
+.trophy-badge.tier-9  { background: linear-gradient(145deg, #ffd9d9, #ff5c5c 52%, #a01e1e); filter: drop-shadow(0 0 19px rgba(255,92,92,0.9)); }
+.trophy-badge.tier-10 { background: linear-gradient(135deg, #ffe066 0%, #ff8a3c 30%, #ff5cc8 60%, #7fd0ff 100%); filter: drop-shadow(0 0 22px rgba(255,210,120,0.95)); }
+.trophy-badge.tier-1 .trophy-icon, .trophy-badge.tier-2 .trophy-icon, .trophy-badge.tier-3 .trophy-icon,
+.trophy-badge.tier-4 .trophy-icon, .trophy-badge.tier-5 .trophy-icon, .trophy-badge.tier-6 .trophy-icon,
+.trophy-badge.tier-7 .trophy-icon, .trophy-badge.tier-8 .trophy-icon, .trophy-badge.tier-9 .trophy-icon,
+.trophy-badge.tier-10 .trophy-icon {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
 }
+.trophy.tier-5 .trophy-tier  { color: #4fe0c0; }
+.trophy.tier-6 .trophy-tier  { color: #2ecc71; }
+.trophy.tier-7 .trophy-tier  { color: #6fd0ff; }
+.trophy.tier-8 .trophy-tier  { color: #b06fff; }
+.trophy.tier-9 .trophy-tier  { color: #ff7a7a; }
+.trophy.tier-10 .trophy-tier { color: #ffd24a; }
 .trophy-badge.sm { width: 46px; height: 46px; margin-bottom: 0; }
 .trophy-badge.sm .trophy-icon { font-size: 1.35rem; }
 
