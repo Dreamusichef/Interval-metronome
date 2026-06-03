@@ -313,6 +313,8 @@ const RogueliteMode = (() => {
   // ── Run / session state ──────────────────────────────────────────────────
   const runState = {
     instrument: null,           // 'kick' | 'snare' — COMPULSORY before a run; keeps boards separate
+    inputSource: 'midi',        // 'midi' | 'audio' — how kicks are detected
+    audioReady: false,          // audio input started + sensitivity usable
     mode: 'timetrial',          // 'timetrial' | 'suddendeath' (both free BPM+duration) | 'gauntlet'
     level: null,                // 1..6 (gauntlet only)
     gameBpm: 120,               // game mode: chosen BPM
@@ -541,6 +543,106 @@ const RogueliteMode = (() => {
     el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + runState.kickNote + ' (default)');
     setMidiStatus(midiAccess ? 'Now learn your ' + instrLabel().toLowerCase() + " note, or use the default." : 'Connect MIDI, then learn your ' + instrLabel().toLowerCase() + ' note.');
     updateGates();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // INPUT SOURCE  (MIDI vs Audio)
+  // ───────────────────────────────────────────────────────────────────────────
+  let sensitivityArmed = false;     // true while "set sensitivity" is listening
+  let sensPeaks = [];               // collected onset peaks during sensitivity calibration
+  const AUDIO_DEFAULT_THRESHOLD = 0.06;
+
+  // Switch between MIDI and Audio. Offset calibration is per-source (the audio path
+  // has different latency), so switching invalidates it — you recalibrate.
+  function selectInputSource(src) {
+    src = (src === 'audio') ? 'audio' : 'midi';
+    if (src === runState.inputSource) { reflectInputSource(); return; }
+    runState.inputSource = src;
+    runState.calibration = null;      // per-source latency → must recalibrate
+    if (src === 'midi' && window.AudioInput) { try { AudioInput.stop(); } catch (e) {} runState.audioReady = false; }
+    reflectInputSource();
+    updateGates();
+  }
+
+  function reflectInputSource() {
+    const audio = runState.inputSource === 'audio';
+    el.inputBtns && el.inputBtns.forEach(b => b.classList.toggle('active', b.dataset.src === runState.inputSource));
+    if (el.midiSteps)  el.midiSteps.style.display  = audio ? 'none' : '';
+    if (el.audioSteps) el.audioSteps.style.display = audio ? '' : 'none';
+  }
+
+  // Open the audio interface/mic and start onset detection. Onsets feed the SAME
+  // event buffer MIDI uses (pushKickEvent), in the perf-clock domain.
+  async function enableAudio() {
+    if (!runState.instrument) { setAudioStatus('Pick a drum (Kick or Snare) first.', true); return; }
+    if (!window.AudioInput || !AudioInput.supported()) { setAudioStatus('Audio input not supported in this browser.', true); return; }
+    MetronomeEngine.init();
+    const ctx = MetronomeEngine.getAudioContext();
+    const deviceId = el.audioDeviceSelect ? el.audioDeviceSelect.value : '';
+    setAudioStatus('Starting…');
+    const ok = await AudioInput.start(ctx, deviceId, {
+      onOnset: onAudioOnset,
+      onLevel: onAudioLevel,
+      onError: (m) => { runState.audioReady = false; setAudioStatus(m, true); updateGates(); },
+    });
+    if (!ok) return;
+    AudioInput.setThreshold(AUDIO_DEFAULT_THRESHOLD);
+    runState.audioReady = true;
+    await refreshAudioDevices();   // labels appear once permission is granted
+    setAudioStatus('Listening. Hit your ' + instrLabel().toLowerCase() + ' — then set sensitivity.');
+    updateGates();
+  }
+
+  async function refreshAudioDevices() {
+    if (!el.audioDeviceSelect || !window.AudioInput) return;
+    const devs = await AudioInput.listDevices();
+    const cur = el.audioDeviceSelect.value;
+    el.audioDeviceSelect.innerHTML = '';
+    devs.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.deviceId; o.textContent = d.label;
+      el.audioDeviceSelect.appendChild(o);
+    });
+    if (cur) el.audioDeviceSelect.value = cur;
+    el.audioDeviceSelect.style.display = devs.length ? '' : 'none';
+  }
+
+  // Live onset during setup: flash the meter + count; if arming sensitivity, collect
+  // the peak. During calibration/run it also feeds the detection buffer.
+  function onAudioOnset(perfMs, peak) {
+    if (sensitivityArmed) {
+      sensPeaks.push(peak);
+      setAudioStatus('Sensitivity: ' + sensPeaks.length + ' hits captured…');
+    }
+    if (el.audioMeter) { el.audioMeter.classList.add('hit'); setTimeout(() => el.audioMeter && el.audioMeter.classList.remove('hit'), 90); }
+    // Debounce (worklet already applies a refractory; this guards the shared buffer).
+    if (perfMs - lastKickTs < KICK_DEBOUNCE_MS) return;
+    lastKickTs = perfMs;
+    pushKickEvent(perfMs);
+  }
+  function onAudioLevel(peak) {
+    if (!el.audioMeterFill) return;
+    const pct = Math.max(0, Math.min(100, Math.round(peak * 140)));   // ~0.7 peak → full
+    el.audioMeterFill.style.width = pct + '%';
+  }
+
+  // Sensitivity calibration: listen for a handful of hits, then set the trigger
+  // threshold to ~55% of the median peak (between noise floor and hit level).
+  function setSensitivity() {
+    if (!runState.audioReady) { setAudioStatus('Enable audio first.', true); return; }
+    sensPeaks = [];
+    sensitivityArmed = true;
+    setAudioStatus('Hit your ' + instrLabel().toLowerCase() + ' ~6 times at playing volume…');
+    setTimeout(() => {
+      sensitivityArmed = false;
+      if (sensPeaks.length < 3) { setAudioStatus('Only ' + sensPeaks.length + ' hits — try again, a bit louder.', true); return; }
+      const sorted = sensPeaks.slice().sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const thresh = Math.max(0.01, median * 0.55);
+      AudioInput.setThreshold(thresh);
+      setAudioStatus('Sensitivity set from ' + sensPeaks.length + ' hits. Now calibrate, then run.');
+      updateGates();
+    }, 6000);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -963,6 +1065,13 @@ const RogueliteMode = (() => {
     if (c.result === 'clear') {
       off = c.offset;
       rank = firstGated ? 0 : ((Math.abs(off) > goodMs) ? 1 : 0);
+    } else if (c.result === 'cram' && runState.inputSource === 'audio') {
+      // Audio mode is PRESENCE-ONLY: a mic can double-trigger (beater bounce, snare
+      // ring), and we can't reliably tell that from a real fast double — so extra
+      // hits in a slot count as present (a clear), never a fail. Only a DROP fails.
+      // (MIDI keeps the strict 'cram' rule below, since its events are clean.)
+      off = (c.offset != null) ? c.offset : 0;
+      rank = (Math.abs(off) > goodMs) ? 1 : 0;
     } else {
       rank = 2;
     }
@@ -973,9 +1082,13 @@ const RogueliteMode = (() => {
     }
     setHudVerdict(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
 
-    // Consume matched kicks so they can't satisfy later slots.
+    // Consume matched kicks so they can't satisfy later slots. (In audio mode a
+    // 'cram' is a present slot — count it cleared and consume all its hits.)
     if (c.result === 'clear') { events[c.indices[0]].consumed = true; runState.hitsCleared++; }
-    else if (c.result === 'cram') { c.indices.forEach(i => { events[i].consumed = true; }); }
+    else if (c.result === 'cram') {
+      c.indices.forEach(i => { events[i].consumed = true; });
+      if (runState.inputSource === 'audio' && rank !== 2) runState.hitsCleared++;
+    }
 
     if (RL_DEBUG) {
       const centre = expectedPerf + runState.meanOffset;
@@ -1230,6 +1343,7 @@ const RogueliteMode = (() => {
   // UI
   // ───────────────────────────────────────────────────────────────────────────
   function setMidiStatus(msg, isErr) { setStatus(el.midiStatus, msg, isErr); }
+  function setAudioStatus(msg, isErr) { setStatus(el.audioStatus, msg, isErr); }
   function setCalStatus(msg, isErr)  { setStatus(el.calStatus, msg, isErr); }
   function setRunStatus(msg, isErr)  { setStatus(el.runStatus, msg, isErr); }
   function setStatus(node, msg, isErr) {
@@ -1381,23 +1495,28 @@ const RogueliteMode = (() => {
   function updateGates() {
     const hasInstr = !!runState.instrument;     // compulsory
     const hasMidi = !!midiAccess && midiInputs.length > 0;
-    const hasKick = hasInstr && hasMidi && runState.kickNote != null;
+    const isAudio = runState.inputSource === 'audio';
+    // A usable input: MIDI connected (+ note), or audio started.
+    const hasInput = isAudio ? !!runState.audioReady : (hasMidi && runState.kickNote != null);
+    const canCal = hasInstr && hasInput;        // calibration reads the same event buffer either way
     const hasCal = runState.calibration != null;
     const hasAnchor = hasCal && runState.calibration.grossOffset != null;   // enables 16ths refine
     // Free modes always have params (BPM input defaults); GAUNTLET needs a level picked.
     const hasTarget = (runState.mode !== 'gauntlet') || (runState.level != null);
     const busy = runState.status === 'calibrating' || runState.status === 'running';
 
-    if (el.learnBtn)      el.learnBtn.disabled      = !hasMidi || !hasInstr || busy;
-    if (el.calQuartersBtn) el.calQuartersBtn.disabled = !hasKick || busy;
-    if (el.cal16Btn)      el.cal16Btn.disabled      = !hasKick || !hasAnchor || busy;
+    if (el.learnBtn)       el.learnBtn.disabled       = !hasMidi || !hasInstr || busy;
+    if (el.audioEnableBtn) el.audioEnableBtn.disabled = !hasInstr || busy;
+    if (el.audioSensBtn)   el.audioSensBtn.disabled   = !runState.audioReady || busy;
+    if (el.calQuartersBtn) el.calQuartersBtn.disabled = !canCal || busy;
+    if (el.cal16Btn)      el.cal16Btn.disabled      = !canCal || !hasAnchor || busy;
     if (el.manualBtn)     el.manualBtn.disabled     = !hasInstr || busy;
-    // Run needs a drum chosen, the offset (calibrated or manual), a target, AND a
-    // live MIDI input (manual offset can be set with no kit attached).
-    if (el.runBtn)   el.runBtn.disabled   = !(hasInstr && hasCal && hasTarget && hasMidi) || busy;
+    // Run needs a drum, the offset (calibrated or manual), a target, and a live input.
+    if (el.runBtn)   el.runBtn.disabled   = !(hasInstr && hasCal && hasTarget && hasInput) || busy;
     el.levelBtns && el.levelBtns.forEach(b => { b.disabled = busy; });
     el.modeBtns   && el.modeBtns.forEach(b => { b.disabled = busy; });
     el.instrBtns  && el.instrBtns.forEach(b => { b.disabled = busy; });
+    el.inputBtns  && el.inputBtns.forEach(b => { b.disabled = busy; });
   }
 
   function selectLevel(n) {
@@ -1438,6 +1557,15 @@ const RogueliteMode = (() => {
       body:         document.getElementById('rogueBody'),
       instrBtns:    Array.from(document.querySelectorAll('.rogue-instr-btn')),
       instrStatus:  document.getElementById('rogueInstrStatus'),
+      inputBtns:    Array.from(document.querySelectorAll('.rogue-input-btn')),
+      midiSteps:    document.getElementById('rogueMidiSteps'),
+      audioSteps:   document.getElementById('rogueAudioSteps'),
+      audioEnableBtn: document.getElementById('rogueAudioEnableBtn'),
+      audioSensBtn:   document.getElementById('rogueAudioSensBtn'),
+      audioDeviceSelect: document.getElementById('rogueAudioDeviceSelect'),
+      audioStatus:    document.getElementById('rogueAudioStatus'),
+      audioMeter:     document.getElementById('rogueAudioMeter'),
+      audioMeterFill: document.getElementById('rogueAudioMeterFill'),
       modeBtns:       Array.from(document.querySelectorAll('.rogue-mode-btn')),
       gameParams:     document.getElementById('rogueGameParams'),
       gauntletParams: document.getElementById('rogueGauntletParams'),
@@ -1494,8 +1622,13 @@ const RogueliteMode = (() => {
     } catch (e) {}
 
     el.instrBtns.forEach(b => b.addEventListener('click', () => selectInstrument(b.dataset.instr)));
+    el.inputBtns.forEach(b => b.addEventListener('click', () => selectInputSource(b.dataset.src)));
     el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
     el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
+    el.audioEnableBtn && el.audioEnableBtn.addEventListener('click', () => enableAudio());
+    el.audioSensBtn   && el.audioSensBtn.addEventListener('click', () => setSensitivity());
+    el.audioDeviceSelect && el.audioDeviceSelect.addEventListener('change', () => { if (runState.audioReady) enableAudio(); });
+    reflectInputSource();
     el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
     el.cal16Btn && el.cal16Btn.addEventListener('click', () => startCal16());
     el.manualBtn && el.manualBtn.addEventListener('click', () => applyManualOffset());

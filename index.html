@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603d">
+  <link rel="stylesheet" href="style.css?v=20260603e">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -218,28 +218,45 @@
           <div class="rogue-status" id="rogueInstrStatus">Pick what you're training — Kick and Snare have separate runs &amp; leaderboards.</div>
         </div>
 
-        <!-- Step 2: MIDI -->
+        <!-- Step 2: Input source (MIDI vs Audio) -->
         <div class="rogue-step">
-          <span class="rogue-step-label">2 · MIDI Device</span>
-          <div class="rogue-row">
-            <button class="rogue-btn" id="rogueMidiBtn">Connect MIDI</button>
-            <select class="rogue-select" id="rogueDeviceSelect" style="display:none"></select>
+          <span class="rogue-step-label">2 · Input</span>
+          <div class="rogue-input-row">
+            <button class="rogue-input-btn active" data-src="midi">MIDI</button>
+            <button class="rogue-input-btn" data-src="audio">Audio</button>
           </div>
-          <div class="rogue-status" id="rogueMidiStatus">Not connected.</div>
+          <div class="rogue-status">MIDI is the most accurate. Audio works with any mic or interface (acoustic or triggered).</div>
+
+          <!-- MIDI sub-panel -->
+          <div id="rogueMidiSteps">
+            <div class="rogue-row" style="margin-top:8px">
+              <button class="rogue-btn" id="rogueMidiBtn">Connect MIDI</button>
+              <select class="rogue-select" id="rogueDeviceSelect" style="display:none"></select>
+            </div>
+            <div class="rogue-status" id="rogueMidiStatus">Not connected.</div>
+            <div class="rogue-row" style="margin-top:8px">
+              <button class="rogue-btn" id="rogueLearnBtn" disabled>Learn Note</button>
+              <span class="rogue-kicknote" id="rogueKickNote">Note: pick a drum first</span>
+            </div>
+          </div>
+
+          <!-- Audio sub-panel -->
+          <div id="rogueAudioSteps" style="display:none">
+            <div class="rogue-row" style="margin-top:8px">
+              <button class="rogue-btn" id="rogueAudioEnableBtn" disabled>Enable mic / interface</button>
+              <select class="rogue-select" id="rogueAudioDeviceSelect" style="display:none"></select>
+            </div>
+            <div class="rogue-meter" id="rogueAudioMeter"><i class="rogue-meter-fill" id="rogueAudioMeterFill"></i></div>
+            <div class="rogue-row" style="margin-top:8px">
+              <button class="rogue-btn" id="rogueAudioSensBtn" disabled>Set sensitivity</button>
+            </div>
+            <div class="rogue-status" id="rogueAudioStatus">Enable your mic/interface, then hit your drum to set sensitivity.</div>
+          </div>
         </div>
 
-        <!-- Step 3: Learn note -->
+        <!-- Step 3: Calibrate -->
         <div class="rogue-step">
-          <span class="rogue-step-label">3 · Note</span>
-          <div class="rogue-row">
-            <button class="rogue-btn" id="rogueLearnBtn" disabled>Learn Note</button>
-            <span class="rogue-kicknote" id="rogueKickNote">Note: 36 (default)</span>
-          </div>
-        </div>
-
-        <!-- Step 4: Calibrate -->
-        <div class="rogue-step">
-          <span class="rogue-step-label">4 · Calibrate</span>
+          <span class="rogue-step-label">3 · Calibrate</span>
           <label class="rogue-cal-tempo">
             <span class="rogue-field-label">Fastest comfortable tempo for 16ths</span>
             <span class="rogue-input-unit">
@@ -260,7 +277,7 @@
 
         <!-- Step 4: Mode -->
         <div class="rogue-step">
-          <span class="rogue-step-label">5 · Mode</span>
+          <span class="rogue-step-label">4 · Mode</span>
           <div class="rogue-mode-select">
             <button class="rogue-mode-btn active" data-rmode="timetrial">TIME TRIAL</button>
             <button class="rogue-mode-btn" data-rmode="suddendeath">SUDDEN DEATH</button>
@@ -313,7 +330,7 @@
 
         <!-- Step 5: Run -->
         <div class="rogue-step">
-          <span class="rogue-step-label">6 · Run</span>
+          <span class="rogue-step-label">5 · Run</span>
           <button class="rogue-btn rogue-run-btn" id="rogueRunBtn" disabled>Start Run</button>
           <div class="rogue-status" id="rogueRunStatus">Calibrate, then start.</div>
         </div>
@@ -344,7 +361,8 @@
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="metronome.js?v=20260603"></script>
   <script defer src="app.js?v=20260603"></script>
-  <script defer src="roguelite.js?v=20260603d"></script>
+  <script defer src="audio-input.js?v=1"></script>
+  <script defer src="roguelite.js?v=20260603e"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
