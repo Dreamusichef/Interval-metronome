@@ -862,14 +862,20 @@ const RogueliteMode = (() => {
     updateGates();
   }
 
-  function abortCalibration(msg) {
+  function abortCalibration(msg, isErr) {
     MetronomeEngine.onSchedule(null);
     MetronomeEngine.stop();
     calState = null;
     events = [];
     runState.status = 'idle';
-    setStatus(el.calStatus, msg, true);
+    setStatus(el.calStatus, msg, isErr !== false);
     updateGates();
+  }
+
+  // User pressed Stop during calibration.
+  function stopCalibration() {
+    if (runState.status !== 'calibrating') return;
+    abortCalibration('Calibration stopped.', false);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1516,6 +1522,7 @@ const RogueliteMode = (() => {
     if (el.audioSensBtn)   el.audioSensBtn.disabled   = !runState.audioReady || busy;
     if (el.calQuartersBtn) el.calQuartersBtn.disabled = !canCal || busy;
     if (el.cal16Btn)      el.cal16Btn.disabled      = !canCal || !hasAnchor || busy;
+    if (el.calStopBtn)    el.calStopBtn.style.display = (runState.status === 'calibrating') ? '' : 'none';
     if (el.manualBtn)     el.manualBtn.disabled     = !hasInstr || busy;
     // Run needs a drum, the offset (calibrated or manual), a target, and a live input.
     if (el.runBtn)   el.runBtn.disabled   = !(hasInstr && hasCal && hasTarget && hasInput) || busy;
@@ -1589,6 +1596,7 @@ const RogueliteMode = (() => {
       cal16Btn:     document.getElementById('rogueCal16Btn'),
       cal16Bpm:     document.getElementById('rogueCal16Bpm'),
       calStatus:    document.getElementById('rogueCalStatus'),
+      calStopBtn:   document.getElementById('rogueCalStopBtn'),
       manualOffset: document.getElementById('rogueManualOffset'),
       manualBtn:    document.getElementById('rogueManualBtn'),
       runBtn:       document.getElementById('rogueRunBtn'),
@@ -1635,6 +1643,7 @@ const RogueliteMode = (() => {
     el.audioSensBtn   && el.audioSensBtn.addEventListener('click', () => setSensitivity());
     el.audioDeviceSelect && el.audioDeviceSelect.addEventListener('change', () => { if (runState.audioReady) enableAudio(); });
     reflectInputSource();
+    el.calStopBtn && el.calStopBtn.addEventListener('click', () => stopCalibration());
     el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
     el.cal16Btn && el.cal16Btn.addEventListener('click', () => startCal16());
     el.manualBtn && el.manualBtn.addEventListener('click', () => applyManualOffset());

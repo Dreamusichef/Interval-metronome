@@ -1632,3 +1632,27 @@ body.rogue-run .rogue-section { display: none !important; }
   transition: width 0.06s linear;
 }
 .rogue-meter.hit { box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px rgba(255, 184, 0, 0.4); }
+
+/* Calibration status row + Stop button */
+.rogue-cal-statusrow { display: flex; align-items: stretch; gap: 8px; }
+.rogue-cal-statusrow .rogue-status { flex: 1; }
+.rogue-cal-stop {
+  flex: none;
+  align-self: stretch;
+  padding: 0 16px;
+  background: linear-gradient(180deg, #ff5c5c 0%, #dd1a1a 45%, #7a0000 100%);
+  border: none;
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 34px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(255, 50, 50, 0.3);
+  transition: box-shadow 0.15s, transform 0.06s;
+}
+.rogue-cal-stop:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 14px rgba(255, 50, 50, 0.5); }
+.rogue-cal-stop:active { transform: translateY(1px); }

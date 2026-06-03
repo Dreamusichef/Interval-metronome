@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603e">
+  <link rel="stylesheet" href="style.css?v=20260603f">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -268,7 +268,10 @@
             <button class="rogue-btn" id="rogueCalQuartersBtn" disabled>Calibrate quarters</button>
             <button class="rogue-btn" id="rogueCal16Btn" disabled>Refine 16ths · optional</button>
           </div>
-          <div class="rogue-status" id="rogueCalStatus">Step 1: quarters sets your offset. Step 2: 16ths refines your pocket (optional). Each: 2-bar count-off + 8 measured bars.</div>
+          <div class="rogue-cal-statusrow">
+            <div class="rogue-status" id="rogueCalStatus">Step 1: quarters sets your offset. Step 2: 16ths refines your pocket (optional). Each: 2-bar count-off + 8 measured bars.</div>
+            <button class="rogue-cal-stop" id="rogueCalStopBtn" style="display:none">Stop</button>
+          </div>
           <div class="rogue-manual-row">
             <input type="number" id="rogueManualOffset" placeholder="offset ms" class="config-input rogue-manual-input">
             <button class="rogue-btn" id="rogueManualBtn">Skip · use offset</button>
@@ -362,7 +365,7 @@
   <script defer src="metronome.js?v=20260603"></script>
   <script defer src="app.js?v=20260603"></script>
   <script defer src="audio-input.js?v=4"></script>
-  <script defer src="roguelite.js?v=20260603g"></script>
+  <script defer src="roguelite.js?v=20260603h"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
