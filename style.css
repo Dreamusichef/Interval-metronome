@@ -1621,33 +1621,36 @@ body.rogue-run .rogue-section { display: none !important; }
   position: relative;
   height: 18px;
   margin-top: 8px;
-  /* Dim zone shading so the green / hot / clip regions read even when empty. */
+  /* Dim zone shading so the green / hot / clip regions read even when empty.
+     Green up to 70% (sweet spot), amber 70–92%, red 92–100%. */
   background:
     linear-gradient(90deg,
-      rgba(0, 232, 122, 0.10) 0%, rgba(0, 232, 122, 0.10) 78%,
-      rgba(255, 184, 0, 0.16) 78%, rgba(255, 184, 0, 0.16) 92%,
+      rgba(0, 232, 122, 0.10) 0%, rgba(0, 232, 122, 0.10) 70%,
+      rgba(255, 184, 0, 0.16) 70%, rgba(255, 184, 0, 0.16) 92%,
       rgba(255, 56, 56, 0.20) 92%, rgba(255, 56, 56, 0.20) 100%),
     linear-gradient(180deg, var(--inset) 0%, #030609 100%);
   border: 1px solid var(--border);
   overflow: hidden;
   clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
 }
+/* Live level fill — translucent so it reads against the coloured zone background. */
 .rogue-meter-fill {
   position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-  background: var(--success);
-  transition: width 0.05s linear, background 0.1s;
+  background: rgba(180, 240, 255, 0.45);
+  transition: width 0.05s linear;
 }
-.rogue-meter-fill.hot  { background: var(--accent); }
-.rogue-meter-fill.clip { background: var(--danger); }
-/* Peak-hold tick — parks at the recent loudest hit, decays slowly. */
+/* Peak tick — LATCHES at your last hit's peak (coloured by its verdict) and stays
+   there until the next hit, so a hot/clip reading doesn't fade away. */
 .rogue-meter-peak {
-  position: absolute; top: 0; bottom: 0; width: 2px;
+  position: absolute; top: 0; bottom: 0; width: 3px;
   left: 0; margin-left: -1px;
   background: #fff;
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
-  opacity: 0.85;
-  transition: left 0.05s linear;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+  transition: left 0.05s linear, background 0.1s;
 }
+.rogue-meter-peak.good { background: var(--success); box-shadow: 0 0 7px rgba(0, 232, 122, 0.8); }
+.rogue-meter-peak.hot  { background: var(--accent);  box-shadow: 0 0 7px rgba(255, 184, 0, 0.8); }
+.rogue-meter-peak.clip { background: var(--danger);  box-shadow: 0 0 8px rgba(255, 56, 56, 0.9); }
 .rogue-meter.hit { box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px rgba(255, 184, 0, 0.4); }
 
 .rogue-gain-hint {

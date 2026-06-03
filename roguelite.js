@@ -551,7 +551,9 @@ const RogueliteMode = (() => {
   let sensitivityArmed = false;     // true while "set sensitivity" is listening
   let sensHits = 0;                 // onsets seen during sensitivity calibration
   let sensLevels = [];              // meter levels seen during it (to estimate the noise floor)
-  let meterPeakHold = 0;            // decaying peak for the input/gain meter
+  let hitPeak = 0;                  // running peak of the hit currently being judged
+  let hitCapturing = false;         // true during the ~90ms peak-capture window
+  let gainTimer = null;             // pending verdict-latch timer
   const AUDIO_DEFAULT_THRESHOLD = 0.03;
 
   // Switch between MIDI and Audio. Offset calibration is per-source (the audio path
@@ -617,37 +619,48 @@ const RogueliteMode = (() => {
       setAudioStatus('Sensitivity: ' + sensHits + ' hits — keep going (any volume)…');
     }
     if (el.audioMeter) { el.audioMeter.classList.add('hit'); setTimeout(() => el.audioMeter && el.audioMeter.classList.remove('hit'), 90); }
+
+    // Capture this hit's true peak over a short window after the attack, then LATCH
+    // the gain verdict (text + peak tick) to it — so a hot/clip reading stays put
+    // until the next hit re-judges, instead of fading back to green as it decays.
+    hitPeak = Math.max(hitPeak, peak);
+    hitCapturing = true;
+    if (!gainTimer) {
+      gainTimer = setTimeout(() => {
+        gainTimer = null; hitCapturing = false;
+        setGainVerdict(hitPeak);
+        hitPeak = 0;
+      }, 90);
+    }
+
     // Debounce (worklet already masks retriggers; this guards the shared buffer).
     if (perfMs - lastKickTs < KICK_DEBOUNCE_MS) return;
     lastKickTs = perfMs;
     pushKickEvent(perfMs);
   }
+
   function onAudioLevel(peak) {
     if (sensitivityArmed) sensLevels.push(peak);   // sample the level (incl. the quiet between hits)
+    if (hitCapturing && peak > hitPeak) hitPeak = peak;
+    // Live level bar (full-scale 0→1; right edge = clipping). The verdict/tick are
+    // latched per-hit in setGainVerdict, not here.
+    if (el.audioMeterFill) el.audioMeterFill.style.width = Math.max(0, Math.min(100, peak * 100)) + '%';
+  }
 
-    // Peak-hold: jumps to the level instantly, decays slowly so a hit's transient
-    // peak stays readable for ~1s instead of flickering.
-    meterPeakHold = Math.max(peak, meterPeakHold * 0.95);
-
-    if (el.audioMeterFill) {
-      // Full-scale (0→1): the right edge of the bar IS clipping.
-      el.audioMeterFill.style.width = Math.max(0, Math.min(100, peak * 100)) + '%';
-      el.audioMeterFill.classList.toggle('hot',  peak >= 0.85 && peak < 0.97);
-      el.audioMeterFill.classList.toggle('clip', peak >= 0.97);
-    }
-    if (el.audioMeterPeak) el.audioMeterPeak.style.left = Math.min(100, meterPeakHold * 100) + '%';
-
-    // Gain-staging guidance, read off the held peak (stable). Helps the user set
-    // their interface gain knob before the sensitivity test.
+  // Latched gain-staging verdict for the last hit's peak. Good ceiling = 70%.
+  function setGainVerdict(level) {
+    let msg, cls;
+    if (level < 0.10)      { msg = 'Low — raise your interface gain for a stronger signal.'; cls = ''; }
+    else if (level < 0.70) { msg = 'Good level ✓ — your hits sit in the green.'; cls = 'good'; }
+    else if (level < 0.95) { msg = 'Hot — ease the interface gain down a little.'; cls = 'hot'; }
+    else                   { msg = 'Clipping — turn the gain down (distortion hurts detection).'; cls = 'clip'; }
     if (el.audioGain) {
-      const ph = meterPeakHold;
-      let msg, cls;
-      if (ph < 0.06)      { msg = 'Play a few hits — raise your interface gain if the bar barely moves.'; cls = ''; }
-      else if (ph < 0.85) { msg = 'Good level ✓ — your hardest hits sit in the green.'; cls = 'good'; }
-      else if (ph < 0.97) { msg = 'Hot — ease the interface gain down a little.'; cls = 'hot'; }
-      else                { msg = 'Clipping — turn the gain down (distortion hurts detection).'; cls = 'clip'; }
       el.audioGain.textContent = msg;
       el.audioGain.className = 'rogue-gain-hint' + (cls ? ' ' + cls : '');
+    }
+    if (el.audioMeterPeak) {
+      el.audioMeterPeak.style.left = Math.min(100, level * 100) + '%';
+      el.audioMeterPeak.className = 'rogue-meter-peak' + (cls ? ' ' + cls : '');
     }
   }
 
