@@ -310,7 +310,7 @@ pauseBtn.addEventListener('click', safeHandler('pause', () => {
 // ── Ramp Mode toggle ──────────────────────────────────────────────────────────
 function applyRampToggleState() {
   intervalConfig.classList.toggle('visible', intervalToggle.checked);
-  ME?.playWelcomeGreeting();
+  // (Welcome greeting now fires when GAME MODE is toggled on — see roguelite.js.)
 }
 intervalToggle.addEventListener('change', safeHandler('rampChange', applyRampToggleState));
 intervalToggle.addEventListener('input',  safeHandler('rampInput',  applyRampToggleState));

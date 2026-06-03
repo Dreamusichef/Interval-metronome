@@ -205,7 +205,9 @@
         <!-- Account: sign in to log progress + appear on the leaderboard -->
         <div class="cloud-bar">
           <div class="cloud-authbar" id="cloudAuthBar"></div>
-          <a class="cloud-stats-link" href="stats.html">Stats &amp; Leaderboard ▸</a>
+          <!-- Opens in its own (reused) tab so the game page stays live — your
+               calibration, input connection and Game Mode aren't reset on return. -->
+          <a class="cloud-stats-link" href="stats.html" target="gmstats">Stats &amp; Leaderboard ▸</a>
         </div>
 
         <!-- Step 1: Drum (compulsory — runs + leaderboards are separate per drum) -->
@@ -363,9 +365,9 @@
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="metronome.js?v=20260603c"></script>
-  <script defer src="app.js?v=20260603"></script>
+  <script defer src="app.js?v=20260603b"></script>
   <script defer src="audio-input.js?v=4"></script>
-  <script defer src="roguelite.js?v=20260603i"></script>
+  <script defer src="roguelite.js?v=20260603j"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

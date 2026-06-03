@@ -15,7 +15,9 @@
   <div class="app-container">
     <section class="rogue-section stats-section">
       <div class="stats-top">
-        <a class="cloud-stats-link" href="index.html">◂ Back to app</a>
+        <!-- If opened from the game (own tab), just close to return to the live
+             game page; otherwise navigate (direct visit). -->
+        <a class="cloud-stats-link" href="index.html" onclick="if(window.opener&amp;&amp;!window.opener.closed){window.close();return false;}">◂ Back to app</a>
         <div class="cloud-authbar" id="cloudAuthBar"></div>
       </div>
 

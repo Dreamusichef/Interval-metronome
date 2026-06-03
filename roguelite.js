@@ -1613,6 +1613,11 @@ const RogueliteMode = (() => {
 
     const applyToggle = () => {
       el.body.classList.toggle('visible', el.toggle.checked);
+      // Welcome greeting fires when Game Mode is turned on (once per session — the
+      // engine's welcomePlayed guard means it won't repeat as you keep playing).
+      if (el.toggle.checked && typeof MetronomeEngine !== 'undefined') {
+        try { MetronomeEngine.playWelcomeGreeting(); } catch (e) {}
+      }
     };
     el.toggle.addEventListener('change', applyToggle);
     // Android-Chrome label fallback, matching the existing toggles.
