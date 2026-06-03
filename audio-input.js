@@ -54,11 +54,12 @@ const AudioInput = (() => {
     await stop();
 
     // Capture with all browser processing disabled — we want the raw transient.
+    // No channelCount constraint: keep the device's native channels (e.g. the
+    // Scarlett's 2) so the detector can watch whichever channel carries the signal.
     const audioConstraints = {
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
-      channelCount: 1,
     };
     if (deviceId) audioConstraints.deviceId = { exact: deviceId };
 
@@ -70,7 +71,7 @@ const AudioInput = (() => {
     }
 
     try {
-      if (!moduleAdded) { await ctx.audioWorklet.addModule('onset-detector.js?v=1'); moduleAdded = true; }
+      if (!moduleAdded) { await ctx.audioWorklet.addModule('onset-detector.js?v=2'); moduleAdded = true; }
     } catch (e) {
       fail('Could not load the onset detector (browser too old?): ' + (e && e.message ? e.message : e));
       stopStream();
@@ -78,7 +79,12 @@ const AudioInput = (() => {
     }
 
     sourceNode = ctx.createMediaStreamSource(stream);
-    workletNode = new AudioWorkletNode(ctx, 'onset-detector');
+    // 'max' + 'discrete' so the processor receives the source's raw channels
+    // (no stereo speaker-downmix) — needed to see a signal on channel 2, etc.
+    workletNode = new AudioWorkletNode(ctx, 'onset-detector', {
+      channelCountMode: 'max',
+      channelInterpretation: 'discrete',
+    });
     workletNode.port.onmessage = (e) => {
       const d = e.data || {};
       if (d.type === 'onset') {
@@ -88,6 +94,8 @@ const AudioInput = (() => {
         if (handlers.onOnset) handlers.onOnset(perf, d.peak);
       } else if (d.type === 'level') {
         if (handlers.onLevel) handlers.onLevel(d.peak);
+      } else if (d.type === 'info') {
+        console.info('[audio] input channels:', d.channels);
       }
     };
     // mic → detector. We do NOT connect to destination (no monitoring — the player

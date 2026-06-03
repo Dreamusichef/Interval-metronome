@@ -42,17 +42,27 @@ class OnsetDetector extends AudioWorkletProcessor {
   process(inputs) {
     const input = inputs[0];
     if (!input || input.length === 0) return true;
-    const ch = input[0];                 // mono (first channel)
-    if (!ch) return true;
+    const nCh = input.length;            // may be >1 (e.g. Scarlett: XLR=ch1, ¼"=ch2)
+    const ch0 = input[0];
+    if (!ch0 || ch0.length === 0) return true;
+    const len = ch0.length;
+    if (!this.announced) { this.announced = true; this.port.postMessage({ type: 'info', channels: nCh }); }
 
     const sr = sampleRate;
     const t0 = currentTime;              // time of the first sample of this block
     const release = this.threshold * this.releaseFactor;
     let blockPeak = 0;
 
-    for (let i = 0; i < ch.length; i++) {
+    for (let i = 0; i < len; i++) {
+      // Watch ALL input channels — take the most extreme sample across them — so a
+      // signal on any channel (e.g. an instrument jack on channel 2) is detected.
+      let x = 0, xa = 0;
+      for (let c = 0; c < nCh; c++) {
+        const v = input[c][i];
+        const a = v < 0 ? -v : v;
+        if (a > xa) { xa = a; x = v; }
+      }
       // DC blocker: y = x - x1 + R*y1  (removes offset/rumble, keeps transients)
-      const x = ch[i];
       const y = x - this.dcPrevIn + 0.995 * this.dcPrevOut;
       this.dcPrevIn = x;
       this.dcPrevOut = y;
