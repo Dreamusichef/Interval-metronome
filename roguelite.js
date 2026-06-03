@@ -637,7 +637,7 @@ const RogueliteMode = (() => {
     sensHits = 0;
     sensLevels = [];
     sensitivityArmed = true;
-    setAudioStatus('Hit your ' + instrLabel().toLowerCase() + ' ~6 times (any volume, leave a little space between)…');
+    setAudioStatus('Hit your ' + instrLabel().toLowerCase() + ' for 8 seconds (any volume, leave a little space between hits)…');
     setTimeout(() => {
       sensitivityArmed = false;
       if (sensHits < 3) { setAudioStatus('Only ' + sensHits + ' clear hits — turn up your interface gain or hit a bit harder, then retry.', true); return; }
@@ -648,7 +648,7 @@ const RogueliteMode = (() => {
       AudioInput.setThreshold(thresh);
       setAudioStatus('Set — soft and loud hits both register now. Calibrate, then run.');
       updateGates();
-    }, 6000);
+    }, 8000);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
