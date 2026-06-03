@@ -16,10 +16,13 @@ const MetronomeEngine = (() => {
 
   let soundMode = 'click'; // 'click' | 'cowbell'
 
-  // Per-sound level trims (linear gain = 10^(dB/20)).
-  const WELCOME_GAIN = 0.708;   // welcome greeting  −3dB
-  const COWBELL_GAIN = 1.122;   // cowbell click     +1dB
-  const CUE_GAIN     = 0.891;   // set start/end + practice-complete cues  −1dB
+  // Per-sound level trims (linear gain = 10^(dB/20)). The metronome accent sits at
+  // the 1.0 ceiling, so the metronome can't be boosted further without clipping —
+  // instead the non-metronome sounds are trimmed an extra 2dB so the metronome is
+  // effectively +2dB louder relative to them (click already carries its own +2dB).
+  const WELCOME_GAIN = 0.562;   // welcome greeting  −5dB (−3 requested −2 to clear the metronome)
+  const COWBELL_GAIN = 1.122;   // cowbell click     +1dB (the metronome's other voice — kept louder)
+  const CUE_GAIN     = 0.708;   // set start/end + practice-complete cues  −3dB (−1 requested −2)
 
   let audioCtx = null;
   let setEndBuffer = null;
@@ -268,7 +271,7 @@ const MetronomeEngine = (() => {
       osc.type = 'sine';
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.49, t + 0.005);   // −1dB, matches the cue buffers
+      gain.gain.linearRampToValueAtTime(0.389, t + 0.005);   // −3dB, matches the cue buffers
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
