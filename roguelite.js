@@ -1348,20 +1348,29 @@ const RogueliteMode = (() => {
   }
 
   // ── Reveal sequence: results → Style Rank animates in → trophies pop 1-by-1 ────
-  // SFX HOOK: define window.GameSfx(name) to play a sound per phase. Phases fired:
-  //   'rank'  (B or lower reveal) · 'rankS' · 'rankSS' (dramatic) · 'trophyPop'.
-  // No-op until you wire it — easy place to drop in your reward sounds.
+  // SFX (window.GameSfx, see sfx.js). Phases:
+  //   overlay appears → run-complete stinger (mode/rank-band) OR 'fail'
+  //   +250ms          → rank-reveal flourish ('rank'+rank), synced to the burst
+  //   each trophy pop → 'trophyPop'
   function sfx(name) { try { if (window.GameSfx) window.GameSfx(name); } catch (e) {} }
 
   let trophyQueue = [];
   let revealTimer = null;
 
-  // Run after a results overlay is shown: fire the rank-reveal SFX, then (if any
-  // trophies were unlocked this run) start the one-at-a-time popup sequence once the
-  // rank has landed. Fast: rank lands ~0.9s, each trophy pop is ~0.5s.
-  function revealResults() {
+  // Run after a results overlay is shown. isWin=false for a failed run (no
+  // celebratory rank flourish — just the fail stinger).
+  function revealResults(isWin) {
     const { rank } = runResultRankPct();
-    sfx(rank === 'SS' ? 'rankSS' : rank === 'S' ? 'rankS' : 'rank');
+    if (isWin) {
+      // Completion stinger as the card appears, then the rank flourish a beat
+      // later to land with the emblem burst (CSS reveal has a 0.25s delay).
+      if (window.GameSfx && window.GameSfx.completeKey) {
+        sfx(window.GameSfx.completeKey(runState.mode, runState.suddenDeath, rank));
+      }
+      setTimeout(() => sfx('rank' + rank), 250);
+    } else {
+      sfx('fail');
+    }
     clearTimeout(revealTimer);
     if (pendingTrophies.length) {
       trophyQueue = pendingTrophies.slice();
@@ -1451,7 +1460,7 @@ const RogueliteMode = (() => {
       '<div class="rogue-diag-line">' + line + '</div>' +
       resultTable();
     el.overlay.classList.add('visible');
-    revealResults();
+    revealResults(false);
   }
 
   function showComplete() {
@@ -1471,7 +1480,7 @@ const RogueliteMode = (() => {
     el.overlayBody.innerHTML =
       '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
     el.overlay.classList.add('visible');
-    revealResults();
+    revealResults(true);
   }
 
   // ───────────────────────────────────────────────────────────────────────────

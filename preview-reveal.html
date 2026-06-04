@@ -7,11 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603p">
+  <link rel="stylesheet" href="style.css?v=20260603q">
   <style>
-    /* sandbox chrome only — the reveal itself uses the real game CSS */
     body { background: #05080f; color: #cfe0ee; font-family: 'Rajdhani', sans-serif; margin: 0; }
-    .sb-wrap { max-width: 720px; margin: 0 auto; padding: 22px 16px 60px; }
+    .sb-wrap { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
     .sb-h1 { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 1.1rem; letter-spacing: .04em; color: #fff; }
     .sb-sub { font-size: .9rem; color: #8ab0c8; margin: 4px 0 18px; line-height: 1.4; }
     .sb-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
@@ -24,7 +23,7 @@
     .sb-field input { transform: scale(1.2); }
     .sb-log { background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 12px 14px; font-family: 'Rajdhani'; font-size: .85rem; min-height: 120px; line-height: 1.55; }
     .sb-log b { color: #ffd24a; font-family: 'Orbitron'; font-weight: 700; }
-    .sb-log .ph { color: #00e87a; }
+    .sb-log .snd { color: #00e87a; }
     .sb-ref { margin-top: 18px; font-size: .82rem; color: #8ab0c8; line-height: 1.6; }
     .sb-ref code { color: #9fe7ff; font-family: 'Orbitron', monospace; font-size: .78rem; }
     .sb-ref h3 { font-family: 'Orbitron'; font-size: .82rem; color: #fff; margin: 14px 0 6px; letter-spacing: .04em; }
@@ -33,38 +32,46 @@
 <body>
   <div class="sb-wrap">
     <div class="sb-h1">Result-Reveal Sandbox</div>
-    <div class="sb-sub">Plays the real result screen with the exact game timings so you can plan sound effects.
-      Rank animates in, then (after 1.0s) one trophy pops while the results blur. Tap / click / any key dismisses the trophy.</div>
+    <div class="sb-sub">Plays the real result screen + your actual sounds with the game's exact timings.
+      Pick a mode, outcome, rank and trophy, then Play. Tap / click / any key dismisses the trophy.</div>
 
     <div class="sb-row">
       <button class="sb-btn" id="play">▶ Play sequence</button>
       <button class="sb-btn alt" id="reset">Reset</button>
-      <label class="sb-field">Rank
-        <select id="rankSel">
-          <option>SS</option><option>S</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+      <label class="sb-field">Mode
+        <select id="modeSel">
+          <option value="timetrial">Time Trial</option>
+          <option value="suddendeath">Sudden Death</option>
+          <option value="gauntlet">Gauntlet</option>
         </select>
       </label>
-      <label class="sb-field">Trophy
-        <select id="trophySel"></select>
+      <label class="sb-field">Outcome
+        <select id="outSel"><option value="win">Complete</option><option value="fail">Fail</option></select>
       </label>
-      <label class="sb-field"><input type="checkbox" id="blips" checked> placeholder blips</label>
+      <label class="sb-field">Rank
+        <select id="rankSel"><option>SS</option><option>S</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
+      </label>
+      <label class="sb-field">Trophy
+        <select id="trophySel"><option value="">— none —</option></select>
+      </label>
+      <label class="sb-field"><input type="checkbox" id="sound" checked> sound</label>
     </div>
 
-    <div class="sb-log" id="log">Press <b>Play</b>. Elapsed ms is shown for every phase — use it to time your SFX.</div>
+    <div class="sb-log" id="log">Press <b>Play</b>. The exact sound file fired at each phase is logged with elapsed ms.</div>
 
     <div class="sb-ref">
-      <h3>Animation reference (exact values from the game CSS/JS)</h3>
-      • Rank reveal — <b>S / SS</b>: <code>rankBurst 0.75s</code> ease <code>cubic-bezier(.2,1.5,.4,1)</code>, after a <code>0.25s</code> delay.<br>
-      &nbsp;&nbsp;<b>A and below</b>: <code>rankPop 0.5s</code>, same 0.25s delay.<br>
-      • Gap before the trophy appears: <code>1000ms</code> after the results show (JS timer).<br>
-      • Results blur-back: <code>filter 0.25s</code> as the trophy starts.<br>
-      • Trophy card in: <code>tpPop 0.5s</code> <code>cubic-bezier(.2,1.5,.4,1)</code> (3D pop).<br>
-      • Trophy card out (on dismiss): <code>tpOut 0.18s</code>, then the next trophy or back to results.<br>
-      <br>SFX hook names already wired in the game: <code>rank</code> / <code>rankS</code> / <code>rankSS</code> (rank reveal) and <code>trophyPop</code> (each trophy).
+      <h3>What fires when</h3>
+      • <b>Overlay appears</b> → run-complete stinger (or <code>fail</code>): Time Trial uses the rank band
+      (<code>E</code> / <code>D-C-B-A</code> / <code>S-SS</code>); Sudden Death &amp; Gauntlet use one "all ranks" clip.<br>
+      • <b>+250ms</b> → rank-reveal flourish (<code>Reveal Rank X</code>), synced to the emblem burst.
+      <i>Skipped on a Fail.</i><br>
+      • <b>+1000ms</b> → trophy pops (<code>Trophy reveal</code>), results blur. Dismiss to continue.<br>
+      <h3>Animation timings (unchanged)</h3>
+      Rank S/SS <code>rankBurst 0.75s</code> (0.25s delay) · others <code>rankPop 0.5s</code> ·
+      trophy in <code>tpPop 0.5s</code> · blur <code>0.25s</code> · trophy out <code>tpOut 0.18s</code>.
     </div>
   </div>
 
-  <!-- Real result overlay markup (copied from index.html) -->
   <div class="done-overlay rogue-overlay" id="rogueOverlay">
     <div class="done-message">
       <h2 class="rogue-overlay-title" id="rogueOverlayTitle">RESULTS</h2>
@@ -73,7 +80,6 @@
     </div>
   </div>
 
-  <!-- Real trophy reveal popup markup -->
   <div class="rogue-trophypop" id="rogueTrophyPop" aria-hidden="true">
     <div class="rtp-card" id="rtpCard">
       <div class="rtp-flash">TROPHY UNLOCKED</div>
@@ -86,45 +92,23 @@
   </div>
 
   <script defer src="achievements.js?v=5"></script>
+  <script defer src="sfx.js?v=1"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
     const overlay = $('rogueOverlay'), body = $('rogueOverlayBody'), title = $('rogueOverlayTitle');
     const pop = $('rogueTrophyPop'), tpBadge = $('rtpBadge'), tpName = $('rtpName'), tpTier = $('rtpTier'), tpDesc = $('rtpDesc');
-    const logEl = $('log'), rankSel = $('rankSel'), trophySel = $('trophySel'), blips = $('blips');
+    const logEl = $('log'), rankSel = $('rankSel'), trophySel = $('trophySel'), modeSel = $('modeSel'), outSel = $('outSel'), soundCb = $('sound');
     const A = window.Achievements;
-
-    // populate trophy dropdown
     if (A) A.LIST.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; trophySel.appendChild(o); });
     if (A) trophySel.value = 'grandslam';
 
     let t0 = 0, timer = null;
     const now = () => Math.round(performance.now() - t0);
-    function log(msg, cls) { const line = document.createElement('div'); if (cls) line.className = cls;
-      line.innerHTML = '<b>+' + now() + 'ms</b> · ' + msg; logEl.appendChild(line); logEl.scrollTop = logEl.scrollHeight; }
-
-    // ---- placeholder blips (WebAudio) so you can feel the rhythm ----
-    let ac = null;
-    function beep(freqs, dur, type, gain) {
-      if (!blips.checked) return;
-      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
-      const t = ac.currentTime;
-      freqs.forEach((f, i) => {
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.type = type || 'triangle'; o.frequency.value = f;
-        o.connect(g); g.connect(ac.destination);
-        const st = t + i * 0.06;
-        g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(gain || 0.25, st + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
-        o.start(st); o.stop(st + dur + 0.02);
-      });
-    }
-    const sfxRank = (rank) => { // mirrors GameSfx('rankSS'/'rankS'/'rank')
-      if (rank === 'SS') beep([784, 1047, 1568], 0.5, 'triangle', 0.28);      // big sparkle
-      else if (rank === 'S') beep([659, 988], 0.4, 'triangle', 0.26);
-      else beep([523, 659], 0.3, 'sine', 0.2);
-    };
-    const sfxTrophy = () => beep([1047, 1320], 0.35, 'square', 0.18);          // punchy ding
+    function log(msg) { const d = document.createElement('div'); d.innerHTML = '<b>+' + now() + 'ms</b> · ' + msg; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight; }
+    const SFX = (k) => { if (window.GameSfx) window.GameSfx(k); };
+    function logSfx(k) { const f = (window.GameSfx && window.GameSfx.manifest[k]) || '??'; log('🔊 <span class="snd">' + k + '</span> → sounds/' + f); }
+    function fire(k) { SFX(k); logSfx(k); }
 
     function rankCell(rank) {
       return '<span class="rogue-result-rank rank-' + rank.toLowerCase() + ' has-art" data-rank="' + rank + '">' +
@@ -134,47 +118,53 @@
     function resultHTML(rank) {
       const row = (cls, label, n, extra) => '<div class="rogue-result-row"><span class="rogue-hex ' + cls + '"></span>' +
         '<span class="rl-lbl">' + label + (extra || '') + '</span><span class="rl-n">' + n + '</span></div>';
-      return '<div class="rogue-diag-line">Survived 5:00 · 180 BPM · no dropped beat</div>' +
+      return '<div class="rogue-diag-line">180 BPM · sample result</div>' +
         '<div class="rogue-result">' + row('rogue-good', 'Good', 412) +
         row('rogue-drag', 'Neutral', 6, ' <span class="rl-split">(3 rush · 3 drag)</span>') +
         row('rogue-bad', 'Bad', 0) +
         '<div class="rogue-result-score">' + rankCell(rank) + '<span class="rogue-result-pct">99%</span></div></div>';
     }
 
-    function reset() {
-      clearTimeout(timer);
-      overlay.classList.remove('visible', 'blurred');
-      pop.classList.remove('visible', 'out');
-    }
+    function reset() { clearTimeout(timer); overlay.classList.remove('visible', 'blurred'); pop.classList.remove('visible', 'out'); }
 
     function play() {
       reset();
-      const rank = rankSel.value;
-      t0 = performance.now();
-      logEl.innerHTML = '';
-      title.textContent = 'SUDDEN DEATH CLEARED'; title.className = 'rogue-overlay-title win';
-      body.innerHTML = resultHTML(rank);          // rank animates via CSS on insert
+      if (window.GameSfx) window.GameSfx.setEnabled(soundCb.checked);
+      const rank = rankSel.value, mode = modeSel.value, win = outSel.value === 'win';
+      t0 = performance.now(); logEl.innerHTML = '';
+
+      if (win) { title.className = 'rogue-overlay-title win'; title.textContent = mode === 'gauntlet' ? 'GAUNTLET CLEARED' : mode === 'suddendeath' ? 'SUDDEN DEATH CLEARED' : 'RESULTS'; }
+      else { title.className = 'rogue-overlay-title fail'; title.textContent = 'RUN OVER'; }
+      body.innerHTML = resultHTML(rank);
       overlay.classList.add('visible');
       log('results shown · rank <b>' + rank + '</b> reveal starts (' + (rank === 'S' || rank === 'SS' ? 'rankBurst 0.75s' : 'rankPop 0.5s') + ', 0.25s delay)');
-      sfxRank(rank);
-      log('🔊 placeholder <span class="ph">rank' + (rank === 'SS' ? 'SS' : rank === 'S' ? 'S' : '') + '</span> blip', 'ph');
+
+      if (win) {
+        const ck = window.GameSfx ? window.GameSfx.completeKey(mode, mode === 'suddendeath', rank) : '';
+        fire(ck);
+        setTimeout(() => { log('rank emblem burst'); fire('rank' + rank); }, 250);
+      } else {
+        fire('fail');
+        log('(fail — no rank flourish)');
+      }
 
       timer = setTimeout(() => {
-        overlay.classList.add('blurred');         // results blur (0.25s)
-        if (A) {
-          const ach = A.LIST.find(t => t.id === trophySel.value);
-          const reached = ach.tiers.length > 1 ? ach.tiers.length : 1;  // show top tier for demo
+        overlay.classList.add('blurred');
+        const tid = trophySel.value;
+        if (tid && A) {
+          const ach = A.LIST.find(t => t.id === tid);
+          const reached = ach.tiers.length > 1 ? ach.tiers.length : 1;
           tpBadge.innerHTML = A.badgeHtml(ach, reached, false);
-          tpName.textContent = ach.name;
-          tpTier.textContent = A.tierName(ach, reached);
-          tpDesc.textContent = ach.desc || '';
+          tpName.textContent = ach.name; tpTier.textContent = A.tierName(ach, reached); tpDesc.textContent = ach.desc || '';
+          pop.classList.remove('out'); pop.classList.add('visible');
+          const card = $('rtpCard'); card.classList.remove('pop'); void card.offsetWidth; card.classList.add('pop');
+          log('trophy pops in (tpPop 0.5s) · results blur (0.25s)');
+          fire('trophyPop');
+          log('— tap / click / key to dismiss —');
+        } else {
+          log('(no trophy selected — sequence ends)');
+          overlay.classList.remove('blurred');
         }
-        pop.classList.remove('out'); pop.classList.add('visible');
-        const card = $('rtpCard'); card.classList.remove('pop'); void card.offsetWidth; card.classList.add('pop');
-        log('trophy pops in (tpPop 0.5s) · results blur (0.25s)');
-        sfxTrophy();
-        log('🔊 placeholder <span class="ph">trophyPop</span> blip', 'ph');
-        log('— waiting for your tap/click/key to dismiss —');
       }, 1000);
     }
 
@@ -182,7 +172,7 @@
       if (!pop.classList.contains('visible')) return;
       pop.classList.add('out');
       log('dismiss → trophy out (tpOut 0.18s) → back to results');
-      setTimeout(() => { pop.classList.remove('visible', 'out'); overlay.classList.remove('blurred'); log('results restored'); }, 180);
+      setTimeout(() => { pop.classList.remove('visible', 'out'); overlay.classList.remove('blurred'); }, 180);
     }
 
     $('play').addEventListener('click', play);
