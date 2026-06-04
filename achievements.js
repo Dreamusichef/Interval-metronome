@@ -38,12 +38,12 @@ const Achievements = (() => {
     { id: 'spectrum',   name: 'Full Spectrum',    icon: '🎚️', key: 'temposB',       tiers: TEMPO_COLLECT, tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored B+ (of 41).' },
     { id: 'sharp',      name: 'Sharpshooter',     icon: '🎯', key: 'temposS',       tiers: TEMPO_COLLECT, tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored S+ (of 41).' },
     { id: 'untouch',    name: 'Untouchable',      icon: '💎', key: 'temposSS',      tiers: [1, 3, 5, 8, 12, 16, 21, 27, 34, 41], tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored SS (of 41).' },
-    { id: 'first',      name: 'First Blood',      icon: '✅', key: 'total',         tiers: [1],  desc: 'Complete your first run.' },
+    { id: 'first',      name: 'First Blood',      icon: '✅', key: 'total',         tiers: [1],  fmt: v => v + (v === 1 ? ' run' : ' runs'),    desc: 'Complete your first run.' },
     { id: 'perfect',    name: 'Perfectionist',    icon: '✨', key: 'flawless',      tiers: [1],  desc: 'Land a 100%-green run.' },
-    { id: 'coord',      name: 'Coordinated',      icon: '🤹', key: 'instruments',   tiers: [2],  desc: 'Log runs on both Kick and Snare.' },
-    { id: 'marathon',   name: 'Marathon',         icon: '⏱️', key: 'longestRun',    tiers: [600],desc: 'A single run of 10+ minutes.' },
+    { id: 'coord',      name: 'Coordinated',      icon: '🤹', key: 'instruments',   tiers: [2],  fmt: v => v + (v === 1 ? ' drum' : ' drums'),  desc: 'Log runs on both Kick and Snare.' },
+    { id: 'marathon',   name: 'Marathon',         icon: '⏱️', key: 'longestRun',    tiers: [600],fmt: v => fmtMMSS(v),                           desc: 'A single run of 10+ minutes.' },
     { id: 'grandslam',  name: 'Grand Slam',       icon: '🏅', key: 'grandSlam',     tiers: [1],  desc: 'Earn SS on both Kick and Snare.' },
-    { id: 'gauntChamp', name: 'Gauntlet Champion',icon: '👑', key: 'gauntletLevels',tiers: [6],  desc: 'Clear every Gauntlet level.' },
+    { id: 'gauntChamp', name: 'Gauntlet Champion',icon: '👑', key: 'gauntletLevels',tiers: [6],  fmt: v => v + ' levels',                        desc: 'Clear every Gauntlet level.' },
   ];
 
   function fmtMMSS(sec) {
@@ -114,8 +114,13 @@ const Achievements = (() => {
     const tierLabel = tierName(ach, reached);
 
     let prog, pct;
-    if (maxed) { prog = '★ Maxed · ' + showVal(ach.tiers[ach.tiers.length - 1]); pct = 100; }
-    else if (ach.tiers.length === 1) { prog = ach.desc || ('Reach ' + showVal(ach.tiers[0])); pct = Math.min(100, value / ach.tiers[0] * 100); }
+    if (ach.tiers.length === 1) {
+      // Single-tier: show STATUS / progress here — never the desc (it prints on
+      // its own line below, so reusing it would just duplicate the same text).
+      if (earned) { prog = '★ Unlocked'; pct = 100; }
+      else { prog = showVal(value) + ' / ' + showVal(ach.tiers[0]); pct = Math.min(100, value / ach.tiers[0] * 100); }
+    }
+    else if (maxed) { prog = '★ Maxed · ' + showVal(ach.tiers[ach.tiers.length - 1]); pct = 100; }
     else { prog = showVal(value) + '  →  next ' + showVal(next); pct = Math.min(100, value / next * 100); }
 
     return { value, reached, maxed, earned, next, pct, tierColorIdx, tierLabel, prog, showVal };
