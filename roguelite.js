@@ -1416,13 +1416,21 @@ const RogueliteMode = (() => {
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
     const { rank } = runResultRankPct();
-    // data-rank lets us swap the letter for custom art per rank (A/S/SS) via CSS later.
+    // A/S/SS get a hero emblem PNG (rank-a/s/ss.png). If the art isn't present
+    // yet, onerror swaps the <img> back to the plain glowing letter — so this is
+    // safe to ship before the art lands, and the art auto-appears once added.
+    const hasArt = (rank === 'A' || rank === 'S' || rank === 'SS');
+    const rankCell = hasArt
+      ? '<span class="rogue-result-rank ' + rankClass(rank) + ' has-art" data-rank="' + rank + '">' +
+          '<img class="rank-art" src="rank-' + rank.toLowerCase() + '.png?v=1" alt="Rank ' + rank + '" ' +
+          'onerror="var p=this.parentNode;p.classList.remove(\'has-art\');p.textContent=\'' + rank + '\';"></span>'
+      : '<span class="rogue-result-rank ' + rankClass(rank) + '" data-rank="' + rank + '">' + rank + '</span>';
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
         row('rogue-drag', 'Neutral', t.neutral, split) +
         row('rogue-bad',  'Bad', t.bad) +
         '<div class="rogue-result-score">' +
-          '<span class="rogue-result-rank ' + rankClass(rank) + '" data-rank="' + rank + '">' + rank + '</span>' +
+          rankCell +
           '<span class="rogue-result-pct">' + pct + '%</span>' +
         '</div>' +
       '</div>';
