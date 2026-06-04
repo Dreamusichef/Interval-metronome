@@ -200,12 +200,14 @@ async function renderTrophies() {
   const cards = A.LIST.map(a => {
     const e = A.evaluate(a, m);
     if (e.earned) unlocked++;
-    return '<div class="trophy ' + (e.earned ? 'earned' : 'locked') + ' tier-' + e.tierColorIdx + '">' +
+    const cardCls = (a.tiers.length === 1) ? (e.earned ? 'solo' : 'tier-0') : ('tier-' + e.reached);
+    return '<div class="trophy ' + (e.earned ? 'earned' : 'locked') + ' ' + cardCls + '">' +
         A.badgeHtml(a, e.reached) +
         '<div class="trophy-name">' + esc(a.name) + '</div>' +
         '<div class="trophy-tier">' + e.tierLabel + (a.tiers.length > 1 && e.earned && !e.maxed ? ' · ' + e.reached + '/' + a.tiers.length : '') + '</div>' +
         '<div class="trophy-bar"><i style="width:' + e.pct + '%"></i></div>' +
         '<div class="trophy-prog">' + esc(e.prog) + '</div>' +
+        '<div class="trophy-desc">' + esc(a.desc || '') + '</div>' +
       '</div>';
   });
 

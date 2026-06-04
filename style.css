@@ -1738,32 +1738,40 @@ body.rogue-run .rogue-section { display: none !important; }
 }
 
 /* Tier fills + glow (on .trophy-badge itself, so a standalone badge — e.g. the
-   run-end popup — colours correctly without a .trophy ancestor). */
-.trophy-badge.tier-1 { background: linear-gradient(145deg, #f0b27a, #cd7f32 55%, #6e3f17); filter: drop-shadow(0 0 9px rgba(205,127,50,0.55)); }
-.trophy-badge.tier-2 { background: linear-gradient(145deg, #ffffff, #c0c0c0 55%, #6e7479); filter: drop-shadow(0 0 10px rgba(200,210,220,0.6)); }
-.trophy-badge.tier-3 { background: linear-gradient(145deg, #fff1a8, #ffd24a 52%, #9a6e16); filter: drop-shadow(0 0 13px rgba(255,210,74,0.7)); }
-.trophy-badge.tier-4 { background: linear-gradient(145deg, #eaffff, #9fe7ff 50%, #3f8fb0); filter: drop-shadow(0 0 16px rgba(120,225,255,0.85)); }
-/* Higher rungs of the 10-tier ladder (Speed Demon): Platinum → Challenger. */
-.trophy-badge.tier-5  { background: linear-gradient(145deg, #d7fff0, #4fe0c0 52%, #1d7e6a); filter: drop-shadow(0 0 16px rgba(79,224,192,0.8)); }
-.trophy-badge.tier-6  { background: linear-gradient(145deg, #c7ffd9, #2ecc71 52%, #15823f); filter: drop-shadow(0 0 16px rgba(46,204,113,0.8)); }
-.trophy-badge.tier-7  { background: linear-gradient(145deg, #dff3ff, #6fd0ff 52%, #2f73a8); filter: drop-shadow(0 0 17px rgba(111,208,255,0.85)); }
-.trophy-badge.tier-8  { background: linear-gradient(145deg, #efe2ff, #b06fff 52%, #5a2ca8); filter: drop-shadow(0 0 18px rgba(176,111,255,0.9)); }
-.trophy-badge.tier-9  { background: linear-gradient(145deg, #ffd9d9, #ff5c5c 52%, #a01e1e); filter: drop-shadow(0 0 19px rgba(255,92,92,0.9)); }
+   reveal popup — colours correctly without a .trophy ancestor).
+   Ladder: 1 Iron · 2 Bronze · 3 Silver · 4 Gold · 5 Emerald · 6 Ruby · 7 Diamond ·
+   8 Platinum · 9 Master · 10 Grandmaster. (solo = an earned single-badge trophy.) */
+.trophy-badge.tier-1  { background: linear-gradient(145deg, #aab1b8, #6a727b 55%, #353b42); filter: drop-shadow(0 0 8px rgba(150,160,170,0.45)); }
+.trophy-badge.tier-2  { background: linear-gradient(145deg, #f0b27a, #cd7f32 55%, #6e3f17); filter: drop-shadow(0 0 9px rgba(205,127,50,0.55)); }
+.trophy-badge.tier-3  { background: linear-gradient(145deg, #ffffff, #c0c0c0 55%, #6e7479); filter: drop-shadow(0 0 10px rgba(200,210,220,0.6)); }
+.trophy-badge.tier-4  { background: linear-gradient(145deg, #fff1a8, #ffd24a 52%, #9a6e16); filter: drop-shadow(0 0 13px rgba(255,210,74,0.7)); }
+.trophy-badge.tier-5  { background: linear-gradient(145deg, #c7ffd9, #2ecc71 52%, #15823f); filter: drop-shadow(0 0 15px rgba(46,204,113,0.8)); }
+.trophy-badge.tier-6  { background: linear-gradient(145deg, #ffd0dd, #ff3b6b 52%, #8a1030); filter: drop-shadow(0 0 16px rgba(255,59,107,0.8)); }
+.trophy-badge.tier-7  { background: linear-gradient(145deg, #eaffff, #9fe7ff 50%, #3f8fb0); filter: drop-shadow(0 0 17px rgba(120,225,255,0.85)); }
+.trophy-badge.tier-8  { background: linear-gradient(145deg, #ffffff, #dbe7ee 50%, #8fa3ad); filter: drop-shadow(0 0 18px rgba(220,235,245,0.9)); }
+.trophy-badge.tier-9  { background: linear-gradient(145deg, #efe2ff, #b06fff 52%, #5a2ca8); filter: drop-shadow(0 0 19px rgba(176,111,255,0.9)); }
 .trophy-badge.tier-10 { background: linear-gradient(135deg, #ffe066 0%, #ff8a3c 30%, #ff5cc8 60%, #7fd0ff 100%); filter: drop-shadow(0 0 22px rgba(255,210,120,0.95)); }
-.trophy-badge.tier-1 .trophy-icon, .trophy-badge.tier-2 .trophy-icon, .trophy-badge.tier-3 .trophy-icon,
-.trophy-badge.tier-4 .trophy-icon, .trophy-badge.tier-5 .trophy-icon, .trophy-badge.tier-6 .trophy-icon,
-.trophy-badge.tier-7 .trophy-icon, .trophy-badge.tier-8 .trophy-icon, .trophy-badge.tier-9 .trophy-icon,
-.trophy-badge.tier-10 .trophy-icon {
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
-}
-.trophy.tier-5 .trophy-tier  { color: #4fe0c0; }
-.trophy.tier-6 .trophy-tier  { color: #2ecc71; }
-.trophy.tier-7 .trophy-tier  { color: #6fd0ff; }
-.trophy.tier-8 .trophy-tier  { color: #b06fff; }
-.trophy.tier-9 .trophy-tier  { color: #ff7a7a; }
+.trophy-badge.tier-solo { background: linear-gradient(145deg, #fff1a8, #ffd24a 50%, #b07a18); filter: drop-shadow(0 0 14px rgba(255,210,74,0.7)); }
+.trophy-badge[class*="tier-"] .trophy-icon { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
+
+.trophy.tier-1 .trophy-tier  { color: #b8c0c8; }
+.trophy.tier-2 .trophy-tier  { color: #e09a5a; }
+.trophy.tier-3 .trophy-tier  { color: #d4dde4; }
+.trophy.tier-4 .trophy-tier  { color: var(--accent); }
+.trophy.tier-5 .trophy-tier  { color: #2ecc71; }
+.trophy.tier-6 .trophy-tier  { color: #ff5c7a; }
+.trophy.tier-7 .trophy-tier  { color: #9fe7ff; }
+.trophy.tier-8 .trophy-tier  { color: #e6f2f8; }
+.trophy.tier-9 .trophy-tier  { color: #b06fff; }
 .trophy.tier-10 .trophy-tier { color: #ffd24a; }
+.trophy.solo .trophy-tier    { color: var(--accent); }
+
 .trophy-badge.sm { width: 46px; height: 46px; margin-bottom: 0; }
 .trophy-badge.sm .trophy-icon { font-size: 1.35rem; }
+.trophy-desc {
+  font-family: 'Rajdhani', sans-serif; font-size: 0.66rem; font-weight: 600;
+  color: var(--text-dim); line-height: 1.3; margin-top: 6px; opacity: 0.85;
+}
 
 .trophy-name {
   font-family: 'Rajdhani', sans-serif; font-size: 0.86rem; font-weight: 700;
@@ -1774,10 +1782,7 @@ body.rogue-run .rogue-section { display: none !important; }
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
   margin-top: 3px;
 }
-.trophy.tier-1 .trophy-tier { color: #e09a5a; }
-.trophy.tier-2 .trophy-tier { color: #d4dde4; }
-.trophy.tier-3 .trophy-tier { color: var(--accent); }
-.trophy.tier-4 .trophy-tier { color: #9fe7ff; }
+/* (tier-label colours are defined with the badge tiers above) */
 
 .trophy-bar {
   width: 100%; height: 5px; margin-top: 8px;
@@ -1813,3 +1818,52 @@ body.rogue-run .rogue-section { display: none !important; }
 .rtw-name { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 0.98rem; color: var(--text); line-height: 1.1; }
 .rtw-tier { font-family: 'Orbitron', monospace; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-top: 2px; }
 @keyframes rtwPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+/* ═══════════════════════════════════════════════════
+   RESULT REVEAL — rank animates in, trophies pop after
+═══════════════════════════════════════════════════ */
+/* Style Rank animates in shortly after the results card appears. */
+.rogue-result-rank { display: inline-block; animation: rankPop 0.5s cubic-bezier(0.2,1.4,0.4,1) 0.25s both; }
+.rogue-result-rank.rank-s, .rogue-result-rank.rank-ss { animation: rankBurst 0.75s cubic-bezier(0.2,1.5,0.4,1) 0.25s both; }
+@keyframes rankPop  { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes rankBurst {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-8deg); filter: brightness(2.2); }
+  55%  { opacity: 1; transform: scale(1.4) rotate(3deg);  filter: brightness(1.9); }
+  75%  { transform: scale(0.92); }
+  100% { transform: scale(1) rotate(0); filter: brightness(1); }
+}
+
+/* Results card blurs back while a trophy pops over it. */
+.done-overlay.blurred .done-message { filter: blur(7px) brightness(0.5); transition: filter 0.25s; pointer-events: none; }
+
+/* ── Trophy reveal popup (3D pop, one at a time) ── */
+.rogue-trophypop {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  align-items: center; justify-content: center; padding: 24px;
+  background: rgba(2, 6, 12, 0.62);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rogue-trophypop.visible { display: flex; }
+.rtp-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+  padding: 26px 28px; max-width: 300px;
+  background: linear-gradient(155deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 50px rgba(0,200,255,0.14);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+}
+.rtp-card.pop { animation: tpPop 0.5s cubic-bezier(0.2,1.5,0.4,1) both; }
+.rogue-trophypop.out .rtp-card { animation: tpOut 0.18s ease both; }
+@keyframes tpPop {
+  0%   { opacity: 0; transform: perspective(700px) translateZ(-220px) scale(0.4) rotateX(24deg); }
+  60%  { opacity: 1; transform: perspective(700px) translateZ(0) scale(1.08) rotateX(0); }
+  100% { transform: scale(1); }
+}
+@keyframes tpOut { to { opacity: 0; transform: scale(0.85); } }
+.rtp-flash { font-family: 'Orbitron', monospace; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.14em; color: var(--accent); text-shadow: 0 0 16px rgba(255,184,0,0.5); }
+.rtp-badge .trophy-badge { width: 96px; height: 96px; margin: 4px 0 2px; }
+.rtp-badge .trophy-icon { font-size: 2.8rem; }
+.rtp-name { font-family: 'Orbitron', monospace; font-size: 1.15rem; font-weight: 900; color: var(--text); line-height: 1.1; }
+.rtp-tier { font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); }
+.rtp-desc { font-family: 'Rajdhani', sans-serif; font-size: 0.82rem; font-weight: 600; color: var(--text-dim); line-height: 1.35; }
+.rtp-hint { font-family: 'Rajdhani', sans-serif; font-size: 0.66rem; font-weight: 600; color: var(--text-dim); opacity: 0.6; margin-top: 6px; }

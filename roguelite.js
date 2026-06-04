@@ -1347,19 +1347,59 @@ const RogueliteMode = (() => {
     trophyBaseline = after;
   }
 
-  // Markup for the "trophy unlocked" block appended to the run-end overlay.
-  function trophiesWonHtml() {
-    if (!pendingTrophies.length || !window.Achievements) return '';
+  // ── Reveal sequence: results → Style Rank animates in → trophies pop 1-by-1 ────
+  // SFX HOOK: define window.GameSfx(name) to play a sound per phase. Phases fired:
+  //   'rank'  (B or lower reveal) · 'rankS' · 'rankSS' (dramatic) · 'trophyPop'.
+  // No-op until you wire it — easy place to drop in your reward sounds.
+  function sfx(name) { try { if (window.GameSfx) window.GameSfx(name); } catch (e) {} }
+
+  let trophyQueue = [];
+  let revealTimer = null;
+
+  // Run after a results overlay is shown: fire the rank-reveal SFX, then (if any
+  // trophies were unlocked this run) start the one-at-a-time popup sequence once the
+  // rank has landed. Fast: rank lands ~0.9s, each trophy pop is ~0.5s.
+  function revealResults() {
+    const { rank } = runResultRankPct();
+    sfx(rank === 'SS' ? 'rankSS' : rank === 'S' ? 'rankS' : 'rank');
+    clearTimeout(revealTimer);
+    if (pendingTrophies.length) {
+      trophyQueue = pendingTrophies.slice();
+      pendingTrophies = [];
+      revealTimer = setTimeout(startTrophySequence, 1000);
+    }
+  }
+
+  function startTrophySequence() {
+    if (el.overlay) el.overlay.classList.add('blurred');   // blur the results behind
+    showNextTrophy();
+  }
+
+  function showNextTrophy() {
+    if (!trophyQueue.length || !window.Achievements || !el.trophyPop) { endTrophySequence(); return; }
+    const t = trophyQueue.shift();
     const A = window.Achievements;
-    const items = pendingTrophies.map(t => {
-      const tn = A.tierName(t.ach, t.reached);
-      return '<div class="rtw-item">' + A.badgeHtml(t.ach, t.reached, true) +
-        '<div class="rtw-text"><div class="rtw-name">' + escapeHtml(t.ach.name) + '</div>' +
-        '<div class="rtw-tier">' + escapeHtml(tn) + '</div></div></div>';
-    }).join('');
-    const title = pendingTrophies.length > 1 ? 'Trophies Unlocked!' : 'Trophy Unlocked!';
-    pendingTrophies = [];
-    return '<div class="rogue-trophies-won"><div class="rtw-title">🏆 ' + title + '</div>' + items + '</div>';
+    el.tpBadge.innerHTML = A.badgeHtml(t.ach, t.reached, false);
+    el.tpName.textContent = t.ach.name;
+    el.tpTier.textContent = A.tierName(t.ach, t.reached);
+    el.tpDesc.textContent = t.ach.desc || '';
+    el.trophyPop.classList.remove('out');
+    el.trophyPop.classList.add('visible');
+    if (el.tpCard) { el.tpCard.classList.remove('pop'); void el.tpCard.offsetWidth; el.tpCard.classList.add('pop'); }
+    sfx('trophyPop');
+  }
+
+  // Tap / click / key advances to the next trophy, or back to the results.
+  function dismissTrophy() {
+    if (!el.trophyPop || !el.trophyPop.classList.contains('visible')) return;
+    el.trophyPop.classList.add('out');
+    setTimeout(() => { el.trophyPop.classList.remove('visible', 'out'); showNextTrophy(); }, 180);
+  }
+
+  function endTrophySequence() {
+    trophyQueue = [];
+    if (el.trophyPop) el.trophyPop.classList.remove('visible', 'out');
+    if (el.overlay) el.overlay.classList.remove('blurred');
   }
 
   // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
@@ -1376,13 +1416,14 @@ const RogueliteMode = (() => {
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
     const { rank } = runResultRankPct();
+    // data-rank lets us swap the letter for custom art per rank (A/S/SS) via CSS later.
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
         row('rogue-drag', 'Neutral', t.neutral, split) +
         row('rogue-bad',  'Bad', t.bad) +
         '<div class="rogue-result-score">' +
-          '<span class="rogue-result-rank ' + rankClass(rank) + '">' + rank + '</span>' +
-          '<span class="rogue-result-pct">' + pct + '% <span>green</span></span>' +
+          '<span class="rogue-result-rank ' + rankClass(rank) + '" data-rank="' + rank + '">' + rank + '</span>' +
+          '<span class="rogue-result-pct">' + pct + '%</span>' +
         '</div>' +
       '</div>';
   }
@@ -1403,8 +1444,9 @@ const RogueliteMode = (() => {
     el.overlayBody.innerHTML =
       headline +
       '<div class="rogue-diag-line">' + line + '</div>' +
-      resultTable() + trophiesWonHtml();
+      resultTable();
     el.overlay.classList.add('visible');
+    revealResults();
   }
 
   function showComplete() {
@@ -1422,8 +1464,9 @@ const RogueliteMode = (() => {
       ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
     }
     el.overlayBody.innerHTML =
-      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable() + trophiesWonHtml();
+      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
     el.overlay.classList.add('visible');
+    revealResults();
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1686,8 +1729,20 @@ const RogueliteMode = (() => {
       hudRank:      document.getElementById('rogueHudRank'),
       hudGaugeFill: document.getElementById('rogueHudGaugeFill'),
       lane:         document.getElementById('rogueLane'),
+      trophyPop:    document.getElementById('rogueTrophyPop'),
+      tpCard:       document.getElementById('rtpCard'),
+      tpBadge:      document.getElementById('rtpBadge'),
+      tpName:       document.getElementById('rtpName'),
+      tpTier:       document.getElementById('rtpTier'),
+      tpDesc:       document.getElementById('rtpDesc'),
     };
     if (!el.toggle) return; // markup not present — nothing to wire
+
+    // Trophy popup: tap / click / any key advances to the next one (or back to results).
+    if (el.trophyPop) el.trophyPop.addEventListener('click', dismissTrophy);
+    document.addEventListener('keydown', () => {
+      if (el.trophyPop && el.trophyPop.classList.contains('visible')) dismissTrophy();
+    });
 
     el.kickNote && (el.kickNote.textContent = 'Note: pick a drum first');
 
@@ -1734,7 +1789,9 @@ const RogueliteMode = (() => {
     el.gameBpmInc && el.gameBpmInc.addEventListener('click', () => stepGameBpm(+GAME_BPM_STEP));
     renderGameBpm();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
-      el.overlay.classList.remove('visible');
+      clearTimeout(revealTimer);
+      endTrophySequence();
+      el.overlay.classList.remove('visible', 'blurred');
       runState.status = 'idle';
       window.__rogueSuppressDoneOverlay = false;
       exitHud();   // leave the HUD and restore the normal (decluttered) setup view

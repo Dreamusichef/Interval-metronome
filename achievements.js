@@ -18,26 +18,32 @@
    ════════════════════════════════════════════════════════════════════════════ */
 const Achievements = (() => {
   const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
-  const TIER_NAMES = ['', 'Bronze', 'Silver', 'Gold', 'Platinum'];   // default (≤4-tier trophies)
-  // 10-rung ranked ladder (LoL-style) for the big Speed Demon trophies.
-  const LADDER_10 = ['', 'Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Emerald', 'Diamond', 'Master', 'Grandmaster', 'Challenger'];
-  // Speed Demon tiers: 120→240 BPM, 10 rungs (each must be earned with an A+ run).
+  const TIER_NAMES = ['', 'Unlocked'];   // single-badge fallback
+  // 10-rung ranked ladder used by every tiered trophy.
+  const LADDER_10 = ['', 'Iron', 'Bronze', 'Silver', 'Gold', 'Emerald', 'Ruby', 'Diamond', 'Platinum', 'Master', 'Grandmaster'];
+  // Speed Demon tiers: 120→240 BPM (each rung must be earned with an A+ run).
   const SPEED_TIERS = [120, 130, 140, 150, 165, 180, 195, 210, 225, 240];
+  // Free-tempo ladder is 50–250 BPM step 5 = 41 tempos — the ceiling for the
+  // "distinct tempos at rank X" collection trophies.
+  const TEMPO_COLLECT = [3, 6, 10, 15, 20, 25, 30, 35, 38, 41];
 
   const LIST = [
-    { id: 'mileage',    name: 'Mileage',          icon: '🥁', key: 'total',         tiers: [10, 50, 100, 500], unit: ' runs' },
-    { id: 'sharp',      name: 'Sharpshooter',     icon: '🎯', key: 'sOrBetter',     tiers: [1, 10, 50],        unit: ' S+ ranks' },
-    { id: 'untouch',    name: 'Untouchable',      icon: '💎', key: 'ss',            tiers: [1, 10, 25],        unit: ' SS ranks' },
-    { id: 'speedKick',  name: 'Kick Speed Demon', icon: '🦵', key: 'kickSpeedBpm',  tiers: SPEED_TIERS, tierNames: LADDER_10, fmt: v => v + ' BPM' },
-    { id: 'speedSnare', name: 'Snare Speed Demon',icon: '✋', key: 'snareSpeedBpm', tiers: SPEED_TIERS, tierNames: LADDER_10, fmt: v => v + ' BPM' },
-    { id: 'iron',       name: 'Iron Endurance',   icon: '🔥', key: 'bestSurvival',  tiers: [60, 180, 300, 600],  fmt: v => fmtMMSS(v) + ' survived' },
-    { id: 'streak',     name: 'Consistency',      icon: '📅', key: 'dayStreak',     tiers: [3, 7, 30],         fmt: v => v + '-day streak' },
+    { id: 'speedKick',  name: 'Kick Speed Demon', icon: '🦵', key: 'kickSpeedBpm',  tiers: SPEED_TIERS, tierNames: LADDER_10, fmt: v => v + ' BPM', desc: 'Highest tempo cleared with an A+ on Kick.' },
+    { id: 'speedSnare', name: 'Snare Speed Demon',icon: '✋', key: 'snareSpeedBpm', tiers: SPEED_TIERS, tierNames: LADDER_10, fmt: v => v + ' BPM', desc: 'Highest tempo cleared with an A+ on Snare.' },
+    { id: 'mileage',    name: 'Mileage',          icon: '🥁', key: 'total',         tiers: [5, 10, 25, 50, 100, 200, 350, 500, 750, 1000], tierNames: LADDER_10, fmt: v => v + ' runs', desc: 'Total runs played.' },
+    { id: 'iron',       name: 'Iron Endurance',   icon: '🔥', key: 'bestSurvival',  tiers: [30, 60, 120, 180, 300, 450, 600, 900, 1200, 1800], tierNames: LADDER_10, fmt: v => fmtMMSS(v), desc: 'Longest Sudden Death survival.' },
+    { id: 'woodshed',   name: 'Woodshed',         icon: '🪵', key: 'totalSeconds',  tiers: [3600, 18000, 36000, 90000, 180000, 360000, 720000, 1440000, 2520000, 3600000], tierNames: LADDER_10, fmt: v => fmtHours(v), desc: 'Total time practiced.' },
+    { id: 'streak',     name: 'Consistency',      icon: '📅', key: 'dayStreak',     tiers: [3, 5, 7, 14, 21, 30, 45, 60, 80, 100], tierNames: LADDER_10, fmt: v => v + 'd', desc: 'Consecutive days practiced.' },
+    { id: 'gauntSlay',  name: 'Gauntlet Slayer',  icon: '⚔️', key: 'gauntletClears',tiers: [1, 3, 5, 10, 20, 30, 50, 70, 85, 100], tierNames: LADDER_10, fmt: v => v + '×', desc: 'Gauntlets cleared.' },
+    { id: 'spectrum',   name: 'Full Spectrum',    icon: '🎚️', key: 'temposB',       tiers: TEMPO_COLLECT, tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored B+ (of 41).' },
+    { id: 'sharp',      name: 'Sharpshooter',     icon: '🎯', key: 'temposS',       tiers: TEMPO_COLLECT, tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored S+ (of 41).' },
+    { id: 'untouch',    name: 'Untouchable',      icon: '💎', key: 'temposSS',      tiers: [1, 3, 5, 8, 12, 16, 21, 27, 34, 41], tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored SS (of 41).' },
     { id: 'first',      name: 'First Blood',      icon: '✅', key: 'total',         tiers: [1],  desc: 'Complete your first run.' },
-    { id: 'perfect',    name: 'Perfectionist',    icon: '✨', key: 'flawless',      tiers: [1],  desc: 'Land a 100% green run.' },
-    { id: 'gaunt',      name: 'Gauntlet Slayer',  icon: '🏆', key: 'gauntletCleared',tiers: [1], desc: 'Clear a Gauntlet.' },
+    { id: 'perfect',    name: 'Perfectionist',    icon: '✨', key: 'flawless',      tiers: [1],  desc: 'Land a 100%-green run.' },
     { id: 'coord',      name: 'Coordinated',      icon: '🤹', key: 'instruments',   tiers: [2],  desc: 'Log runs on both Kick and Snare.' },
     { id: 'marathon',   name: 'Marathon',         icon: '⏱️', key: 'longestRun',    tiers: [600],desc: 'A single run of 10+ minutes.' },
-    { id: 'range',      name: 'Full Spectrum',    icon: '🎚️', key: 'distinctBpms',  tiers: [5],  desc: 'Play at 5 different tempos.' },
+    { id: 'grandslam',  name: 'Grand Slam',       icon: '🏅', key: 'grandSlam',     tiers: [1],  desc: 'Earn SS on both Kick and Snare.' },
+    { id: 'gauntChamp', name: 'Gauntlet Champion',icon: '👑', key: 'gauntletLevels',tiers: [6],  desc: 'Clear every Gauntlet level.' },
   ];
 
   function fmtMMSS(sec) {
@@ -47,25 +53,35 @@ const Achievements = (() => {
 
   function deriveMetrics(runs) {
     const days = [...new Set(runs.map(r => (r.created_at || '').slice(0, 10)).filter(Boolean))].sort();
-    // Speed Demon counts a BPM only if you EARNED it with an A-or-better run there,
-    // tracked per drum (Kick vs Snare are separate ladders).
+    const ge = (r, min) => (RANK_ORDER[r.rank] ?? -1) >= RANK_ORDER[min];
+    // Distinct free-mode tempos played at a given rank-or-better (either drum).
+    const temposAt = (min) => new Set(runs.filter(r => r.bpm && ge(r, min)).map(r => r.bpm)).size;
+    // Speed Demon: highest BPM EARNED with an A+ run, per drum.
     const speedBpm = (instr) => runs.reduce((m, r) =>
-      (r.bpm && (r.instrument || 'kick') === instr && (RANK_ORDER[r.rank] ?? -1) >= RANK_ORDER.A)
-        ? Math.max(m, r.bpm) : m, 0);
+      (r.bpm && (r.instrument || 'kick') === instr && ge(r, 'A')) ? Math.max(m, r.bpm) : m, 0);
     return {
       total: runs.length,
-      sOrBetter: runs.filter(r => (RANK_ORDER[r.rank] ?? -1) >= RANK_ORDER.S).length,
-      ss: runs.filter(r => r.rank === 'SS').length,
       kickSpeedBpm: speedBpm('kick'),
       snareSpeedBpm: speedBpm('snare'),
       bestSurvival: runs.reduce((m, r) => Math.max(m, r.survival_sec || 0), 0),
+      // Time practiced: actual survival for Sudden Death, else the run's duration.
+      totalSeconds: runs.reduce((s, r) => s + (r.mode === 'suddendeath' ? (r.survival_sec || 0) : (r.duration_sec || 0)), 0),
+      dayStreak: longestDayStreak(days),
+      gauntletClears: runs.filter(r => r.mode === 'gauntlet' && r.cleared).length,
+      gauntletLevels: new Set(runs.filter(r => r.mode === 'gauntlet' && r.cleared).map(r => r.level)).size,
+      temposB: temposAt('B'),
+      temposS: temposAt('S'),
+      temposSS: temposAt('SS'),
       flawless: runs.some(r => (r.green_pct || 0) >= 100) ? 1 : 0,
-      gauntletCleared: runs.some(r => r.mode === 'gauntlet' && r.cleared) ? 1 : 0,
       instruments: new Set(runs.map(r => r.instrument || 'kick')).size,
       longestRun: runs.reduce((m, r) => Math.max(m, r.duration_sec || 0), 0),
-      distinctBpms: new Set(runs.filter(r => r.bpm).map(r => r.bpm)).size,
-      dayStreak: longestDayStreak(days),
+      grandSlam: (runs.some(r => (r.instrument || 'kick') === 'kick' && r.rank === 'SS') &&
+                  runs.some(r => r.instrument === 'snare' && r.rank === 'SS')) ? 1 : 0,
     };
+  }
+
+  function fmtHours(sec) {
+    return sec >= 3600 ? Math.round(sec / 3600) + 'h' : Math.round(sec / 60) + 'm';
   }
 
   function longestDayStreak(days) {
@@ -125,12 +141,19 @@ const Achievements = (() => {
   }
 
   // Hexagon badge markup (same look as the grid). compact = smaller, for the popup.
+  // Badge frame class: single-tier trophies get a distinct 'solo' look when earned
+  // (so they don't read as low-tier "Iron"); tiered trophies use tier-1..10.
+  function tierClass(ach, reached) {
+    if (ach.tiers.length === 1) return reached > 0 ? 'tier-solo' : 'tier-0';
+    return 'tier-' + reached;
+  }
+
   function badgeHtml(ach, reached, compact) {
     const lock = reached <= 0 ? '<span class="trophy-lock">🔒</span>' : '';
-    return '<div class="trophy-badge' + (compact ? ' sm' : '') + ' tier-' + reached + '">' +
+    return '<div class="trophy-badge' + (compact ? ' sm' : '') + ' ' + tierClass(ach, reached) + '">' +
       '<span class="trophy-icon">' + ach.icon + '</span>' + lock + '</div>';
   }
 
-  return { LIST, TIER_NAMES, LADDER_10, deriveMetrics, evaluate, reachedMap, diff, badgeHtml, tierName, fmtMMSS };
+  return { LIST, TIER_NAMES, LADDER_10, deriveMetrics, evaluate, reachedMap, diff, badgeHtml, tierClass, tierName, fmtMMSS };
 })();
 if (typeof window !== 'undefined') window.Achievements = Achievements;
