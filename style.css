@@ -1762,6 +1762,16 @@ body.rogue-run .rogue-section { display: none !important; }
 .trophy-badge.tier-solo { background: linear-gradient(145deg, #fff1a8, #ffd24a 50%, #b07a18); filter: drop-shadow(0 0 14px rgba(255,210,74,0.7)); }
 .trophy-badge[class*="tier-"] .trophy-icon { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
 
+/* Art badges: the PNG is the whole badge (frame + coloured icon), so drop the
+   hexagon fill/shine and keep only the tier-coloured glow (the tier-N filter
+   above still applies to the badge box, glowing the art). */
+.trophy-badge.has-art { clip-path: none; background: none; }
+.trophy-badge.has-art::before { display: none; }
+.trophy-badge[class*="tier-"].has-art { background: none; }
+.trophy-art { width: 100%; height: 100%; object-fit: contain; display: block; }
+.trophy.locked .trophy-art,
+.trophy-badge.tier-0 .trophy-art { filter: grayscale(0.85) brightness(0.6); opacity: 0.55; }
+
 .trophy.tier-1 .trophy-tier  { color: #b8c0c8; }
 .trophy.tier-2 .trophy-tier  { color: #e09a5a; }
 .trophy.tier-3 .trophy-tier  { color: #d4dde4; }

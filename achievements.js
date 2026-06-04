@@ -39,7 +39,7 @@ const Achievements = (() => {
     { id: 'sharp',      name: 'Sharpshooter',     icon: '🎯', key: 'temposS',       tiers: TEMPO_COLLECT, tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored S+ (of 41).' },
     { id: 'untouch',    name: 'Untouchable',      icon: '💎', key: 'temposSS',      tiers: [1, 3, 5, 8, 12, 16, 21, 27, 34, 41], tierNames: LADDER_10, fmt: v => v + ' tempos', desc: 'Tempos scored SS (of 41).' },
     { id: 'first',      name: 'First Blood',      icon: '✅', key: 'total',         tiers: [1],  fmt: v => v + (v === 1 ? ' run' : ' runs'),    desc: 'Complete your first run.' },
-    { id: 'perfect',    name: 'Perfectionist',    icon: '✨', key: 'flawless',      tiers: [1],  desc: 'Land a 100%-green run.' },
+    { id: 'perfect',    name: 'Perfectionist',    icon: '✨', key: 'flawless',      tiers: [10], fmt: v => v + (v === 1 ? ' run' : ' runs'), desc: 'Land ten 100%-green runs.' },
     { id: 'coord',      name: 'Coordinated',      icon: '🤹', key: 'instruments',   tiers: [2],  fmt: v => v + (v === 1 ? ' drum' : ' drums'),  desc: 'Log runs on both Kick and Snare.' },
     { id: 'marathon',   name: 'Marathon',         icon: '⏱️', key: 'longestRun',    tiers: [600],fmt: v => fmtMMSS(v),                           desc: 'A single run of 10+ minutes.' },
     { id: 'grandslam',  name: 'Grand Slam',       icon: '🏅', key: 'grandSlam',     tiers: [1],  desc: 'Earn SS on both Kick and Snare.' },
@@ -72,7 +72,7 @@ const Achievements = (() => {
       temposB: temposAt('B'),
       temposS: temposAt('S'),
       temposSS: temposAt('SS'),
-      flawless: runs.some(r => (r.green_pct || 0) >= 100) ? 1 : 0,
+      flawless: runs.filter(r => (r.green_pct || 0) >= 100).length,
       instruments: new Set(runs.map(r => r.instrument || 'kick')).size,
       longestRun: runs.reduce((m, r) => Math.max(m, r.duration_sec || 0), 0),
       grandSlam: (runs.some(r => (r.instrument || 'kick') === 'kick' && r.rank === 'SS') &&
@@ -155,8 +155,14 @@ const Achievements = (() => {
 
   function badgeHtml(ach, reached, compact) {
     const lock = reached <= 0 ? '<span class="trophy-lock">🔒</span>' : '';
-    return '<div class="trophy-badge' + (compact ? ' sm' : '') + ' ' + tierClass(ach, reached) + '">' +
-      '<span class="trophy-icon">' + ach.icon + '</span>' + lock + '</div>';
+    // Art badge (trophy-<id>.png). If the art is missing, onerror reverts to the
+    // emoji + hexagon fill. Tier is conveyed by the CSS glow (Option A), not by
+    // recolouring the art.
+    const art = '<img class="trophy-art" src="trophy-' + ach.id + '.png?v=1" alt="" ' +
+      'onerror="this.parentNode.classList.remove(\'has-art\');' +
+      'this.outerHTML=\'<span class=&quot;trophy-icon&quot;>' + ach.icon + '</span>\';">';
+    return '<div class="trophy-badge has-art' + (compact ? ' sm' : '') + ' ' + tierClass(ach, reached) + '">' +
+      art + lock + '</div>';
   }
 
   return { LIST, TIER_NAMES, LADDER_10, deriveMetrics, evaluate, reachedMap, diff, badgeHtml, tierClass, tierName, fmtMMSS };
