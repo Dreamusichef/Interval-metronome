@@ -3,3 +3,10 @@
 
 # Node
 node_modules/
+
+# Source art originals + local image helper (processed outputs are committed)
+Rank A.png
+Rank S.png
+Rank SS.png
+_rankproc.py
+_preview*.png
