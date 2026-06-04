@@ -1840,9 +1840,11 @@ body.rogue-run .rogue-section { display: none !important; }
 /* ═══════════════════════════════════════════════════
    RESULT REVEAL — rank animates in, trophies pop after
 ═══════════════════════════════════════════════════ */
-/* Style Rank animates in shortly after the results card appears. */
-.rogue-result-rank { display: inline-block; animation: rankPop 0.5s cubic-bezier(0.2,1.4,0.4,1) 0.25s both; }
-.rogue-result-rank.rank-s, .rogue-result-rank.rank-ss { animation: rankBurst 0.75s cubic-bezier(0.2,1.5,0.4,1) 0.25s both; }
+/* Style Rank stays hidden until JS adds .revealed (a beat after the card shows),
+   so the results land first and the rank then bursts in with its sound. */
+.rogue-result-rank { display: inline-block; opacity: 0; }
+.rogue-result-rank.revealed { opacity: 1; animation: rankPop 0.5s cubic-bezier(0.2,1.4,0.4,1) both; }
+.rogue-result-rank.revealed.rank-s, .rogue-result-rank.revealed.rank-ss { animation: rankBurst 0.75s cubic-bezier(0.2,1.5,0.4,1) both; }
 @keyframes rankPop  { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
 @keyframes rankBurst {
   0%   { opacity: 0; transform: scale(0.2) rotate(-8deg); filter: brightness(2.2); }

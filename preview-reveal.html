@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603q">
+  <link rel="stylesheet" href="style.css?v=20260603r">
   <style>
     body { background: #05080f; color: #cfe0ee; font-family: 'Rajdhani', sans-serif; margin: 0; }
     .sb-wrap { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
@@ -63,9 +63,9 @@
       <h3>What fires when</h3>
       • <b>Overlay appears</b> → run-complete stinger (or <code>fail</code>): Time Trial uses the rank band
       (<code>E</code> / <code>D-C-B-A</code> / <code>S-SS</code>); Sudden Death &amp; Gauntlet use one "all ranks" clip.<br>
-      • <b>+250ms</b> → rank-reveal flourish (<code>Reveal Rank X</code>), synced to the emblem burst.
-      <i>Skipped on a Fail.</i><br>
-      • <b>+1000ms</b> → trophy pops (<code>Trophy reveal</code>), results blur. Dismiss to continue.<br>
+      • <b>+750ms</b> → rank bursts in + rank-reveal flourish (<code>Reveal Rank X</code>).
+      <i>Sound skipped on a Fail.</i><br>
+      • <b>+1500ms</b> → trophy pops (<code>Trophy reveal</code>), results blur. Dismiss to continue.<br>
       <h3>Animation timings (unchanged)</h3>
       Rank S/SS <code>rankBurst 0.75s</code> (0.25s delay) · others <code>rankPop 0.5s</code> ·
       trophy in <code>tpPop 0.5s</code> · blur <code>0.25s</code> · trophy out <code>tpOut 0.18s</code>.
@@ -137,16 +137,22 @@
       else { title.className = 'rogue-overlay-title fail'; title.textContent = 'RUN OVER'; }
       body.innerHTML = resultHTML(rank);
       overlay.classList.add('visible');
-      log('results shown · rank <b>' + rank + '</b> reveal starts (' + (rank === 'S' || rank === 'SS' ? 'rankBurst 0.75s' : 'rankPop 0.5s') + ', 0.25s delay)');
+      log('results shown (rank hidden for now)');
 
       if (win) {
         const ck = window.GameSfx ? window.GameSfx.completeKey(mode, mode === 'suddendeath', rank) : '';
         fire(ck);
-        setTimeout(() => { log('rank emblem burst'); fire('rank' + rank); }, 250);
       } else {
         fire('fail');
-        log('(fail — no rank flourish)');
       }
+
+      // Rank bursts in at 750ms (visual + flourish on a win).
+      setTimeout(() => {
+        const rankEl = body.querySelector('.rogue-result-rank');
+        if (rankEl) rankEl.classList.add('revealed');
+        log('rank <b>' + rank + '</b> bursts in (' + (rank === 'S' || rank === 'SS' ? 'rankBurst 0.75s' : 'rankPop 0.5s') + ')');
+        if (win) fire('rank' + rank); else log('(fail — no rank flourish)');
+      }, 750);
 
       timer = setTimeout(() => {
         overlay.classList.add('blurred');
@@ -165,7 +171,7 @@
           log('(no trophy selected — sequence ends)');
           overlay.classList.remove('blurred');
         }
-      }, 1000);
+      }, 1500);
     }
 
     function dismiss() {

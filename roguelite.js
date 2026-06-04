@@ -1356,26 +1356,33 @@ const RogueliteMode = (() => {
 
   let trophyQueue = [];
   let revealTimer = null;
+  let rankTimer = null;
 
   // Run after a results overlay is shown. isWin=false for a failed run (no
   // celebratory rank flourish — just the fail stinger).
+  // Timeline: 0ms run-complete/fail stinger · 750ms rank bursts in (+ flourish on
+  // a win) · 1500ms first trophy pops.
   function revealResults(isWin) {
     const { rank } = runResultRankPct();
     if (isWin) {
-      // Completion stinger as the card appears, then the rank flourish a beat
-      // later to land with the emblem burst (CSS reveal has a 0.25s delay).
       if (window.GameSfx && window.GameSfx.completeKey) {
         sfx(window.GameSfx.completeKey(runState.mode, runState.suddenDeath, rank));
       }
-      setTimeout(() => sfx('rank' + rank), 250);
     } else {
       sfx('fail');
     }
+    // Reveal the rank emblem a beat after the card lands (visual + sound together).
+    const rankEl = el.overlay && el.overlay.querySelector('.rogue-result-rank');
+    clearTimeout(rankTimer);
+    rankTimer = setTimeout(() => {
+      if (rankEl) rankEl.classList.add('revealed');
+      if (isWin) sfx('rank' + rank);
+    }, 750);
     clearTimeout(revealTimer);
     if (pendingTrophies.length) {
       trophyQueue = pendingTrophies.slice();
       pendingTrophies = [];
-      revealTimer = setTimeout(startTrophySequence, 1000);
+      revealTimer = setTimeout(startTrophySequence, 1500);
     }
   }
 
@@ -1804,6 +1811,7 @@ const RogueliteMode = (() => {
     renderGameBpm();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
       clearTimeout(revealTimer);
+      clearTimeout(rankTimer);
       endTrophySequence();
       el.overlay.classList.remove('visible', 'blurred');
       runState.status = 'idle';
