@@ -1393,7 +1393,7 @@ body.rogue-run .rogue-section { display: none !important; }
 .rank-s  { color: var(--cyan);    text-shadow: 0 0 10px rgba(0, 200, 255, 0.85), 0 0 24px rgba(0, 200, 255, 0.5); }
 .rank-a  { color: var(--success); text-shadow: 0 0 10px rgba(0, 232, 122, 0.8); }
 .rank-b  { color: #4aa8ff;        text-shadow: 0 0 9px rgba(74, 168, 255, 0.7); }
-.rank-c  { color: var(--text);    text-shadow: 0 0 8px rgba(232, 240, 245, 0.4); }
+.rank-c  { color: #b06fff;        text-shadow: 0 0 9px rgba(176, 111, 255, 0.6); }
 .rank-d  { color: var(--text-dim); }
 .rank-e  { color: var(--danger);  text-shadow: 0 0 9px rgba(255, 56, 56, 0.6); }
 

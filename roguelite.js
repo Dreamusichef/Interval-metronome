@@ -1532,7 +1532,7 @@ const RogueliteMode = (() => {
     return 'E';
   }
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
-  const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
+  const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#b06fff', D: '#8ab0c8', E: '#ff3838' };
 
   // Style gauge = GOOD beats ÷ total beats in the run, as a %. It only ever FILLS
   // (good beats add; neutral/bad just don't), so it climbs from E and never drops.
