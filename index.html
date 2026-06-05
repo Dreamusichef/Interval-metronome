@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603t">
+  <link rel="stylesheet" href="style.css?v=20260603u">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -182,6 +182,14 @@
               <input type="number" id="restSecs" min="0" max="59" value="30" class="time-part" placeholder="ss">
             </div>
           </div>
+        </div>
+
+        <div class="interval-toggle-row interval-subrow">
+          <span class="section-label">1-Bar Count-In</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="countInToggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
         </div>
       </div>
     </section>
@@ -405,7 +413,7 @@
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="metronome.js?v=20260603d"></script>
-  <script defer src="app.js?v=20260603e"></script>
+  <script defer src="app.js?v=20260603f"></script>
   <script defer src="audio-input.js?v=4"></script>
   <script defer src="achievements.js?v=5"></script>
   <script defer src="sfx.js?v=1"></script>

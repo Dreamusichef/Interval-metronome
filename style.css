@@ -672,6 +672,13 @@ body {
   color: var(--cyan);
   border-color: rgba(0, 200, 255, 0.28);
 }
+.status-phase.countin {
+  background: rgba(0, 232, 122, 0.1);
+  color: var(--success);
+  border-color: rgba(0, 232, 122, 0.3);
+}
+/* Sub-row toggle inside the ramp config (e.g. count-in) */
+.interval-subrow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 
 .status-set {
   font-family: 'Rajdhani', sans-serif;

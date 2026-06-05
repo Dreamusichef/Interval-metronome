@@ -57,9 +57,39 @@ function safeHandler(label, fn) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const States = { IDLE: 0, RUNNING_SET: 1, RESTING: 2, DONE: 3 };
+const States = { IDLE: 0, RUNNING_SET: 1, RESTING: 2, DONE: 3, COUNTING_IN: 4 };
 let appState = States.IDLE;
 let countdownTimer = null;
+let countInTimer = null;
+
+// Ramp "1-bar count-in" toggle (persisted). One bar of clicks plays before each
+// set's timer starts, so you're ready. Skipped in Game Mode (it has its own count-in).
+const countInToggle = document.getElementById('countInToggle');
+if (countInToggle) {
+  const saved = localStorage.getItem('gm_rampcountin');
+  if (saved !== null) countInToggle.checked = (saved === '1');
+  countInToggle.addEventListener('change', () => localStorage.setItem('gm_rampcountin', countInToggle.checked ? '1' : '0'));
+}
+function countInOn() { return !!(countInToggle && countInToggle.checked) && !window.__gameModeActive; }
+function oneBarMs() { return Math.round(currentBeats * 60000 / clampBpm(session.currentBpm || 120)); }
+
+// Begin a set: play a 1-bar count-in first (if enabled), then start the set timer.
+function beginSet(isFirst) {
+  if (countInOn()) {
+    appState = States.COUNTING_IN;
+    updateStatusDisplay();
+    clearTimeout(countInTimer);
+    countInTimer = setTimeout(() => startSetTiming(isFirst), oneBarMs());
+  } else {
+    startSetTiming(isFirst);
+  }
+}
+function startSetTiming(isFirst) {
+  appState = States.RUNNING_SET;
+  updateStatusDisplay();
+  // Roguelite hook: announce the live BPM so a run can gate hits / check the ceiling.
+  document.dispatchEvent(new CustomEvent(isFirst ? 'ramp:start' : 'ramp:bpmchange', { detail: { bpm: session.currentBpm } }));
+}
 let isPaused = false;
 
 const session = {
@@ -301,6 +331,8 @@ function stopAll() {
   ME?.stop();
   clearInterval(countdownTimer);
   countdownTimer = null;
+  clearTimeout(countInTimer);
+  countInTimer = null;
   isPaused = false;
   appState = States.IDLE;
   startStopBtn.textContent = 'START';
@@ -314,7 +346,7 @@ function stopAll() {
 
 // ── Pause / Resume (ramp sessions only) ───────────────────────────────────────
 pauseBtn.addEventListener('click', safeHandler('pause', () => {
-  if (appState === States.IDLE) return;
+  if (appState === States.IDLE || appState === States.COUNTING_IN) return;
 
   if (isPaused) {
     isPaused = false;
@@ -394,7 +426,6 @@ function startIntervalSession() {
   ME?.playSetStartCue();
 
   isPaused = false;
-  appState = States.RUNNING_SET;
   startStopBtn.textContent = 'STOP';
   startStopBtn.classList.add('running');
   pauseBtn.textContent = 'PAUSE';
@@ -402,14 +433,12 @@ function startIntervalSession() {
   pauseBtn.classList.remove('resuming');
   setConfigDisabled(true);
   intervalStatus.classList.add('visible');
-  updateStatusDisplay();
   countdownTimer = setInterval(countdownTick, 1000);
-  // Roguelite hook: the session is fully live (appState set, BPM applied) — now
-  // announce the start BPM so a run can begin gating hits / check the ceiling.
-  document.dispatchEvent(new CustomEvent('ramp:start', { detail: { bpm: session.currentBpm } }));
+  beginSet(true);   // count-in (if enabled) → start the set timer + ramp:start
 }
 
 function countdownTick() {
+  if (appState === States.COUNTING_IN) return;   // count-in bar: clicks only, no timer
   session.timeRemaining--;
   if (session.timeRemaining <= 0) {
     if (appState === States.RUNNING_SET) onSetComplete();
@@ -444,11 +473,7 @@ function advanceToNextSet() {
   setDisplayBpm(session.currentBpm);
   if (!ME?.isRunning()) ME?.start();
   ME?.playSetStartCue();
-  appState = States.RUNNING_SET;
-  updateStatusDisplay();
-  // Roguelite hook: the ramp just climbed — report the new BPM so a run can
-  // check it against the tier's ceiling.
-  document.dispatchEvent(new CustomEvent('ramp:bpmchange', { detail: { bpm: session.currentBpm } }));
+  beginSet(false);   // count-in (if enabled) → start the set timer + ramp:bpmchange
 }
 
 function finishSession() {
@@ -483,13 +508,14 @@ doneBtn.addEventListener('click', () => doneOverlay.classList.remove('visible'))
 
 // ── Status Display ────────────────────────────────────────────────────────────
 function updateStatusDisplay() {
+  const isCountIn = appState === States.COUNTING_IN;
   const isRest = appState === States.RESTING;
-  statusPhase.textContent = isRest ? 'REST' : 'SET';
-  statusPhase.className   = 'status-phase' + (isRest ? ' rest' : '');
+  statusPhase.textContent = isCountIn ? 'COUNT-IN' : isRest ? 'REST' : 'SET';
+  statusPhase.className   = 'status-phase' + (isRest ? ' rest' : isCountIn ? ' countin' : '');
   statusSet.textContent   = `Set ${session.currentSet} of ${session.totalSets}`;
   statusBpm.textContent   = `BPM: ${session.currentBpm}`;
-  statusCountdown.textContent = formatTime(session.timeRemaining);
-  const pct = session.totalDuration > 0 ? (session.timeRemaining / session.totalDuration) * 100 : 0;
+  statusCountdown.textContent = isCountIn ? 'Ready…' : formatTime(session.timeRemaining);
+  const pct = isCountIn ? 100 : (session.totalDuration > 0 ? (session.timeRemaining / session.totalDuration) * 100 : 0);
   progressBar.style.width = pct + '%';
   progressBar.classList.toggle('rest-mode', isRest);
   if (!isRest && session.currentSet < session.totalSets) {
