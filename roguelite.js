@@ -233,6 +233,7 @@ const RogueliteMode = (() => {
   // the resulting leaderboard density is a display concern handled on the stats page.
   // The pure metronome / Ramp / Stopwatch are untouched — still 20–400.
   const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
+  const GAME_MINS_MIN = 1, GAME_MINS_MAX = 60;
   const snapGameBpm = (n) => {
     const v = Math.round(n / GAME_BPM_STEP) * GAME_BPM_STEP;
     return Math.max(GAME_BPM_MIN, Math.min(GAME_BPM_MAX, v));
@@ -970,7 +971,7 @@ const RogueliteMode = (() => {
       // ladder) for the chosen duration. No climb. Sudden death ends on one bad beat
       // and scores survival time; time trial never fails and is graded E–SS.
       const bpm  = snapGameBpm(runState.gameBpm);
-      const mins = Math.max(1, parseIntOr(el.gameMins, 3));
+      const mins = Math.max(GAME_MINS_MIN, Math.min(GAME_MINS_MAX, runState.gameMins || 3));
       runState.gameBpm = bpm;
       runState.gameMins = mins;
       runState.suddenDeath = (runState.mode === 'suddendeath');
@@ -1698,6 +1699,15 @@ const RogueliteMode = (() => {
     if (el.gameBpmDec) el.gameBpmDec.disabled = runState.gameBpm <= GAME_BPM_MIN;
     if (el.gameBpmInc) el.gameBpmInc.disabled = runState.gameBpm >= GAME_BPM_MAX;
   }
+  function stepGameMins(delta) {
+    runState.gameMins = Math.max(GAME_MINS_MIN, Math.min(GAME_MINS_MAX, runState.gameMins + delta));
+    renderGameMins();
+  }
+  function renderGameMins() {
+    if (el.gameMinsVal) el.gameMinsVal.textContent = runState.gameMins;
+    if (el.gameMinsDec) el.gameMinsDec.disabled = runState.gameMins <= GAME_MINS_MIN;
+    if (el.gameMinsInc) el.gameMinsInc.disabled = runState.gameMins >= GAME_MINS_MAX;
+  }
 
   function initUI() {
     el = {
@@ -1723,7 +1733,9 @@ const RogueliteMode = (() => {
       gameBpmDec:     document.getElementById('rogueGameBpmDec'),
       gameBpmInc:     document.getElementById('rogueGameBpmInc'),
       gameModeHint:   document.getElementById('rogueGameModeHint'),
-      gameMins:       document.getElementById('rogueGameMins'),
+      gameMinsVal:    document.getElementById('rogueGameMinsVal'),
+      gameMinsDec:    document.getElementById('rogueGameMinsDec'),
+      gameMinsInc:    document.getElementById('rogueGameMinsInc'),
       midiBtn:      document.getElementById('rogueMidiBtn'),
       deviceSelect: document.getElementById('rogueDeviceSelect'),
       midiStatus:   document.getElementById('rogueMidiStatus'),
@@ -1768,6 +1780,7 @@ const RogueliteMode = (() => {
 
     const applyToggle = () => {
       el.body.classList.toggle('visible', el.toggle.checked);
+      window.__gameModeActive = el.toggle.checked;   // routes keyboard shortcuts here
       // Leaving Game Mode restores the normal practice-complete cue.
       if (!el.toggle.checked) window.__rogueSuppressCompleteCue = false;
       // Welcome greeting fires when Game Mode is turned on (once per session — the
@@ -1809,7 +1822,10 @@ const RogueliteMode = (() => {
     el.modeBtns.forEach(b => b.addEventListener('click', () => selectMode(b.dataset.rmode)));
     el.gameBpmDec && el.gameBpmDec.addEventListener('click', () => stepGameBpm(-GAME_BPM_STEP));
     el.gameBpmInc && el.gameBpmInc.addEventListener('click', () => stepGameBpm(+GAME_BPM_STEP));
+    el.gameMinsDec && el.gameMinsDec.addEventListener('click', () => stepGameMins(-1));
+    el.gameMinsInc && el.gameMinsInc.addEventListener('click', () => stepGameMins(+1));
     renderGameBpm();
+    renderGameMins();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
       clearTimeout(revealTimer);
       clearTimeout(rankTimer);
@@ -1835,6 +1851,29 @@ const RogueliteMode = (() => {
     document.addEventListener('ramp:bpmchange', e => maybeCompleteOnBpm(e.detail && e.detail.bpm));
     document.addEventListener('ramp:complete', () => onRampComplete());
     document.addEventListener('ramp:stop', () => onRampStop());
+
+    // ── Game-mode keyboard shortcuts (only while Game Mode is on) ──
+    //   ← / →  BPM down / up · ↑ / ↓  minutes up / down · Space  start / stop run.
+    // Inactive while a results overlay is showing (keys dismiss trophies instead).
+    document.addEventListener('keydown', (e) => {
+      if (!window.__gameModeActive) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (el.overlay && el.overlay.classList.contains('visible')) return;   // results up
+      const running = runState.status === 'running';
+      switch (e.key) {
+        case 'ArrowLeft':  if (!running) { e.preventDefault(); stepGameBpm(-GAME_BPM_STEP); } break;
+        case 'ArrowRight': if (!running) { e.preventDefault(); stepGameBpm(+GAME_BPM_STEP); } break;
+        case 'ArrowUp':    if (!running) { e.preventDefault(); stepGameMins(+1); } break;
+        case 'ArrowDown':  if (!running) { e.preventDefault(); stepGameMins(-1); } break;
+        case ' ':
+          e.preventDefault();
+          if (running) { if (window.AppRamp) window.AppRamp.stop(); }
+          else if (el.runBtn && !el.runBtn.disabled) startRun();
+          break;
+      }
+    });
 
     updateGates();
   }

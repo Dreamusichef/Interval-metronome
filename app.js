@@ -249,6 +249,28 @@ subBtns.forEach(btn => {
   });
 });
 
+// ── Keyboard shortcuts (metronome / ramp) ─────────────────────────────────────
+//   Space  start / stop · Alt  pause / resume (ramp) · ↑/↓ ±1 BPM · ←/→ ±5 BPM.
+// Suppressed in Game Mode (roguelite handles its own keys) and while typing.
+document.addEventListener('keydown', (e) => {
+  if (window.__gameModeActive) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (e.key === 'Alt') {                       // pause / resume an active ramp session
+    if (!e.repeat && appState !== States.IDLE) { e.preventDefault(); pauseBtn.click(); }
+    return;
+  }
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const bpm = () => parseInt(bpmValue.value, 10) || 120;
+  switch (e.key) {
+    case ' ':          e.preventDefault(); startStopBtn.click(); break;
+    case 'ArrowUp':    e.preventDefault(); setDisplayBpm(clampBpm(bpm() + 1)); break;
+    case 'ArrowDown':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 1)); break;
+    case 'ArrowRight': e.preventDefault(); setDisplayBpm(clampBpm(bpm() + 5)); break;
+    case 'ArrowLeft':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 5)); break;
+  }
+});
+
 // ── Start / Stop ──────────────────────────────────────────────────────────────
 startStopBtn.addEventListener('click', safeHandler('startStop', () => {
   if (appState !== States.IDLE) { stopAll(); return; }
