@@ -185,9 +185,14 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
-  /* 6 × 40px items + 5 × 6px gaps = 270px — hard cap at 6 per row */
-  max-width: 270px;
+  /* 8 × 40px items + 7 × 6px gaps = 362px — up to 8 per row (max 2 rows of 8). */
+  max-width: 362px;
   margin: 0 auto;
+}
+/* On narrow phones, shrink the pips a touch so 8 still fit one row. */
+@media (max-width: 380px) {
+  .beat-indicators { gap: 4px; max-width: 100%; }
+  .beat-indicator { width: 34px; }
 }
 
 .beat-indicator {

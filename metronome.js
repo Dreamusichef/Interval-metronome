@@ -235,7 +235,7 @@ const MetronomeEngine = (() => {
   }
 
   function setBeatsPerMeasure(n) {
-    n = Math.max(1, Math.min(11, n));
+    n = Math.max(1, Math.min(16, n));
     beatsPerMeasure = n;
     while (beatModes.length < n) beatModes.push('click');
     beatModes = beatModes.slice(0, n);

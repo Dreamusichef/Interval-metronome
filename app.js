@@ -193,7 +193,7 @@ beatCountDec.addEventListener('click', () => {
 });
 
 beatCountInc.addEventListener('click', () => {
-  if (currentBeats >= 11) return;
+  if (currentBeats >= 16) return;
   currentBeats++;
   beatCountDisplay.textContent = currentBeats;
   ME?.setBeatsPerMeasure(currentBeats);
@@ -258,6 +258,15 @@ document.addEventListener('keydown', (e) => {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   if (e.key === 'Alt') {                       // pause / resume an active ramp session
     if (!e.repeat && appState !== States.IDLE) { e.preventDefault(); pauseBtn.click(); }
+    return;
+  }
+  if (e.key === 'Control') {                    // Ctrl cycles the subdivision
+    if (!e.repeat) {
+      const btns = [...subBtns];
+      const i = btns.findIndex(b => b.classList.contains('active'));
+      const next = btns[(i + 1) % btns.length];
+      next && next.click();
+    }
     return;
   }
   if (e.altKey || e.ctrlKey || e.metaKey) return;
