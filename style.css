@@ -1589,6 +1589,18 @@ body.rogue-run .rogue-section { display: none !important; }
   color: var(--text);
   text-shadow: 0 0 24px rgba(184, 204, 216, 0.18);
 }
+/* Early-access tag tucked beside the title (hover shows the version). */
+.brand-beta {
+  align-self: flex-start;
+  margin: 1px 0 0 -7px;
+  padding: 2px 6px 1px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.5rem; font-weight: 900; letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #0a0f16; background: var(--accent);
+  box-shadow: 0 0 10px rgba(255, 184, 0, 0.4);
+  cursor: default;
+}
 /* small inline logo (e.g. beside the stats heading) */
 .brand-logo.sm {
   width: 26px;
