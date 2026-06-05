@@ -32,6 +32,7 @@
 
   const cache = {};
   let enabled = true;
+  const LEVEL = 0.79;   // −2 dB (10^(−2/20)) — trims the reward sounds vs the click
 
   function get(key) {
     const file = MANIFEST[key];
@@ -39,6 +40,7 @@
     if (!cache[file]) {
       const a = new Audio(BASE + file + '?v=' + V);
       a.preload = 'auto';
+      a.volume = LEVEL;
       cache[file] = a;
     }
     return cache[file];

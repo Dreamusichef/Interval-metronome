@@ -1360,8 +1360,8 @@ const RogueliteMode = (() => {
 
   // Run after a results overlay is shown. isWin=false for a failed run (no
   // celebratory rank flourish — just the fail stinger).
-  // Timeline: 0ms run-complete/fail stinger · 750ms rank bursts in (+ flourish on
-  // a win) · 1500ms first trophy pops.
+  // Timeline: 0ms run-complete/fail stinger · 950ms rank bursts in (+ flourish on
+  // a win) · 2250ms first trophy pops.
   function revealResults(isWin) {
     const { rank } = runResultRankPct();
     if (isWin) {
@@ -1377,12 +1377,12 @@ const RogueliteMode = (() => {
     rankTimer = setTimeout(() => {
       if (rankEl) rankEl.classList.add('revealed');
       if (isWin) sfx('rank' + rank);
-    }, 750);
+    }, 950);
     clearTimeout(revealTimer);
     if (pendingTrophies.length) {
       trophyQueue = pendingTrophies.slice();
       pendingTrophies = [];
-      revealTimer = setTimeout(startTrophySequence, 1500);
+      revealTimer = setTimeout(startTrophySequence, 2250);
     }
   }
 

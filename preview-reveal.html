@@ -63,9 +63,9 @@
       <h3>What fires when</h3>
       • <b>Overlay appears</b> → run-complete stinger (or <code>fail</code>): Time Trial uses the rank band
       (<code>E</code> / <code>D-C-B-A</code> / <code>S-SS</code>); Sudden Death &amp; Gauntlet use one "all ranks" clip.<br>
-      • <b>+750ms</b> → rank bursts in + rank-reveal flourish (<code>Reveal Rank X</code>).
+      • <b>+950ms</b> → rank bursts in + rank-reveal flourish (<code>Reveal Rank X</code>).
       <i>Sound skipped on a Fail.</i><br>
-      • <b>+1500ms</b> → trophy pops (<code>Trophy reveal</code>), results blur. Dismiss to continue.<br>
+      • <b>+2250ms</b> → trophy pops (<code>Trophy reveal</code>), results blur. Dismiss to continue.<br>
       <h3>Animation timings (unchanged)</h3>
       Rank S/SS <code>rankBurst 0.75s</code> (0.25s delay) · others <code>rankPop 0.5s</code> ·
       trophy in <code>tpPop 0.5s</code> · blur <code>0.25s</code> · trophy out <code>tpOut 0.18s</code>.
@@ -92,7 +92,7 @@
   </div>
 
   <script defer src="achievements.js?v=5"></script>
-  <script defer src="sfx.js?v=1"></script>
+  <script defer src="sfx.js?v=2"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
@@ -152,7 +152,7 @@
         if (rankEl) rankEl.classList.add('revealed');
         log('rank <b>' + rank + '</b> bursts in (' + (rank === 'S' || rank === 'SS' ? 'rankBurst 0.75s' : 'rankPop 0.5s') + ')');
         if (win) fire('rank' + rank); else log('(fail — no rank flourish)');
-      }, 750);
+      }, 950);
 
       timer = setTimeout(() => {
         overlay.classList.add('blurred');
@@ -171,7 +171,7 @@
           log('(no trophy selected — sequence ends)');
           overlay.classList.remove('blurred');
         }
-      }, 1500);
+      }, 2250);
     }
 
     function dismiss() {
