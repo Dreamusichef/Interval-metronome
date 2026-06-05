@@ -32,7 +32,7 @@
 
   const cache = {};
   let enabled = true;
-  const LEVEL = 0.79;   // −2 dB (10^(−2/20)) — trims the reward sounds vs the click
+  const LEVEL = 0.63;   // −4 dB (10^(−4/20)) — trims the reward sounds vs the click
 
   function get(key) {
     const file = MANIFEST[key];
