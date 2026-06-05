@@ -1353,7 +1353,8 @@ body.rogue-run .rogue-section { display: none !important; }
   display: block;
   width: 210px; height: 210px; max-width: 62vw; max-height: 62vw;
   object-fit: contain;
-  filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.55));
+  /* No drop-shadow filter: it forces a per-frame shadow re-render while the
+     emblem scales (rankBurst). The PNG already carries its own glow. */
 }
 .rogue-result-pct {
   font-family: 'Orbitron', monospace;
@@ -1888,18 +1889,22 @@ body.rogue-run .rogue-section { display: none !important; }
 /* Style Rank stays hidden until JS adds .revealed (a beat after the card shows),
    so the results land first and the rank then bursts in with its sound. */
 .rogue-result-rank { display: inline-block; opacity: 0; }
-.rogue-result-rank.revealed { opacity: 1; animation: rankPop 0.5s cubic-bezier(0.2,1.4,0.4,1) both; }
+/* will-change promotes the emblem to its own GPU layer so the burst is composited
+   (transform/opacity only — no filter animation, which would repaint each frame). */
+.rogue-result-rank.revealed { opacity: 1; will-change: transform; animation: rankPop 0.5s cubic-bezier(0.2,1.4,0.4,1) both; }
 .rogue-result-rank.revealed.rank-s, .rogue-result-rank.revealed.rank-ss { animation: rankBurst 0.75s cubic-bezier(0.2,1.5,0.4,1) both; }
 @keyframes rankPop  { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
 @keyframes rankBurst {
-  0%   { opacity: 0; transform: scale(0.2) rotate(-8deg); filter: brightness(2.2); }
-  55%  { opacity: 1; transform: scale(1.4) rotate(3deg);  filter: brightness(1.9); }
+  0%   { opacity: 0; transform: scale(0.2) rotate(-8deg); }
+  55%  { opacity: 1; transform: scale(1.4) rotate(3deg); }
   75%  { transform: scale(0.92); }
-  100% { transform: scale(1) rotate(0); filter: brightness(1); }
+  100% { transform: scale(1) rotate(0); }
 }
 
-/* Results card blurs back while a trophy pops over it. */
-.done-overlay.blurred .done-message { filter: blur(7px) brightness(0.5); transition: filter 0.25s; pointer-events: none; }
+/* Results card dims/blurs back while a trophy pops over it. Static (no transition)
+   — animating blur re-rasterizes the whole card every frame and is the main
+   result-screen jank on weaker GPUs. A one-time 4px blur is cheap to hold. */
+.done-overlay.blurred .done-message { filter: blur(4px) brightness(0.5); pointer-events: none; }
 
 /* ── Trophy reveal popup (3D pop, one at a time) ── */
 .rogue-trophypop {
@@ -1916,6 +1921,7 @@ body.rogue-run .rogue-section { display: none !important; }
   border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 50px rgba(0,200,255,0.14);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  will-change: transform, opacity;   /* one GPU layer: 3D pop + shadow + badge glow */
 }
 .rtp-card.pop { animation: tpPop 0.5s cubic-bezier(0.2,1.5,0.4,1) both; }
 .rogue-trophypop.out .rtp-card { animation: tpOut 0.18s ease both; }
