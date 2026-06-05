@@ -8,26 +8,26 @@
    window.GameSfx.setEnabled(b)   mute / unmute
    window.GameSfx.completeKey(mode, suddenDeath, rank)  → the right "complete" key
 
-   Files live in sounds/ (mono 44.1kHz wav). Ranks D/C/B share one reveal clip.
+   Files live in sounds/ (mono 256kbps mp3). Ranks D/C/B share one reveal clip.
    ════════════════════════════════════════════════════════════════════════════ */
 (function () {
   const BASE = 'sounds/';
   const V = '1';   // cache-bust — bump if a clip is re-exported
   const MANIFEST = {
     // Rank-reveal flourish (fires when the emblem bursts in)
-    rankE: 'rank-e.wav',
-    rankD: 'rank-dcb.wav', rankC: 'rank-dcb.wav', rankB: 'rank-dcb.wav',
-    rankA: 'rank-a.wav', rankS: 'rank-s.wav', rankSS: 'rank-ss.wav',
+    rankE: 'rank-e.mp3',
+    rankD: 'rank-dcb.mp3', rankC: 'rank-dcb.mp3', rankB: 'rank-dcb.mp3',
+    rankA: 'rank-a.mp3', rankS: 'rank-s.mp3', rankSS: 'rank-ss.mp3',
     // Run-complete stingers (fire when the result overlay appears)
-    'completeTT-E': 'complete-tt-e.wav',
-    'completeTT-DCBA': 'complete-tt-dcba.wav',
-    'completeTT-SSS': 'complete-tt-sss.wav',
-    completeSD: 'complete-sd.wav',
-    completeGauntlet: 'complete-gauntlet.wav',
+    'completeTT-E': 'complete-tt-e.mp3',
+    'completeTT-DCBA': 'complete-tt-dcba.mp3',
+    'completeTT-SSS': 'complete-tt-sss.mp3',
+    completeSD: 'complete-sd.mp3',
+    completeGauntlet: 'complete-gauntlet.mp3',
     // Fail stinger (sudden death death / gauntlet fail)
-    fail: 'fail.wav',
+    fail: 'fail.mp3',
     // Each trophy pop
-    trophyPop: 'trophy.wav',
+    trophyPop: 'trophy.mp3',
   };
 
   const cache = {};

@@ -14,3 +14,4 @@ _preview*.png
 _tphypreview.png
 _rankrow.png
 /Game sounds/
+sounds/*.wav
