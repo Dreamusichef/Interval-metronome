@@ -422,7 +422,9 @@ function advanceToNextSet() {
 
 function finishSession() {
   ME?.stop();
-  ME?.playPracticeCompleteCue();
+  // Roguelite suppresses the practice-complete cue during a game run — its own
+  // result-screen sound system (GameSfx) plays the completion stinger instead.
+  if (!window.__rogueSuppressCompleteCue) ME?.playPracticeCompleteCue();
   clearInterval(countdownTimer);
   countdownTimer = null;
   isPaused = false;

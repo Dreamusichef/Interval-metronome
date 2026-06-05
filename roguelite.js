@@ -937,6 +937,7 @@ const RogueliteMode = (() => {
     runState.gatingStartPerf = 0;
     runState.status = 'running';
     window.__rogueSuppressDoneOverlay = false;
+    window.__rogueSuppressCompleteCue = true;   // GameSfx owns completion audio for game runs
 
     events = [];
     clearPendingEvals();
@@ -1254,13 +1255,11 @@ const RogueliteMode = (() => {
     MetronomeEngine.onSchedule(null);
 
     if (stopRamp) {
-      // Ceiling reached mid-ramp: stop the metronome and fire the existing
-      // completion / level-up audio ourselves. (AppRamp.stop() → ramp:stop is a
-      // no-op now because status is already 'complete'.)
+      // Ceiling reached mid-ramp: stop the metronome. (AppRamp.stop() → ramp:stop
+      // is a no-op now because status is already 'complete'.) The completion sound
+      // is handled by GameSfx in the reveal sequence, not the old practice cue.
       if (window.AppRamp && window.AppRamp.isRunning()) window.AppRamp.stop();
-      try { MetronomeEngine.playPracticeCompleteCue(); } catch (e) {}
     }
-    // For the natural-finish path the cue already fired in finishSession().
 
     saveRunRecord();          // saves + computes any newly-unlocked trophies first
     showComplete();
@@ -1769,6 +1768,8 @@ const RogueliteMode = (() => {
 
     const applyToggle = () => {
       el.body.classList.toggle('visible', el.toggle.checked);
+      // Leaving Game Mode restores the normal practice-complete cue.
+      if (!el.toggle.checked) window.__rogueSuppressCompleteCue = false;
       // Welcome greeting fires when Game Mode is turned on (once per session — the
       // engine's welcomePlayed guard means it won't repeat as you keep playing).
       if (el.toggle.checked && typeof MetronomeEngine !== 'undefined') {
@@ -1816,6 +1817,7 @@ const RogueliteMode = (() => {
       el.overlay.classList.remove('visible', 'blurred');
       runState.status = 'idle';
       window.__rogueSuppressDoneOverlay = false;
+      window.__rogueSuppressCompleteCue = false;   // restore the normal practice cue
       exitHud();   // leave the HUD and restore the normal (decluttered) setup view
       setRunStatus('Start another run.');
       updateGates();
