@@ -32,7 +32,12 @@
 
   const cache = {};
   let enabled = true;
-  const LEVEL = 0.63;   // −4 dB (10^(−4/20)) — trims the reward sounds vs the click
+  const LEVEL = 0.63;   // −4 dB (10^(−4/20)) — base trim for the reward sounds vs the click
+  // Extra per-key trim (linear, relative to LEVEL). 0.841 = −1.5 dB.
+  const TRIM = {
+    trophyPop: 0.841,
+    rankE: 0.841, rankD: 0.841, rankC: 0.841, rankB: 0.841, rankA: 0.841, rankS: 0.841, rankSS: 0.841,
+  };
 
   function get(key) {
     const file = MANIFEST[key];
@@ -40,7 +45,6 @@
     if (!cache[file]) {
       const a = new Audio(BASE + file + '?v=' + V);
       a.preload = 'auto';
-      a.volume = LEVEL;
       cache[file] = a;
     }
     return cache[file];
@@ -50,7 +54,9 @@
     if (!enabled) return;
     const a = get(key);
     if (!a) return;
-    try { a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    // Volume is set per-key at play time (a file may be shared by keys with
+    // different trims — e.g. the rank-dcb clip serves D, C and B).
+    try { a.volume = LEVEL * (TRIM[key] || 1); a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
   }
 
   play.preloadAll = () => Object.keys(MANIFEST).forEach(get);

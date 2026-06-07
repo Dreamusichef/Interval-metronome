@@ -20,7 +20,7 @@ const MetronomeEngine = (() => {
   // the 1.0 ceiling, so the metronome can't be boosted further without clipping —
   // instead the non-metronome sounds are trimmed an extra 2dB so the metronome is
   // effectively +2dB louder relative to them (click already carries its own +2dB).
-  const WELCOME_GAIN = 0.562;   // welcome greeting  −5dB (−3 requested −2 to clear the metronome)
+  const WELCOME_GAIN = 0.473;   // welcome greeting  −6.5dB (was −5dB, trimmed −1.5dB more)
   const COWBELL_GAIN = 1.122;   // cowbell click     +1dB (the metronome's other voice — kept louder)
   const CUE_GAIN     = 0.708;   // set start/end + practice-complete cues  −3dB (−1 requested −2)
 
