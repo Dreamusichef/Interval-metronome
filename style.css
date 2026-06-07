@@ -1574,6 +1574,16 @@ body.rogue-run .rogue-section { display: none !important; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 0; }
 .settings-row-label { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 0.92rem; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
 .settings-row-label small { font-weight: 600; font-size: 0.72rem; color: var(--text-dim); }
+#latencyReadout { color: var(--cyan); font-variant-numeric: tabular-nums; }
+.settings-row-btn { width: 100%; background: none; border: 0; border-top: 1px solid var(--border); margin-top: 4px; cursor: pointer; }
+.settings-disclosure { color: var(--text-dim); font-size: 0.9rem; transition: transform 0.15s; }
+.settings-shortcuts { border-top: 1px solid var(--border); padding-top: 8px; }
+.sc-group { font-family: 'Orbitron', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cyan); margin: 8px 0 3px; }
+.sc-table { width: 100%; border-collapse: collapse; }
+.sc-table td { padding: 3px 0; font-family: 'Rajdhani', sans-serif; font-size: 0.84rem; font-weight: 600; color: var(--text); }
+.sc-table td:first-child { width: 104px; white-space: nowrap; }
+.sc-table kbd { display: inline-block; min-width: 14px; text-align: center; padding: 1px 5px; font-family: 'Rajdhani', sans-serif; font-size: 0.72rem; font-weight: 700; color: var(--text); background: var(--inset); border: 1px solid var(--border); }
+.sc-hint { font-size: 0.7rem; color: var(--text-dim); opacity: 0.8; margin-top: 8px; }
 .brand-logo {
   width: 46px;
   height: 46px;

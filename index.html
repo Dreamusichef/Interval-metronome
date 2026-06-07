@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603w">
+  <link rel="stylesheet" href="style.css?v=20260603x">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -59,6 +59,37 @@
             <input type="checkbox" id="wakeLockToggle"><span class="toggle-slider"></span>
           </span>
         </label>
+
+        <label class="settings-row">
+          <span class="settings-row-label">Auto latency correction
+            <small id="latencyCompNote">Beta · keeps Game Mode timing accurate if your device's audio latency drifts (laptops). <span id="latencyReadout"></span></small>
+          </span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="latencyCompToggle"><span class="toggle-slider"></span>
+          </span>
+        </label>
+
+        <button class="settings-row settings-row-btn" id="shortcutsToggleRow" type="button" aria-expanded="false">
+          <span class="settings-row-label">Keyboard shortcuts</span>
+          <span class="settings-disclosure" id="shortcutsCaret">&#9662;</span>
+        </button>
+        <div class="settings-shortcuts" id="shortcutsTable" hidden>
+          <div class="sc-group">Metronome / Ramp</div>
+          <table class="sc-table">
+            <tr><td><kbd>Space</kbd></td><td>Start / Stop</td></tr>
+            <tr><td><kbd>Alt</kbd></td><td>Pause / Resume (ramp)</td></tr>
+            <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd></td><td>BPM &minus;/+ 1</td></tr>
+            <tr><td><kbd>&rarr;</kbd> / <kbd>&larr;</kbd></td><td>BPM &minus;/+ 5</td></tr>
+            <tr><td><kbd>Ctrl</kbd></td><td>Cycle subdivision</td></tr>
+          </table>
+          <div class="sc-group">Game Mode</div>
+          <table class="sc-table">
+            <tr><td><kbd>&larr;</kbd> / <kbd>&rarr;</kbd></td><td>BPM &minus; / +</td></tr>
+            <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd></td><td>Minutes + / &minus;</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>Start / Stop run</td></tr>
+          </table>
+          <div class="sc-hint">Shortcuts ignore typing in input fields.</div>
+        </div>
       </div>
     </div>
 
@@ -418,8 +449,8 @@
   <script defer src="audio-input.js?v=4"></script>
   <script defer src="achievements.js?v=5"></script>
   <script defer src="sfx.js?v=5"></script>
-  <script defer src="settings.js?v=1"></script>
-  <script defer src="roguelite.js?v=20260603x"></script>
+  <script defer src="settings.js?v=2"></script>
+  <script defer src="roguelite.js?v=20260603y"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

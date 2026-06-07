@@ -420,6 +420,34 @@ const RogueliteMode = (() => {
     }
   }
 
+  // ── Output-latency compensation (opt-in; default off via Settings) ───────────
+  // The click is heard ctx.outputLatency after it's scheduled. Calibration bakes
+  // the latency-at-cal into meanOffset; if the OS shifts the audio buffer later
+  // (laptop power state, load…), that baked offset goes stale. When enabled we
+  // re-sync the difference (now − cal) at each set's count-in — a SAFE point where
+  // the player isn't being judged — so the window never moves mid-set.
+  let latencyCalSec = null;          // ctx.outputLatency captured at calibration
+  let latencyCompMs = 0;             // current applied compensation (ms)
+  const LAT_COMP_THRESH_MS = 4;      // ignore sub-threshold drift (don't chase noise)
+  function currentOutputLatency() {
+    const ctx = (typeof MetronomeEngine !== 'undefined') && MetronomeEngine.getAudioContext();
+    return (ctx && typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0) ? ctx.outputLatency : null;
+  }
+  function captureLatencyCal() { const l = currentOutputLatency(); if (l != null) latencyCalSec = l; }
+  // Re-read at a safe point (count-in). Holds steady through the gated part of the set.
+  function resyncLatencyComp() {
+    if (!(window.__latencyCompEnabled && latencyCalSec != null)) { latencyCompMs = 0; return; }
+    const l = currentOutputLatency();
+    if (l == null) return;
+    const target = (l - latencyCalSec) * 1000;
+    if (Math.abs(target - latencyCompMs) > LAT_COMP_THRESH_MS) latencyCompMs = target;
+    window.__latencyDebug = { outMs: +(l * 1000).toFixed(1), calMs: +(latencyCalSec * 1000).toFixed(1), compMs: +latencyCompMs.toFixed(1) };
+  }
+  // Calibration offset + (optional) live latency compensation. Used for run gating.
+  function effectiveOffset() {
+    return runState.meanOffset + ((window.__latencyCompEnabled && latencyCalSec != null) ? latencyCompMs : 0);
+  }
+
   // ── Kick event buffer ────────────────────────────────────────────────────
   // Each entry: { t (perf ms), consumed }. Shared by calibration and runs; reset
   // when each phase begins. Old entries are purged during runs to bound growth.
@@ -837,6 +865,7 @@ const RogueliteMode = (() => {
       console.info('[roguelite] cal quarters gross offset:', signed(G) + 'ms (' + gross.sampleCount + ' hits)');
       runState.meanOffset = G;
       runState.calibration = { meanOffset: G, sd: gross.sd, sampleCount: gross.sampleCount, grossOffset: G, drift: 0, refined: false };
+      captureLatencyCal();
       setStatus(el.calStatus, 'Quarters calibrated @ ' + passBpm + ' BPM. Offset ' + signed(G) +
         'ms (subtracted). Optional: refine your 16th pocket.', false);
       updateGates();
@@ -878,6 +907,7 @@ const RogueliteMode = (() => {
     const drift = meanOffset - G;             // 16th vs quarter (negative = rushing 16ths)
     runState.meanOffset = meanOffset;
     runState.calibration = { meanOffset, sd, sampleCount, grossOffset: G, drift, refined: true };
+    captureLatencyCal();
 
     const dir = drift < 0 ? 'rushing' : 'dragging';
     setStatus(el.calStatus,
@@ -895,6 +925,7 @@ const RogueliteMode = (() => {
     if (!isFinite(v)) { setStatus(el.calStatus, 'Enter your offset in ms (a number, e.g. 102).', true); return; }
     runState.meanOffset = v;
     runState.calibration = { meanOffset: v, sd: 0, sampleCount: 0, grossOffset: v, drift: 0, manual: true };
+    captureLatencyCal();
     setStatus(el.calStatus, 'Manual offset ' + signed(v) + 'ms applied — calibration skipped.', false);
     updateGates();
   }
@@ -1040,6 +1071,7 @@ const RogueliteMode = (() => {
       events = [];
       hudBeatRank = [0, 0, 0, 0];
       hudBeatOff  = [0, 0, 0, 0];
+      resyncLatencyComp();   // safe point: re-read output latency before this set is gated
       // (The set countdown is held in maybeCompleteOnBpm — the ramp:start/bpmchange
       // handler — which fires after the timer exists; doing it here is too early.)
     }
@@ -1085,18 +1117,22 @@ const RogueliteMode = (() => {
     const presenceMs = sixteenthMs * RUN_PRESENCE_FACTOR;
     const goodMs = presenceMs * goodFraction(bpm);   // GOOD vs RUSH/DRAG threshold (tempo-aware)
     const sixteenthSec = sixteenthMs / 1000;
+    // Offset for this whole tick (calibration + any latency compensation). Captured
+    // once and passed through so the eval timer and the classify centre always agree.
+    const runOffset = effectiveOffset();
     for (let k = 0; k < 4; k++) {
       const subPerf = audioToPerfMs(tickTimeSec + k * sixteenthSec, sync);
       // Evaluate after the (offset-shifted) slot closes — classifySlot centres it at
-      // subPerf + meanOffset, so the eval timer must wait out meanOffset too.
-      const evalAt = subPerf + runState.meanOffset + presenceMs + EVAL_MARGIN_MS;
+      // subPerf + runOffset, so the eval timer must wait out runOffset too.
+      const evalAt = subPerf + runOffset + presenceMs + EVAL_MARGIN_MS;
       const delay = Math.max(0, evalAt - performance.now());
-      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, goodMs, beatIndex, k), delay));
+      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, goodMs, beatIndex, k, runOffset), delay));
     }
   }
 
-  function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, sixteenthIdx) {
+  function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, sixteenthIdx, offset) {
     if (runState.status !== 'running') return;
+    if (offset == null) offset = runState.meanOffset;
 
     // The first scored 16th of each set is lenient on the early side (a rushed start
     // would otherwise be orphaned → instant drop). Every other slot: exactly one
@@ -1104,9 +1140,9 @@ const RogueliteMode = (() => {
     const firstGated = pendingFirstGated;
     pendingFirstGated = false;
     const c = firstGated
-      ? classifyFirstSlot(expectedPerf, runState.meanOffset, presenceMs, events,
+      ? classifyFirstSlot(expectedPerf, offset, presenceMs, events,
           presenceMs * RUN_FIRST_SLOT_EARLY_MULT)
-      : classifySlot(expectedPerf, runState.meanOffset, presenceMs, events);
+      : classifySlot(expectedPerf, offset, presenceMs, events);
 
     // Verdict for this 16th: 0 = good (well inside the slot), 1 = neutral (rode the
     // edge — signed offset gives RUSH/DRAG), 2 = bad (drop/cram). The lenient first
@@ -1141,7 +1177,7 @@ const RogueliteMode = (() => {
     }
 
     if (RL_DEBUG) {
-      const centre = expectedPerf + runState.meanOffset;
+      const centre = expectedPerf + offset;
       const near = events
         .map(e => ({ off: +(e.t - centre).toFixed(1), consumed: e.consumed }))
         .filter(e => Math.abs(e.off) <= 250)
