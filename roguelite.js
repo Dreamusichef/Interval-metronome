@@ -429,6 +429,8 @@ const RogueliteMode = (() => {
   let latencyCalSec = null;          // ctx.outputLatency captured at calibration
   let latencyCompMs = 0;             // current applied compensation (ms)
   const LAT_COMP_THRESH_MS = 4;      // ignore sub-threshold drift (don't chase noise)
+  const LAT_COMP_EASE = 0.35;        // gentle: ease this fraction toward target per set (not a full snap)
+  const LAT_COMP_MAX_MS = 50;        // safety clamp: never apply more than ±this
   function currentOutputLatency() {
     const ctx = (typeof MetronomeEngine !== 'undefined') && MetronomeEngine.getAudioContext();
     return (ctx && typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0) ? ctx.outputLatency : null;
@@ -440,8 +442,13 @@ const RogueliteMode = (() => {
     const l = currentOutputLatency();
     if (l == null) return;
     const target = (l - latencyCalSec) * 1000;
-    if (Math.abs(target - latencyCompMs) > LAT_COMP_THRESH_MS) latencyCompMs = target;
-    window.__latencyDebug = { outMs: +(l * 1000).toFixed(1), calMs: +(latencyCalSec * 1000).toFixed(1), compMs: +latencyCompMs.toFixed(1) };
+    // Gentle: ease only part of the way toward the new target each set (so it
+    // nudges rather than jumps), and clamp so a bad reading can't skew timing.
+    if (Math.abs(target - latencyCompMs) > LAT_COMP_THRESH_MS) {
+      latencyCompMs += (target - latencyCompMs) * LAT_COMP_EASE;
+    }
+    latencyCompMs = Math.max(-LAT_COMP_MAX_MS, Math.min(LAT_COMP_MAX_MS, latencyCompMs));
+    window.__latencyDebug = { outMs: +(l * 1000).toFixed(1), calMs: +(latencyCalSec * 1000).toFixed(1), compMs: +latencyCompMs.toFixed(1), targetMs: +target.toFixed(1) };
   }
   // Calibration offset + (optional) live latency compensation. Used for run gating.
   function effectiveOffset() {
