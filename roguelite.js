@@ -234,6 +234,10 @@ const RogueliteMode = (() => {
   // The pure metronome / Ramp / Stopwatch are untouched — still 20–400.
   const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
   const GAME_MINS_MIN = 1, GAME_MINS_MAX = 60;
+  // Beta access gate for Game Mode (sign-in + claim a 250 spot). Flip to false to
+  // disable the gate entirely (Game Mode open to all).
+  const BETA_GATE = true;
+  let betaOk = false;   // session cache: once a spot is confirmed, don't re-check
   const snapGameBpm = (n) => {
     const v = Math.round(n / GAME_BPM_STEP) * GAME_BPM_STEP;
     return Math.max(GAME_BPM_MIN, Math.min(GAME_BPM_MAX, v));
@@ -1732,6 +1736,30 @@ const RogueliteMode = (() => {
     updateGates();
   }
 
+  // ── Beta access gate (Game Mode only) ───────────────────────────────────────
+  function showBetaGate(state) {
+    if (!el.betaGate) return;
+    el.betaGate.hidden = false;
+    el.betaGate.querySelectorAll('.beta-gate-state').forEach(s => { s.hidden = (s.dataset.state !== state); });
+  }
+  function hideBetaGate() { if (el.betaGate) el.betaGate.hidden = true; }
+
+  // Resolve whether the user may enter Game Mode. Shows the gate as needed.
+  // Returns true only if a beta spot is confirmed.
+  async function ensureBetaAccess() {
+    if (!BETA_GATE || betaOk) return true;
+    const C = window.Cloud;
+    if (!C || !C.claimBetaSpot) return true;   // cloud not available → don't lock out
+    const u = C.getSessionUser ? await C.getSessionUser() : (C.currentUser && C.currentUser());
+    if (!u) { showBetaGate('signin'); return false; }
+    showBetaGate('checking');
+    let res = 'error';
+    try { res = await C.claimBetaSpot(); } catch (e) {}
+    if (res === 'ok') { betaOk = true; hideBetaGate(); return true; }
+    showBetaGate(res === 'full' ? 'full' : 'error');
+    return false;
+  }
+
   // BPM ladder stepper (Time Trial / Sudden Death): snaps to 10s, clamps 60–240.
   function stepGameBpm(delta) {
     runState.gameBpm = snapGameBpm(runState.gameBpm + delta);
@@ -1756,6 +1784,13 @@ const RogueliteMode = (() => {
     el = {
       toggle:       document.getElementById('rogueToggle'),
       body:         document.getElementById('rogueBody'),
+      betaGate:     document.getElementById('betaGate'),
+      betaGateClose:document.getElementById('betaGateClose'),
+      betaSignIn:   document.getElementById('betaSignIn'),
+      betaWaitForm: document.getElementById('betaWaitForm'),
+      betaWaitEmail:document.getElementById('betaWaitEmail'),
+      betaWaitMsg:  document.getElementById('betaWaitMsg'),
+      betaRetry:    document.getElementById('betaRetry'),
       instrBtns:    Array.from(document.querySelectorAll('.rogue-instr-btn')),
       instrStatus:  document.getElementById('rogueInstrStatus'),
       inputBtns:    Array.from(document.querySelectorAll('.rogue-input-btn')),
@@ -1821,7 +1856,13 @@ const RogueliteMode = (() => {
 
     el.kickNote && (el.kickNote.textContent = 'Note: pick a drum first');
 
-    const applyToggle = () => {
+    const applyToggle = async () => {
+      // Gate Game Mode behind the beta sign-in + spot claim. If denied, snap the
+      // toggle back off and leave the rest of the app (free metronome) untouched.
+      if (el.toggle.checked && BETA_GATE && !betaOk) {
+        const granted = await ensureBetaAccess();
+        if (!granted) { el.toggle.checked = false; el.body.classList.remove('visible'); window.__gameModeActive = false; return; }
+      }
       el.body.classList.toggle('visible', el.toggle.checked);
       window.__gameModeActive = el.toggle.checked;   // routes keyboard shortcuts here
       // Leaving Game Mode restores the normal practice-complete cue.
@@ -1833,6 +1874,20 @@ const RogueliteMode = (() => {
       }
     };
     el.toggle.addEventListener('change', applyToggle);
+
+    // Beta gate controls.
+    if (el.betaGateClose) el.betaGateClose.addEventListener('click', () => { hideBetaGate(); el.toggle.checked = false; el.body.classList.remove('visible'); window.__gameModeActive = false; });
+    if (el.betaSignIn) el.betaSignIn.addEventListener('click', () => { try { window.Cloud && window.Cloud.signIn(); } catch (e) {} });
+    if (el.betaRetry) el.betaRetry.addEventListener('click', () => { el.toggle.checked = true; applyToggle(); });
+    if (el.betaWaitForm) el.betaWaitForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = el.betaWaitEmail ? el.betaWaitEmail.value : '';
+      if (el.betaWaitMsg) el.betaWaitMsg.textContent = 'Adding you…';
+      let err = null;
+      try { const r = await (window.Cloud && window.Cloud.joinWaitlist(email)); err = r && r.error; } catch (x) { err = x; }
+      if (el.betaWaitMsg) el.betaWaitMsg.textContent = err ? 'Could not save — check the email and retry.' : "You're on the list! We'll be in touch.";
+      if (!err && el.betaWaitForm) el.betaWaitForm.reset();
+    });
     // Android-Chrome label fallback, matching the existing toggles.
     const lbl = el.toggle.closest('.toggle-switch');
     if (lbl) lbl.addEventListener('click', () => setTimeout(applyToggle, 0));

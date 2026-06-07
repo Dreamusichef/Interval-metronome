@@ -88,6 +88,34 @@ const Cloud = (() => {
     if (error) console.warn('[cloud] upsertProfile', error.message);
   }
 
+  // Force a fresh session read (avoids the race where the app asks who's signed
+  // in before the initial getSession() has resolved).
+  async function getSessionUser() {
+    if (!init()) return null;
+    const { data } = await client.auth.getSession();
+    const u = data && data.session ? data.session.user : null;
+    setUser(u);
+    return u;
+  }
+
+  // Beta gate: claim/confirm a spot. Returns 'ok' | 'full' | 'unauthenticated' | 'error'.
+  async function claimBetaSpot() {
+    if (!init() || !user) return 'unauthenticated';
+    const { data, error } = await client.rpc('claim_beta_spot');
+    if (error) { console.warn('[cloud] claimBetaSpot', error.message); return 'error'; }
+    return data || 'error';
+  }
+
+  // Waitlist capture when the beta is full. Duplicate email = treated as success.
+  async function joinWaitlist(email) {
+    if (!init()) return { error: 'no-client' };
+    const e = (email || '').trim().toLowerCase();
+    if (!e) return { error: 'empty' };
+    const { error } = await client.from('beta_waitlist').insert({ email: e });
+    if (error && error.code !== '23505') { console.warn('[cloud] joinWaitlist', error.message); return { error }; }
+    return {};
+  }
+
   // record: { mode, bpm, level, rank, green_pct, duration_sec, survival_sec, cleared }
   async function saveRun(record) {
     if (!init()) return { skipped: 'no-client' };
@@ -144,6 +172,6 @@ const Cloud = (() => {
     else init();
   }
 
-  return { init, onAuth, signIn, signOut, currentUser, saveRun, myRuns, leaderboard, mountAuthBar };
+  return { init, onAuth, signIn, signOut, currentUser, getSessionUser, claimBetaSpot, joinWaitlist, saveRun, myRuns, leaderboard, mountAuthBar };
 })();
 if (typeof window !== 'undefined') window.Cloud = Cloud;
