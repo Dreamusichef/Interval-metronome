@@ -1577,7 +1577,6 @@ body.rogue-run .rogue-section { display: none !important; }
 /* Keep the toggle at its full size even when the label text is long (it would
    otherwise get flex-shrunk and look different from the others). */
 .settings-row .toggle-switch { flex: none; }
-#latencyReadout { color: var(--cyan); font-variant-numeric: tabular-nums; }
 .settings-row-btn { width: 100%; background: none; border: 0; border-top: 1px solid var(--border); margin-top: 4px; cursor: pointer; }
 .settings-disclosure { color: var(--text-dim); font-size: 0.9rem; transition: transform 0.15s; }
 .settings-shortcuts { border-top: 1px solid var(--border); padding-top: 8px; }

@@ -13,9 +13,8 @@
   const wakeNote = document.getElementById('wakeLockNote');
   if (!gear || !overlay) return;
 
-  let readoutTimer = null;
-  const open = () => { overlay.hidden = false; startReadout(); };
-  const close = () => { overlay.hidden = true; stopReadout(); };
+  const open = () => { overlay.hidden = false; };
+  const close = () => { overlay.hidden = true; };
   gear.addEventListener('click', open);
   closeBtn && closeBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -24,7 +23,6 @@
   // ── Auto latency correction (opt-in, default off) ──
   const LAT_KEY = 'gm_latencycomp';
   const latToggle = document.getElementById('latencyCompToggle');
-  const latReadout = document.getElementById('latencyReadout');
   window.__latencyCompEnabled = (localStorage.getItem(LAT_KEY) === '1');
   if (latToggle) {
     latToggle.checked = window.__latencyCompEnabled;
@@ -33,21 +31,6 @@
       localStorage.setItem(LAT_KEY, latToggle.checked ? '1' : '0');
     });
   }
-  // Live output-latency readout (lets you watch it move when you change power/output).
-  function readLatency() {
-    try {
-      const ctx = (typeof MetronomeEngine !== 'undefined') && MetronomeEngine.getAudioContext();
-      if (ctx && typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0) return Math.round(ctx.outputLatency * 1000);
-    } catch (e) {}
-    return null;
-  }
-  function startReadout() {
-    if (!latReadout) return;
-    const tick = () => { const ms = readLatency(); latReadout.textContent = ms == null ? '(output latency: start audio to measure)' : ('output latency: ' + ms + ' ms'); };
-    tick();
-    readoutTimer = setInterval(tick, 500);
-  }
-  function stopReadout() { if (readoutTimer) { clearInterval(readoutTimer); readoutTimer = null; } }
 
   // ── Keyboard-shortcuts collapsible ──
   const scRow = document.getElementById('shortcutsToggleRow');
