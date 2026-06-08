@@ -1339,8 +1339,19 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // DIAGNOSTICS / overlays  (factual and clinical — the number is the feedback)
   // ───────────────────────────────────────────────────────────────────────────
-  // Single source of truth for a run's final grade: green % → rankFor (SS at 99%+).
+  // Single source of truth for a run's final grade.
+  //  • Time Trial: accuracy — green % of all beats played (it never fails).
+  //  • Sudden Death / Gauntlet: ENDURANCE — how far you got, not accuracy. One bad
+  //    beat ends the run, so accuracy is ~100% right up until death; grading on that
+  //    would hand an A to someone who died 10 beats into a 5-minute run. Instead we
+  //    score beats survived ÷ beats in the full run (clearing it = 100% = SS).
   function runResultRankPct() {
+    if (runState.mode === 'suddendeath' || runState.mode === 'gauntlet') {
+      if (runState.status === 'complete') return { rank: 'SS', pct: 100 };
+      const totalSixteenths = (runState.totalRunBeats || 0) * 4;   // totalRunBeats = quarter-beats
+      const pct = totalSixteenths ? Math.round(Math.min(100, runState.hitsCleared / totalSixteenths * 100)) : 0;
+      return { rank: rankFor(pct), pct };
+    }
     const t = runState.tally;
     const total = t.good + t.neutral + t.bad;
     const pct = total ? Math.round(t.good / total * 100) : 0;
