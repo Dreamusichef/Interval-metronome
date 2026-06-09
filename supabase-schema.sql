@@ -76,6 +76,7 @@ returns table (
   green_pct    int,
   duration_sec int,
   survival_sec int,
+  cleared      boolean,
   achieved_at  timestamptz
 )
 language sql
@@ -96,16 +97,19 @@ as $$
       row_number() over (
         partition by user_id
         order by
+          -- Gauntlet: a cleared run always ranks above an uncleared one.
+          case when p_mode = 'gauntlet' and cleared then 1 else 0 end desc,
           case when p_mode = 'suddendeath' then survival_sec else green_pct end desc nulls last,
           duration_sec desc nulls last,
           created_at asc
       ) as rn
     from slice
   )
-  select dname, aurl, rank, green_pct, duration_sec, survival_sec, created_at
+  select dname, aurl, rank, green_pct, duration_sec, survival_sec, cleared, created_at
   from best_per_user
   where rn = 1
   order by
+    case when p_mode = 'gauntlet' and cleared then 1 else 0 end desc,
     case when p_mode = 'suddendeath' then survival_sec else green_pct end desc nulls last,
     duration_sec desc nulls last,
     created_at asc
