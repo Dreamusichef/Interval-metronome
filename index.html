@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260611a">
+  <link rel="stylesheet" href="style.css?v=20260611b">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -254,6 +254,16 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+
+        <div class="ramp-favs">
+          <select id="rampFavSelect" class="config-input ramp-fav-select">
+            <option value="">&mdash; Saved ramps &mdash;</option>
+          </select>
+          <div class="ramp-favs-btns">
+            <button type="button" class="ramp-fav-btn save" id="rampFavSave">Save current</button>
+            <button type="button" class="ramp-fav-btn danger" id="rampFavDelete">Delete</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -485,7 +495,7 @@
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="metronome.js?v=20260603e"></script>
-  <script defer src="app.js?v=20260611b"></script>
+  <script defer src="app.js?v=20260611c"></script>
   <script defer src="audio-input.js?v=4"></script>
   <script defer src="achievements.js?v=5"></script>
   <script defer src="sfx.js?v=5"></script>

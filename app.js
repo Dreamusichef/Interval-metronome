@@ -466,6 +466,100 @@ function parseIntVal(el, fallback) {
   return isNaN(v) ? fallback : v;
 }
 
+// ── Favourite ramps ───────────────────────────────────────────────────────────
+// Save the current ramp config under a name and reload it later with one pick.
+// Device-local (localStorage) — no sign-in needed. Saving a name that already
+// exists overwrites it (that's how you "edit" a favourite).
+const RAMP_FAVS_KEY = 'gm_favramps';
+const rampFavSelect = document.getElementById('rampFavSelect');
+const rampFavSave   = document.getElementById('rampFavSave');
+const rampFavDelete = document.getElementById('rampFavDelete');
+
+function readRampFavs() {
+  try { const a = JSON.parse(localStorage.getItem(RAMP_FAVS_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function writeRampFavs(list) {
+  try { localStorage.setItem(RAMP_FAVS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function currentRampConfig() {
+  return {
+    startBpm:     parseIntVal(startBpmInput, 80),
+    numSets:      parseIntVal(numSetsInput, 4),
+    setMins:      parseIntVal(setMinsInput, 2),
+    setSecs:      parseIntVal(setSecsInput, 0),
+    bpmIncrement: parseIntVal(bpmIncrInput, 5),
+    restMins:     parseIntVal(restMinsInput, 0),
+    restSecs:     parseIntVal(restSecsInput, 30),
+    countIn:      !!(countInToggle && countInToggle.checked),
+  };
+}
+function applyRampConfig(c) {
+  if (!c) return;
+  startBpmInput.value = c.startBpm;
+  numSetsInput.value  = c.numSets;
+  setMinsInput.value  = c.setMins;
+  setSecsInput.value  = c.setSecs;
+  bpmIncrInput.value  = c.bpmIncrement;
+  restMinsInput.value = c.restMins;
+  restSecsInput.value = c.restSecs;
+  if (countInToggle && typeof c.countIn === 'boolean') {
+    countInToggle.checked = c.countIn;
+    localStorage.setItem('gm_rampcountin', c.countIn ? '1' : '0');
+  }
+}
+function renderRampFavs(selectName) {
+  if (!rampFavSelect) return;
+  const list = readRampFavs();
+  rampFavSelect.innerHTML = '<option value="">— Saved ramps —</option>';
+  list.forEach((f, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = f.name;
+    rampFavSelect.appendChild(o);
+  });
+  if (selectName != null) {
+    const idx = list.findIndex(f => f.name === selectName);
+    if (idx >= 0) rampFavSelect.value = String(idx);
+  }
+}
+
+if (rampFavSelect) {
+  rampFavSelect.addEventListener('change', () => {
+    const idx = parseInt(rampFavSelect.value, 10);
+    if (isNaN(idx)) return;
+    applyRampConfig(readRampFavs()[idx]);
+  });
+}
+if (rampFavSave) {
+  rampFavSave.addEventListener('click', () => {
+    const name = (prompt('Name this ramp:', '') || '').trim();
+    if (!name) return;
+    const list = readRampFavs();
+    const cfg  = currentRampConfig();
+    cfg.name = name;
+    const existing = list.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+    if (existing >= 0) list[existing] = cfg;   // same name → edit in place
+    else list.push(cfg);
+    writeRampFavs(list);
+    renderRampFavs(name);
+  });
+}
+if (rampFavDelete) {
+  rampFavDelete.addEventListener('click', () => {
+    const idx = parseInt(rampFavSelect.value, 10);
+    if (isNaN(idx)) return;
+    const list = readRampFavs();
+    const f = list[idx];
+    if (!f) return;
+    if (!confirm('Delete saved ramp "' + f.name + '"?')) return;
+    list.splice(idx, 1);
+    writeRampFavs(list);
+    renderRampFavs();
+  });
+}
+renderRampFavs();
+
 function startIntervalSession() {
   const totalSets    = Math.max(1, parseIntVal(numSetsInput, 1));
   const setDuration  = Math.max(0, parseIntVal(setMinsInput, 0)) * 60 + Math.max(0, parseIntVal(setSecsInput, 0));

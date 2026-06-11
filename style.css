@@ -880,6 +880,30 @@ body {
   text-shadow: 0 0 20px rgba(255, 92, 92, 0.4);
 }
 
+/* Favourite ramps (saved configs) */
+.ramp-favs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ramp-fav-select { font-size: 0.95rem; text-align: left; }
+.ramp-favs-btns { display: flex; gap: 8px; }
+.ramp-fav-btn {
+  flex: 1;
+  padding: 7px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  color: var(--text-dim);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition: box-shadow 0.15s, color 0.15s;
+}
+.ramp-fav-btn:hover { color: var(--text); }
+.ramp-fav-btn.save { color: var(--text); border-color: rgba(18, 160, 255, 0.4); }
+.ramp-fav-btn.danger:hover { color: var(--danger, #ff5c5c); }
+
 /* ── Roguelite Mode ────────────────────────────── */
 /* Reuses the existing Mass Effect HUD system (same panel base, cut corners,
    cyan/amber/danger/success vars) so it sits flush with the rest of the app. */
