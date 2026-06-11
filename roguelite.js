@@ -1513,14 +1513,16 @@ const RogueliteMode = (() => {
       '</div>';
   }
 
-  // Per-hit timeline chart (collapsible). Plots every evaluated 16th by its signed
-  // timing offset: early/rush above the centre line, late/drag below, colour-coded
-  // good (green) / neutral (amber) / bad (red). A dropped 16th (nothing landed) is
-  // an × on the centre line. Pure string-built SVG — no chart library, no canvas.
+  // Per-hit timeline chart (collapsible). A line chart of every evaluated 16th by
+  // its signed timing offset: above the centre line = RUSH (early), below = DRAG
+  // (late). Each segment/point is colour-coded by verdict — green (good), orange
+  // (neutral & rushing), yellow (neutral & dragging), red (bad). A dropped 16th
+  // (nothing landed) breaks the line and is marked × on the centre line. Pure
+  // string-built SVG — no chart library, no canvas.
   function hitTimelineChart() {
     const log = runState.hitLog || [];
     if (!log.length) return '';
-    const W = 520, H = 132, padL = 40, padR = 12, padT = 12, padB = 18;
+    const W = 520, H = 132, padL = 44, padR = 12, padT = 14, padB = 14;
     const plotW = W - padL - padR, plotH = H - padT - padB;
     const mid = padT + plotH / 2;
     let maxAbs = 30;                                   // floor so a tight run still reads
@@ -1528,31 +1530,40 @@ const RogueliteMode = (() => {
     maxAbs = Math.ceil(maxAbs / 10) * 10;
     const n = log.length;
     const x = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-    const y = off => mid + (off / maxAbs) * (plotH / 2);   // +off (late) plots below
-    const COLOR = ['#00e87a', '#ffd24a', '#ff5566'];       // good / neutral / bad
-    let marks = '';
-    log.forEach((h, i) => {
-      const cx = x(i).toFixed(1);
-      if (h.off == null) {
-        marks += '<path d="M' + (cx - 3) + ' ' + (mid - 3) + ' l6 6 M' + (cx - 3) + ' ' +
-          (mid + 3) + ' l6 -6" stroke="#ff5566" stroke-width="1.4"/>';
-      } else {
-        marks += '<circle cx="' + cx + '" cy="' + y(h.off).toFixed(1) + '" r="2.3" fill="' + COLOR[h.rank] + '"/>';
+    const y = off => mid + (off / maxAbs) * (plotH / 2);   // +off (late/drag) plots below
+    const colorFor = h => {
+      if (h.off == null || h.rank === 2) return '#ff5566';     // bad / drop
+      if (h.rank === 0) return '#00e87a';                      // good
+      return h.off < 0 ? '#ff9d3a' : '#ffd24a';                // neutral: rush / drag
+    };
+    let segs = '', dots = '';
+    for (let i = 0; i < n; i++) {
+      const h = log[i];
+      if (h.off == null) {                                     // dropped 16th → × marker
+        const cx = x(i).toFixed(1);
+        dots += '<path d="M' + (cx - 3) + ' ' + (mid - 3) + ' l6 6 M' + (cx - 3) + ' ' +
+          (mid + 3) + ' l6 -6" stroke="#ff5566" stroke-width="1.5"/>';
+        continue;
       }
-    });
+      const cx = x(i), cy = y(h.off);
+      if (i > 0 && log[i - 1].off != null) {                   // connect from previous point
+        const px = x(i - 1), py = y(log[i - 1].off);
+        segs += '<line x1="' + px.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + cx.toFixed(1) +
+          '" y2="' + cy.toFixed(1) + '" stroke="' + colorFor(h) + '" stroke-width="1.6"/>';
+      }
+      dots += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2" fill="' + colorFor(h) + '"/>';
+    }
     const grid =
       '<line x1="' + padL + '" y1="' + mid + '" x2="' + (W - padR) + '" y2="' + mid + '" stroke="rgba(150,180,200,.35)" stroke-width="1"/>' +
       '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="rgba(150,180,200,.18)" stroke-width="1"/>';
     const labels =
-      '<text x="4" y="' + (padT + 8) + '" fill="#8ab0c8" font-size="9">-' + maxAbs + 'ms</text>' +
+      '<text x="4" y="' + (padT + 8) + '" fill="#8ab0c8" font-size="10" font-weight="700">RUSH</text>' +
       '<text x="6" y="' + (mid + 3) + '" fill="#8ab0c8" font-size="9">0</text>' +
-      '<text x="4" y="' + (H - padB + 4) + '" fill="#8ab0c8" font-size="9">+' + maxAbs + 'ms</text>';
+      '<text x="4" y="' + (H - padB + 2) + '" fill="#8ab0c8" font-size="10" font-weight="700">DRAG</text>';
     const svg =
       '<svg viewBox="0 0 ' + W + ' ' + H + '" class="rl-timeline-svg" preserveAspectRatio="xMidYMid meet" role="img" ' +
-      'aria-label="Per-hit timing timeline">' + grid + marks + labels + '</svg>';
+      'aria-label="Per-hit timing timeline">' + grid + segs + dots + labels + '</svg>';
     return '<details class="rl-timeline"><summary>Show hit timeline (' + n + ' sixteenths)</summary>' +
-      '<div class="rl-timeline-legend"><span class="rl-lg good">early = rush ▲</span>' +
-      '<span class="rl-lg">late = drag ▼</span><span class="rl-lg bad">× = dropped</span></div>' +
       svg + '</details>';
   }
 

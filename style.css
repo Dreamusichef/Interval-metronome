@@ -1396,13 +1396,6 @@ body.rogue-run .rogue-section { display: none !important; }
   list-style: revert;
 }
 .rl-timeline > summary:hover { color: #cfe9ff; }
-.rl-timeline-legend {
-  display: flex; flex-wrap: wrap; gap: 12px;
-  font-family: 'Rajdhani', sans-serif; font-size: 0.72rem; color: #8ab0c8;
-  margin: 4px 2px 6px;
-}
-.rl-lg.good { color: #00e87a; }
-.rl-lg.bad  { color: #ff5566; }
 .rl-timeline-svg {
   width: 100%; height: auto; display: block;
   background: rgba(10, 20, 34, 0.6);
