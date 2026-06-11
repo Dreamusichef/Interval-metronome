@@ -335,6 +335,7 @@ const RogueliteMode = (() => {
     hitsCleared: 0,             // cleared 16th-note slots this run
     totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
+    hitLog: [],                 // per-16th timeline: { off, rank } (for the result-card chart)
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
     // kickNote is a single number today; widening it to a Set later is the only
@@ -975,6 +976,7 @@ const RogueliteMode = (() => {
 
     runState.hitsCleared = 0;
     runState.tally = { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 };
+    runState.hitLog = [];
     runState.diedAtBpm = null;
     runState.survivalSec = 0;
     runState.gatingStartPerf = 0;
@@ -1178,6 +1180,10 @@ const RogueliteMode = (() => {
       hudBeatOff[beatIndex] = off;   // keep the most extreme neutral direction this beat
     }
     setHudVerdict(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
+
+    // Timeline log: one entry per evaluated 16th, for the result-card chart. A drop
+    // has no timing offset (nothing landed) → off=null so the chart can mark a gap.
+    runState.hitLog.push({ rank, off: (c.result === 'clear' || (c.result === 'cram' && c.offset != null)) ? off : null });
 
     // Consume matched kicks so they can't satisfy later slots. (In audio mode a
     // 'cram' is a present slot — count it cleared and consume all its hits.)
@@ -1507,6 +1513,49 @@ const RogueliteMode = (() => {
       '</div>';
   }
 
+  // Per-hit timeline chart (collapsible). Plots every evaluated 16th by its signed
+  // timing offset: early/rush above the centre line, late/drag below, colour-coded
+  // good (green) / neutral (amber) / bad (red). A dropped 16th (nothing landed) is
+  // an × on the centre line. Pure string-built SVG — no chart library, no canvas.
+  function hitTimelineChart() {
+    const log = runState.hitLog || [];
+    if (!log.length) return '';
+    const W = 520, H = 132, padL = 40, padR = 12, padT = 12, padB = 18;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const mid = padT + plotH / 2;
+    let maxAbs = 30;                                   // floor so a tight run still reads
+    log.forEach(h => { if (h.off != null) maxAbs = Math.max(maxAbs, Math.abs(h.off)); });
+    maxAbs = Math.ceil(maxAbs / 10) * 10;
+    const n = log.length;
+    const x = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const y = off => mid + (off / maxAbs) * (plotH / 2);   // +off (late) plots below
+    const COLOR = ['#00e87a', '#ffd24a', '#ff5566'];       // good / neutral / bad
+    let marks = '';
+    log.forEach((h, i) => {
+      const cx = x(i).toFixed(1);
+      if (h.off == null) {
+        marks += '<path d="M' + (cx - 3) + ' ' + (mid - 3) + ' l6 6 M' + (cx - 3) + ' ' +
+          (mid + 3) + ' l6 -6" stroke="#ff5566" stroke-width="1.4"/>';
+      } else {
+        marks += '<circle cx="' + cx + '" cy="' + y(h.off).toFixed(1) + '" r="2.3" fill="' + COLOR[h.rank] + '"/>';
+      }
+    });
+    const grid =
+      '<line x1="' + padL + '" y1="' + mid + '" x2="' + (W - padR) + '" y2="' + mid + '" stroke="rgba(150,180,200,.35)" stroke-width="1"/>' +
+      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="rgba(150,180,200,.18)" stroke-width="1"/>';
+    const labels =
+      '<text x="4" y="' + (padT + 8) + '" fill="#8ab0c8" font-size="9">-' + maxAbs + 'ms</text>' +
+      '<text x="6" y="' + (mid + 3) + '" fill="#8ab0c8" font-size="9">0</text>' +
+      '<text x="4" y="' + (H - padB + 4) + '" fill="#8ab0c8" font-size="9">+' + maxAbs + 'ms</text>';
+    const svg =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" class="rl-timeline-svg" preserveAspectRatio="xMidYMid meet" role="img" ' +
+      'aria-label="Per-hit timing timeline">' + grid + marks + labels + '</svg>';
+    return '<details class="rl-timeline"><summary>Show hit timeline (' + n + ' sixteenths)</summary>' +
+      '<div class="rl-timeline-legend"><span class="rl-lg good">early = rush ▲</span>' +
+      '<span class="rl-lg">late = drag ▼</span><span class="rl-lg bad">× = dropped</span></div>' +
+      svg + '</details>';
+  }
+
   function showGameOver(c) {
     const line = (c && c.result === 'cram')
       ? 'Crammed an extra hit into one 16th — rushed too hard.'
@@ -1523,7 +1572,8 @@ const RogueliteMode = (() => {
     el.overlayBody.innerHTML =
       headline +
       '<div class="rogue-diag-line">' + line + '</div>' +
-      resultTable();
+      resultTable() +
+      hitTimelineChart();
     el.overlay.classList.add('visible');
     revealResults(false);
   }
@@ -1543,7 +1593,7 @@ const RogueliteMode = (() => {
       ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
     }
     el.overlayBody.innerHTML =
-      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
+      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable() + hitTimelineChart();
     el.overlay.classList.add('visible');
     revealResults(true);
   }
