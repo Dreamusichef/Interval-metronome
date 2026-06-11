@@ -35,6 +35,10 @@ const stopwatchStartStop = document.getElementById('stopwatchStartStop');
 const stopwatchReset     = document.getElementById('stopwatchReset');
 const stopwatchToggle    = document.getElementById('stopwatchToggle');
 const stopwatchBody      = document.getElementById('stopwatchBody');
+const swModeBtns         = document.querySelectorAll('.sw-mode-btn');
+const swTimerSet         = document.getElementById('swTimerSet');
+const timerMinsInput     = document.getElementById('timerMins');
+const timerSecsInput     = document.getElementById('timerSecs');
 const pauseBtn           = document.getElementById('pauseBtn');
 
 // Guard: if MetronomeEngine failed to load, show a recoverable error state
@@ -98,11 +102,15 @@ const session = {
   currentBpm: 0, timeRemaining: 0, totalDuration: 0,
 };
 
-// ── Stopwatch ─────────────────────────────────────────────────────────────────
-let swSeconds = 0;
+// ── Stopwatch / Timer ───────────────────────────────────────────────────────
+// Two modes share one display + START/RESET controls:
+//   'stopwatch' counts UP from 0:00, capped at 60:00.
+//   'timer'     counts DOWN from a user-set mm:ss (up to 60:00) and stops at 0.
+let swMode    = 'stopwatch';   // 'stopwatch' | 'timer'
+let swSeconds = 0;             // stopwatch: elapsed · timer: remaining
 let swRunning = false;
 let swTimer   = null;
-const SW_MAX  = 3600;
+const SW_MAX  = 3600;          // 60 minutes, the ceiling for both modes
 
 function formatStopwatch(secs) {
   if (secs >= 3600) return '1:00:00';
@@ -111,44 +119,78 @@ function formatStopwatch(secs) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// Timer's configured duration (seconds), clamped to [0, 60:00].
+function timerDurationSecs() {
+  const m = Math.max(0, Math.min(60, parseInt(timerMinsInput?.value, 10) || 0));
+  const s = Math.max(0, Math.min(59, parseInt(timerSecsInput?.value, 10) || 0));
+  return Math.min(SW_MAX, m * 60 + s);
+}
+
+function swStopTicking() {
+  clearInterval(swTimer);
+  swTimer = null;
+  swRunning = false;
+  stopwatchStartStop.textContent = 'START';
+  stopwatchStartStop.classList.remove('running');
+}
+
+// Reset the display to the mode's starting value (0:00 for stopwatch, the set
+// duration for timer) and stop any run in progress.
+function swResetDisplay() {
+  swStopTicking();
+  swSeconds = (swMode === 'timer') ? timerDurationSecs() : 0;
+  stopwatchDisplay.textContent = formatStopwatch(swSeconds);
+}
+
+function setSwMode(mode) {
+  swMode = (mode === 'timer') ? 'timer' : 'stopwatch';
+  swModeBtns.forEach(b => b.classList.toggle('active', b.dataset.swmode === swMode));
+  if (swTimerSet) swTimerSet.hidden = (swMode !== 'timer');
+  swResetDisplay();
+}
+
 stopwatchToggle.addEventListener('change', () => {
   stopwatchBody.classList.toggle('visible', stopwatchToggle.checked);
 });
 
+swModeBtns.forEach(b => b.addEventListener('click', () => setSwMode(b.dataset.swmode)));
+
+// Re-seed the timer display when the duration inputs change (only when idle, so a
+// running countdown isn't disturbed).
+[timerMinsInput, timerSecsInput].forEach(inp => inp && inp.addEventListener('change', () => {
+  if (swMode === 'timer' && !swRunning) swResetDisplay();
+}));
+
 stopwatchStartStop.addEventListener('click', () => {
-  if (swRunning) {
-    clearInterval(swTimer);
-    swTimer = null;
-    swRunning = false;
-    stopwatchStartStop.textContent = 'START';
-    stopwatchStartStop.classList.remove('running');
+  if (swRunning) { swStopTicking(); return; }
+
+  if (swMode === 'timer') {
+    // Starting fresh (display at 0) re-arms from the configured duration.
+    if (swSeconds <= 0) swSeconds = timerDurationSecs();
+    if (swSeconds <= 0) return;                     // nothing to count down
   } else {
-    if (swSeconds >= SW_MAX) return;
-    swRunning = true;
-    stopwatchStartStop.textContent = 'STOP';
-    stopwatchStartStop.classList.add('running');
-    swTimer = setInterval(() => {
+    if (swSeconds >= SW_MAX) return;                // stopwatch already maxed
+  }
+
+  swRunning = true;
+  stopwatchStartStop.textContent = 'STOP';
+  stopwatchStartStop.classList.add('running');
+  swTimer = setInterval(() => {
+    if (swMode === 'timer') {
+      swSeconds--;
+      stopwatchDisplay.textContent = formatStopwatch(Math.max(0, swSeconds));
+      if (swSeconds <= 0) { swStopTicking(); stopwatchDisplay.classList.add('sw-done'); }
+    } else {
       swSeconds++;
       stopwatchDisplay.textContent = formatStopwatch(swSeconds);
-      if (swSeconds >= SW_MAX) {
-        clearInterval(swTimer);
-        swTimer = null;
-        swRunning = false;
-        stopwatchStartStop.textContent = 'START';
-        stopwatchStartStop.classList.remove('running');
-      }
-    }, 1000);
-  }
+      if (swSeconds >= SW_MAX) swStopTicking();
+    }
+  }, 1000);
 });
 
 stopwatchReset.addEventListener('click', () => {
-  clearInterval(swTimer);
-  swTimer = null;
-  swRunning = false;
-  swSeconds = 0;
-  stopwatchDisplay.textContent = '0:00';
-  stopwatchStartStop.textContent = 'START';
-  stopwatchStartStop.classList.remove('running');
+  stopwatchDisplay.classList.remove('sw-done');
+  swResetDisplay();
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -280,8 +322,19 @@ subBtns.forEach(btn => {
 });
 
 // ── Keyboard shortcuts (metronome / ramp) ─────────────────────────────────────
-//   Space  start / stop · Alt  pause / resume (ramp) · ↑/↓ ±1 BPM · ←/→ ±5 BPM.
+//   Space  start / stop · Alt  pause / resume (ramp) · ↑/↓ ±1 BPM · ←/→ ±5 BPM ·
+//   S  start / stop stopwatch / timer.
 // Suppressed in Game Mode (roguelite handles its own keys) and while typing.
+
+// Enter confirms (commits) any number field, so you don't need a mouse click —
+// blur fires that field's existing 'change' handler. Runs even while focused in
+// an input (the main shortcut handler below bails out on inputs, by design).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const t = e.target;
+  if (t && t.tagName === 'INPUT' && t.type === 'number') { e.preventDefault(); t.blur(); }
+});
+
 document.addEventListener('keydown', (e) => {
   if (window.__gameModeActive) return;
   const t = e.target;
@@ -307,6 +360,7 @@ document.addEventListener('keydown', (e) => {
     case 'ArrowDown':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 1)); break;
     case 'ArrowRight': e.preventDefault(); setDisplayBpm(clampBpm(bpm() + 5)); break;
     case 'ArrowLeft':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 5)); break;
+    case 's': case 'S': e.preventDefault(); stopwatchStartStop.click(); break;
   }
 });
 
