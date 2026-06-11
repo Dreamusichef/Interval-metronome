@@ -882,7 +882,8 @@ body {
 
 /* Favourite ramps (saved configs) */
 .ramp-favs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.ramp-fav-select { font-size: 0.95rem; text-align: left; }
+.ramp-fav-select { font-size: 0.95rem; text-align: left; color-scheme: dark; }
+.ramp-fav-select option { background: #0c1828; color: var(--text); }
 .ramp-favs-btns { display: flex; gap: 8px; }
 .ramp-fav-btn {
   flex: 1;
