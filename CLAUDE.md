@@ -15,7 +15,12 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 
 ## How it runs & deploys
 - **Vanilla JS, no build step, no framework.** Static files served by GitHub Pages.
-- **Deploy = push to `main`.** GitHub Pages auto-publishes in ~1 min. There is no CI.
+- **Deploy = merge to `main`.** GitHub Pages auto-publishes ~1 min after `main` changes. There is no CI.
+- **`main` is branch-protected** (since 2026-06): direct pushes are blocked, so every change
+  goes on a feature branch → **Pull Request → 1 approval from the owner (@Dreamusichef) → merge**.
+  CODEOWNERS (`.github/CODEOWNERS`) auto-requests the owner as reviewer. Repo *admins* are exempt
+  from the rule, but **automated Claude sessions push via a non-admin token and CANNOT push to
+  `main`** — always work on a feature branch and open a PR for the owner to review/merge.
 - **Cache-busting:** every script/style is referenced with `?v=...` in index.html/stats.html.
   **Bump the `?v=` when you change a file** or browsers serve stale copies. (JS use
   date-ish tokens like `?v=20260605b`; sfx.js/achievements.js use small integers.)
@@ -26,7 +31,9 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 
 ## Conventions (follow these)
 - **Commit messages end with:** `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
-- **Direct-to-main deploys are approved** for this project (it's the deploy path).
+- **All changes ship via PR.** `main` is branch-protected (see "How it runs & deploys"): commit
+  to a feature branch, push, and open a Pull Request for the owner to review and merge. Do NOT
+  attempt to push directly to `main` — it will 403.
 - **Database/DDL: Claude does NOT run SQL.** Write the SQL and **paste it in chat** for the
   human to run in the Supabase SQL editor (owner creds required). Pasting in chat is the
   user's stated preference (not a separate .sql file unless asked).

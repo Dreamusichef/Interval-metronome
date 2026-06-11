@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local VS Sandbox — 2-pad continuity test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260605a">
+  <style>
+    body { background: #05080f; color: #cfe0ee; font-family: 'Rajdhani', sans-serif; margin: 0; }
+    .sb-wrap { max-width: 820px; margin: 0 auto; padding: 22px 16px 60px; }
+    .sb-h1 { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 1.1rem; letter-spacing: .04em; color: #fff; }
+    .sb-sub { font-size: .9rem; color: #8ab0c8; margin: 4px 0 18px; line-height: 1.4; }
+    .sb-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+    .sb-btn { font-family: 'Orbitron', monospace; font-weight: 700; font-size: .8rem; letter-spacing: .06em;
+      background: linear-gradient(155deg, #12a0ff, #0a66ff); color: #001018; border: 0; padding: 11px 18px;
+      cursor: pointer; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+    .sb-btn.alt { background: linear-gradient(155deg, #2a3a4d, #16202e); color: #cfe0ee; }
+    .sb-btn:disabled { opacity: .35; cursor: default; }
+    .sb-field { font-size: .85rem; color: #cfe0ee; display: flex; align-items: center; gap: 6px; }
+    .sb-field select, .sb-field input[type=number] { background: #0c1828; color: #fff; border: 1px solid rgba(0,200,255,.25); padding: 6px 8px; font-family: 'Rajdhani'; font-weight: 600; width: 80px; }
+    .sb-log { background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 12px 14px; font-family: 'Rajdhani'; font-size: .85rem; min-height: 100px; max-height: 260px; overflow-y: auto; line-height: 1.55; }
+    .sb-log b { color: #ffd24a; font-family: 'Orbitron'; font-weight: 700; }
+    .sb-panel { display: flex; gap: 14px; margin-bottom: 14px; }
+    .player-card { flex: 1; background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 14px 16px; }
+    .player-card h3 { font-family: 'Orbitron'; font-size: .9rem; margin: 0 0 8px; letter-spacing: .04em; }
+    .player-card.p1 h3 { color: #00e87a; }
+    .player-card.p2 h3 { color: #ff7ad9; }
+    .player-card .stat { font-size: .85rem; margin: 4px 0; }
+    .player-card .stat b { color: #fff; }
+    .status-alive { color: #00e87a; font-weight: 700; }
+    .status-out { color: #ff5566; font-weight: 700; }
+    .sb-ref { margin-top: 18px; font-size: .82rem; color: #8ab0c8; line-height: 1.6; }
+    .sb-ref code { color: #9fe7ff; font-family: 'Orbitron', monospace; font-size: .78rem; }
+    .sb-ref h3 { font-family: 'Orbitron'; font-size: .82rem; color: #fff; margin: 14px 0 6px; letter-spacing: .04em; }
+    .winner-banner { font-family: 'Orbitron'; font-weight: 900; font-size: 1.4rem; text-align: center; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(0,200,255,.3); display: none; }
+    .winner-banner.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="sb-wrap">
+    <div class="sb-h1">Local VS Sandbox</div>
+    <div class="sb-sub">One e-drum/trigger module, two separate pad inputs mapped to two different MIDI notes.
+      Both players play 16th-note continuity against the same click at the same BPM (shared calibration).
+      First to drop or cram a slot is OUT — survive longer than your opponent to win. This is a standalone
+      prototype (not wired into Game Mode yet).</div>
+
+    <div class="sb-row">
+      <button class="sb-btn" id="connectBtn">Connect MIDI</button>
+      <label class="sb-field">Input
+        <select id="deviceSel" style="width:auto;"><option>—</option></select>
+      </label>
+      <label class="sb-field">BPM
+        <input type="number" id="bpmInput" value="100" min="50" max="250" step="5">
+      </label>
+      <label class="sb-field">Bars
+        <input type="number" id="barsInput" value="4" min="1" max="16" step="1">
+      </label>
+    </div>
+    <div class="sb-row">
+      <span id="midiStatus" class="sb-sub" style="margin:0;">Not connected.</span>
+    </div>
+
+    <div class="sb-panel">
+      <div class="player-card p1">
+        <h3>PLAYER 1</h3>
+        <div class="stat">Note: <b id="p1Note">—</b></div>
+        <div class="stat">Status: <b id="p1Status">—</b></div>
+        <div class="stat">16ths survived: <b id="p1Cleared">0</b></div>
+        <button class="sb-btn alt" id="learnP1">Learn P1 pad</button>
+      </div>
+      <div class="player-card p2">
+        <h3>PLAYER 2</h3>
+        <div class="stat">Note: <b id="p2Note">—</b></div>
+        <div class="stat">Status: <b id="p2Status">—</b></div>
+        <div class="stat">16ths survived: <b id="p2Cleared">0</b></div>
+        <button class="sb-btn alt" id="learnP2">Learn P2 pad</button>
+      </div>
+    </div>
+
+    <div class="sb-row">
+      <button class="sb-btn alt" id="calBtn">Calibrate (2 bars, both pads)</button>
+      <span class="sb-field" id="calStatus">No calibration yet (offset = 0ms).</span>
+    </div>
+
+    <div class="sb-row">
+      <button class="sb-btn" id="startBtn">▶ Start run</button>
+      <button class="sb-btn alt" id="stopBtn" disabled>■ Stop</button>
+    </div>
+
+    <div class="winner-banner" id="winnerBanner"></div>
+
+    <div class="sb-log" id="log">Connect MIDI, learn each player's pad note, optionally calibrate, then start.</div>
+
+    <div class="sb-ref">
+      <h3>How it works</h3>
+      • Both pads send MIDI note-on on the same input — routed to P1/P2 by note number.<br>
+      • <b>Calibrate</b> plays 2 bars of 16th clicks; hit both pads in time with them (in unison is fine) to
+      capture one shared latency offset, same as the main game's calibration principle.<br>
+      • <b>Run</b>: each 16th-note slot must contain exactly one unconsumed hit from a player to count as
+      'clear'. Zero hits = drop, 2+ hits = cram — either ends that player's run.<br>
+      • Run ends when both players are out, or after the configured number of bars if both survive.
+    </div>
+  </div>
+
+  <script defer src="metronome.js?v=20260603e"></script>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const $ = id => document.getElementById(id);
+
+    // ── pure timing math (mirrors RL_TimingMath in roguelite.js) ─────────────
+    function audioToPerfMs(audioSec, sync) { return (audioSec - sync.a0) * 1000 + sync.p0; }
+    function computeCalibration(expectedPerfTimes, eventPerfTimes, captureWindowMs) {
+      const offsets = [];
+      for (const expected of expectedPerfTimes) {
+        let best = null, bestAbs = Infinity;
+        for (const ev of eventPerfTimes) {
+          const d = ev - expected, a = Math.abs(d);
+          if (a < bestAbs) { bestAbs = a; best = d; }
+        }
+        if (best !== null && bestAbs <= captureWindowMs) offsets.push(best);
+      }
+      const n = offsets.length;
+      if (n === 0) return { meanOffset: 0, sd: 0, sampleCount: 0 };
+      const mean = offsets.reduce((s, x) => s + x, 0) / n;
+      const variance = offsets.reduce((s, x) => s + (x - mean) * (x - mean), 0) / n;
+      return { meanOffset: mean, sd: Math.sqrt(variance), sampleCount: n };
+    }
+    function classifySlot(expectedPerf, meanOffset, halfWindowMs, events) {
+      const centre = expectedPerf + meanOffset;
+      const indices = [];
+      for (let i = 0; i < events.length; i++) {
+        if (events[i].consumed) continue;
+        const d = events[i].t - centre;
+        if (d >= -halfWindowMs && d < halfWindowMs) indices.push(i);
+      }
+      if (indices.length === 0) return { result: 'drop', count: 0, indices };
+      if (indices.length === 1) return { result: 'clear', count: 1, indices };
+      return { result: 'cram', count: indices.length, indices };
+    }
+
+    // ── MIDI ───────────────────────────────────────────────────────────────
+    let midiAccess = null, midiInputs = [], selectedInputId = null;
+    let learning = null;          // null | 'p1' | 'p2'
+    let p1Note = null, p2Note = null;
+    let lastTs = { p1: 0, p2: 0 };
+    const DEBOUNCE_MS = 60;
+    let calibrating = false, calEvents = [], calExpected = [];
+
+    async function connectMidi() {
+      if (!navigator.requestMIDIAccess) { setStatus('Web MIDI not supported in this browser.', true); return; }
+      try {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+      } catch (e) {
+        setStatus('MIDI access denied: ' + (e && e.message ? e.message : e), true);
+        return;
+      }
+      midiAccess.onstatechange = refreshInputs;
+      refreshInputs();
+    }
+    function refreshInputs() {
+      midiInputs = [];
+      for (const input of midiAccess.inputs.values()) midiInputs.push({ id: input.id, name: input.name || input.id });
+      const sel = $('deviceSel');
+      sel.innerHTML = '';
+      if (!midiInputs.length) {
+        sel.innerHTML = '<option>—</option>';
+        setStatus('No MIDI inputs found. Connect your module and try again.', true);
+        return;
+      }
+      midiInputs.forEach(i => {
+        const o = document.createElement('option');
+        o.value = i.id; o.textContent = i.name;
+        sel.appendChild(o);
+      });
+      if (!midiInputs.some(i => i.id === selectedInputId)) selectedInputId = midiInputs[0].id;
+      sel.value = selectedInputId;
+      bindInput();
+      setStatus('Connected: ' + (midiInputs.find(i => i.id === selectedInputId) || {}).name);
+    }
+    function bindInput() {
+      for (const input of midiAccess.inputs.values()) {
+        input.onmidimessage = (input.id === selectedInputId) ? handleMidiMessage : null;
+      }
+    }
+    $('deviceSel').addEventListener('change', e => { selectedInputId = e.target.value; bindInput(); });
+
+    function handleMidiMessage(e) {
+      const status = e.data[0] & 0xf0, note = e.data[1], vel = e.data[2];
+      if (status !== 0x90 || vel === 0) return; // note-on only
+
+      const recv = performance.now();
+      let ts = e.timeStamp;
+      if (typeof ts !== 'number' || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
+
+      if (learning === 'p1') { p1Note = note; learning = null; updateNoteLabels(); log('P1 pad learned: note ' + note); return; }
+      if (learning === 'p2') { p2Note = note; learning = null; updateNoteLabels(); log('P2 pad learned: note ' + note); return; }
+
+      if (calibrating) {
+        if (note === p1Note || note === p2Note) calEvents.push(ts);
+        return;
+      }
+
+      if (!runActive) return;
+      if (note === p1Note) pushEvent('p1', ts);
+      else if (note === p2Note) pushEvent('p2', ts);
+    }
+    function pushEvent(pid, ts) {
+      if (ts - lastTs[pid] < DEBOUNCE_MS) return;
+      lastTs[pid] = ts;
+      players[pid].events.push({ t: ts, consumed: false });
+    }
+
+    function updateNoteLabels() {
+      $('p1Note').textContent = p1Note == null ? '—' : p1Note;
+      $('p2Note').textContent = p2Note == null ? '—' : p2Note;
+    }
+    $('learnP1').addEventListener('click', () => {
+      if (!midiAccess) { setStatus('Connect MIDI first.', true); return; }
+      learning = 'p1'; log("Learning P1 — hit P1's pad…");
+    });
+    $('learnP2').addEventListener('click', () => {
+      if (!midiAccess) { setStatus('Connect MIDI first.', true); return; }
+      learning = 'p2'; log("Learning P2 — hit P2's pad…");
+    });
+
+    // ── Calibration ────────────────────────────────────────────────────────
+    let meanOffset = 0;
+    $('calBtn').addEventListener('click', () => {
+      if (p1Note == null || p2Note == null) { setStatus('Learn both pads before calibrating.', true); return; }
+      calibrating = true; calEvents = []; calExpected = [];
+      const bpm = getBpm();
+      MetronomeEngine.setSubdivision('sixteenth');
+      MetronomeEngine.setBeatsPerMeasure(4);
+      MetronomeEngine.setBpm(bpm);
+      let sync = null;
+      const TARGET = 32; // 2 bars of 16ths
+      MetronomeEngine.onSchedule((t) => {
+        if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
+        if (calExpected.length < TARGET) calExpected.push(audioToPerfMs(t, sync));
+      });
+      MetronomeEngine.start();
+      log('Calibrating: play both pads along with the 16th clicks for 2 bars…');
+      const sixteenthMs = (60000 / bpm) / 4;
+      setTimeout(() => {
+        MetronomeEngine.stop();
+        MetronomeEngine.onSchedule(null);
+        calibrating = false;
+        const cal = computeCalibration(calExpected, calEvents, 150);
+        meanOffset = cal.meanOffset;
+        $('calStatus').textContent = 'Calibrated: offset ' + meanOffset.toFixed(1) + 'ms (sd ' + cal.sd.toFixed(1) + 'ms, ' + cal.sampleCount + ' samples).';
+        log('Calibration done — offset ' + meanOffset.toFixed(1) + 'ms, sd ' + cal.sd.toFixed(1) + 'ms.');
+      }, TARGET * sixteenthMs + 400);
+    });
+
+    // ── Run ────────────────────────────────────────────────────────────────
+    let players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
+    let pendingSlots = [], slotCounter = 0, maxSlots = 64, halfWindowMs = 0;
+    let runActive = false, judgeTimer = null, sync = null;
+
+    function getBpm() {
+      let v = parseInt($('bpmInput').value, 10) || 100;
+      v = Math.round(v / 5) * 5;
+      return Math.max(50, Math.min(250, v));
+    }
+
+    $('startBtn').addEventListener('click', () => {
+      if (p1Note == null || p2Note == null) { setStatus('Learn both pads before starting.', true); return; }
+      const bpm = getBpm();
+      const bars = Math.max(1, Math.min(16, parseInt($('barsInput').value, 10) || 4));
+      maxSlots = bars * 16;
+      players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
+      pendingSlots = []; slotCounter = 0; sync = null;
+      halfWindowMs = (60000 / bpm) / 8; // half of a 16th
+      $('p1Status').textContent = 'ALIVE'; $('p1Status').className = 'status-alive';
+      $('p2Status').textContent = 'ALIVE'; $('p2Status').className = 'status-alive';
+      $('p1Cleared').textContent = '0'; $('p2Cleared').textContent = '0';
+      $('winnerBanner').classList.remove('show');
+
+      MetronomeEngine.setSubdivision('sixteenth');
+      MetronomeEngine.setBeatsPerMeasure(4);
+      MetronomeEngine.setBpm(bpm);
+      MetronomeEngine.onSchedule(onSchedule);
+      MetronomeEngine.start();
+      judgeTimer = setInterval(judgeTick, 15);
+      runActive = true;
+      $('startBtn').disabled = true; $('stopBtn').disabled = false;
+      log('Run started: ' + bpm + ' BPM, ' + bars + ' bar(s), offset ' + meanOffset.toFixed(1) + 'ms.');
+    });
+
+    $('stopBtn').addEventListener('click', () => endRun('Stopped by user.'));
+
+    function onSchedule(tickTimeSec) {
+      if (slotCounter >= maxSlots) { MetronomeEngine.onSchedule(null); return; }
+      if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
+      pendingSlots.push({ expectedPerf: audioToPerfMs(tickTimeSec, sync), idx: slotCounter++ });
+    }
+
+    function judgeTick() {
+      const now = performance.now();
+      while (pendingSlots.length && now >= pendingSlots[0].expectedPerf + meanOffset + halfWindowMs) {
+        const slot = pendingSlots.shift();
+        for (const pid of ['p1', 'p2']) {
+          const pl = players[pid];
+          if (!pl.alive) continue;
+          const res = classifySlot(slot.expectedPerf, meanOffset, halfWindowMs, pl.events);
+          if (res.result === 'clear') {
+            pl.cleared++;
+            pl.events[res.indices[0]].consumed = true;
+            $(pid + 'Cleared').textContent = pl.cleared;
+          } else {
+            pl.alive = false;
+            $(pid + 'Status').textContent = 'OUT (' + res.result.toUpperCase() + ')';
+            $(pid + 'Status').className = 'status-out';
+            log(pid.toUpperCase() + ' is OUT at slot ' + (slot.idx + 1) + ' (' + res.result + ') — survived ' + pl.cleared + ' 16ths.');
+          }
+        }
+        if (!players.p1.alive && !players.p2.alive) { endRun(); return; }
+      }
+      if (slotCounter >= maxSlots && pendingSlots.length === 0) endRun();
+    }
+
+    function endRun(reason) {
+      MetronomeEngine.stop();
+      MetronomeEngine.onSchedule(null);
+      if (judgeTimer) { clearInterval(judgeTimer); judgeTimer = null; }
+      if (!runActive) return;
+      runActive = false;
+      $('startBtn').disabled = false; $('stopBtn').disabled = true;
+      showResult(reason);
+    }
+
+    function showResult(reason) {
+      const p1 = players.p1, p2 = players.p2;
+      const banner = $('winnerBanner');
+      let text;
+      if (p1.alive && p2.alive) {
+        text = 'BOTH SURVIVED ' + maxSlots + ' 16ths — try a higher BPM or more bars.';
+      } else if (p1.cleared === p2.cleared) {
+        text = "IT'S A TIE — " + p1.cleared + ' 16ths each.';
+      } else {
+        const winner = p1.cleared > p2.cleared ? 'P1' : 'P2';
+        text = winner + ' WINS — ' + Math.max(p1.cleared, p2.cleared) + ' vs ' + Math.min(p1.cleared, p2.cleared) + ' 16ths.';
+      }
+      banner.textContent = text;
+      banner.classList.add('show');
+      log((reason || 'Run finished.') + ' ' + text);
+    }
+
+    // ── status / log helpers ─────────────────────────────────────────────
+    function setStatus(msg, isErr) {
+      const el = $('midiStatus');
+      el.textContent = msg;
+      el.style.color = isErr ? '#ff5566' : '#8ab0c8';
+    }
+    function log(msg) {
+      const el = $('log');
+      const line = document.createElement('div');
+      line.textContent = msg;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    $('connectBtn').addEventListener('click', connectMidi);
+  });
+  </script>
+</body>
+</html>
