@@ -338,7 +338,15 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (window.__gameModeActive) return;
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  // A focused toggle switch (checkbox) eats Space to flip itself by default,
+  // which hijacks the Start/Stop shortcut. Block that default and blur it so
+  // Space falls through to the switch below instead of toggling the switch.
+  if (t && t.tagName === 'INPUT' && t.type === 'checkbox' && e.key === ' ') {
+    e.preventDefault();
+    t.blur();
+  } else if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+    return;
+  }
   if (e.key === 'Alt') {                       // pause / resume an active ramp session
     if (!e.repeat && appState !== States.IDLE) { e.preventDefault(); pauseBtn.click(); }
     return;
