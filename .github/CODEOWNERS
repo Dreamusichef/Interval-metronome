@@ -1,0 +1,4 @@
+# Global owner — matches every file in the repo.
+# Required reviewer on PRs that touch these files (when "Require review from
+# Code Owners" is enabled in the main branch protection rule).
+* @Dreamusichef
