@@ -15,7 +15,8 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 
 ## How it runs & deploys
 - **Vanilla JS, no build step, no framework.** Static files served by GitHub Pages.
-- **Deploy = merge to `main`.** GitHub Pages auto-publishes ~1 min after `main` changes. There is no CI.
+- **Deploy = merge to `main`.** GitHub Pages auto-publishes ~1 min after `main` changes.
+- **CI:** `.github/workflows/test.yml` runs `npm test` on every PR and on pushes to `dev`.
 - **`main` is branch-protected** (since 2026-06): direct pushes are blocked, so every change
   goes on a feature branch → **Pull Request → 1 approval from the owner (@Dreamusichef) → merge**.
   CODEOWNERS (`.github/CODEOWNERS`) auto-requests the owner as reviewer. Repo *admins* are exempt
