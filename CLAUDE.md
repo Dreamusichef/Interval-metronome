@@ -11,12 +11,14 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 
 - **Live:** https://metronome.artofdrumminghq.com  (also dreamusichef.github.io/Interval-metronome)
 - **Repo:** https://github.com/Dreamusichef/Interval-metronome  (deploy branch: `main`)
-- **Sandbox:** `/preview-reveal.html` — plays the result-reveal sequence + sounds at real timings.
+- **Sandbox:** `/sandbox/preview-reveal.html` — plays the result-reveal sequence + sounds at real timings.
 
 ## How it runs & deploys
 - **Vanilla JS, no build step, no framework.** Static files served by GitHub Pages.
 - **Deploy = merge to `main`.** GitHub Pages auto-publishes ~1 min after `main` changes.
-- **CI:** `.github/workflows/test.yml` runs `npm test` on every PR and on pushes to `dev`.
+- **CI:** `.github/workflows/test.yml` runs `npm test` (`node --test`) on every PR and on
+  pushes to `dev`. VS Code Testing tab: install `connor4312.nodejs-testing` (see
+  `.vscode/extensions.json`).
 - **`main` is branch-protected** (since 2026-06): direct pushes are blocked, so every change
   goes on a feature branch → **Pull Request → 1 approval from the owner (@Dreamusichef) → merge**.
   CODEOWNERS (`.github/CODEOWNERS`) auto-requests the owner as reviewer. Repo *admins* are exempt
@@ -43,24 +45,30 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
   API keys (e.g. Kit) must live server-side (Supabase Edge Function secret), never in client JS.
 - `.claude/settings.local.json` is gitignored. Source-art originals (`Rank *.png`,
   `Trophy *.png`, `Game sounds/`) and `_*.py` helpers are gitignored; only processed
-  outputs (`rank-*.png`, `trophy-*.png`, `sounds/*.mp3`) are committed.
+  outputs (`assets/img/rank/*.png`, `assets/img/trophy/*.png`, `sounds/*.mp3`) are committed.
 
 ## File map
 - `index.html` — main app (metronome + Game Mode UI, settings panel, beta gate, result overlay).
-- `metronome.js` — **MetronomeEngine** (Web Audio scheduler, sounds, cues). Top-level `const`
+- `stats.html` — Stats & Leaderboard page (Personal / Global / Trophies).
+- `assets/css/style.css` — shared stylesheet.
+- `assets/js/metronome.js` — **MetronomeEngine** (Web Audio scheduler, sounds, cues). Top-level `const`
   (a global lexical binding) — reference it **bare** as `MetronomeEngine`, NOT `window.MetronomeEngine`.
-- `app.js` — ramp/session engine, metronome controls, keyboard shortcuts, finishSession.
-- `roguelite.js` — **Game Mode** core: calibration, clock reconciliation, run gating/scoring,
+- `assets/js/app.js` — ramp/session engine, metronome controls, keyboard shortcuts, finishSession.
+- `assets/js/roguelite.js` — **Game Mode** core: calibration, clock reconciliation, run gating/scoring,
   ranks, result reveal sequence, beta gate, latency compensation. (Biggest file.)
-- `achievements.js` — trophy definitions + evaluation (shared by game + stats pages).
-- `sfx.js` — result-screen reward sounds (`window.GameSfx`), per-key volume, mp3 manifest.
-- `cloud.js` — Supabase auth (Google), run saving, leaderboard RPC, beta claim/waitlist.
-- `stats.js` / `stats.html` — Stats & Leaderboard page (Personal / Global / Trophies).
-- `audio-input.js`, `onset-detector.js` — mic/interface hit detection (AudioWorklet).
-- `sounds.js` — base64 metronome/cue samples (large; lazy-loaded).
-- `settings.js` — top-right gear panel (wake lock, latency-comp toggle, shortcuts list).
-- `sounds/` — mp3 reward clips. `rank-*.png` / `trophy-*.png` — emblem/badge art.
-- `supabase-schema.sql` — canonical DB schema (tables, RLS, get_leaderboard RPC).
+- `assets/js/achievements.js` — trophy definitions + evaluation (shared by game + stats pages).
+- `assets/js/sfx.js` — result-screen reward sounds (`window.GameSfx`), per-key volume, mp3 manifest.
+- `assets/js/cloud.js` — Supabase auth (Google), run saving, leaderboard RPC, beta claim/waitlist.
+- `assets/js/stats.js` — stats page logic.
+- `assets/js/audio-input.js`, `assets/js/onset-detector.js` — mic/interface hit detection (AudioWorklet).
+- `assets/js/sounds.js` — base64 metronome/cue samples (large; lazy-loaded).
+- `assets/js/settings.js` — top-right gear panel (wake lock, latency-comp toggle, shortcuts list).
+- `assets/img/` — `logo.png`, rank emblems (`rank/*.png`), trophy art (`trophy/*.png`).
+- `sounds/` — mp3 reward clips.
+- `sql/supabase-schema.sql` — canonical DB schema (tables, RLS, get_leaderboard RPC).
+- `sandbox/` — dev sandboxes (`preview-reveal.html`, `vs-sandbox.html`).
+- `tests/roguelite.test.cjs` — timing-math unit tests (`node:test`).
+- `tests/achievements.test.cjs` — trophy metric / tier / retroactive-diff unit tests (`node:test`).
 
 ## Backend (Supabase) — project ref `mmdmibimpipxckgfmhmz`
 - Tables: `profiles`, `runs`, `beta_members`, `beta_allowlist`, `beta_waitlist`. RLS on all.
@@ -76,7 +84,7 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Trophies:** 16, 10-rung ladder (Iron→Grandmaster); shown on Stats + as result popups.
 - **Result reveal:** results → rank emblem bursts in @950ms → trophies pop @2250ms; sounds
   via GameSfx (completion stinger by mode/band, rank flourish, trophy pop), all −4 dB base.
-- **Rank emblems** E→SS (`rank-*.png`), **trophy art** (`trophy-*.png`).
+- **Rank emblems** E→SS (`assets/img/rank/*.png`), **trophy art** (`assets/img/trophy/*.png`).
 - **Beta gate** (Game Mode only): sign-in + `claim_beta_spot()` (250 cap, students allowlisted,
   waitlist when full). Flag `BETA_GATE` in roguelite.js. Plain metronome stays free.
 - **Settings:** screen wake-lock, **auto latency correction** (opt-in, eases ±50ms, off by

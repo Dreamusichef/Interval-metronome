@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Game Metronome</title>
-  <link rel="icon" type="image/png" href="logo.png?v=1">
-  <link rel="apple-touch-icon" href="logo.png?v=1">
+  <link rel="icon" type="image/png" href="assets/img/logo.png?v=2">
+  <link rel="apple-touch-icon" href="assets/img/logo.png?v=2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260605a">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260612c">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -38,7 +38,7 @@
 
     <!-- Brand header -->
     <header class="app-brand">
-      <img class="brand-logo" src="logo.png?v=1" alt="Art of Drumming HQ">
+      <img class="brand-logo" src="assets/img/logo.png?v=2" alt="Art of Drumming HQ">
       <span class="brand-word">GAME METRONOME</span>
       <span class="brand-beta" title="v0.9.0 — beta">BETA</span>
       <button class="settings-gear" id="settingsGear" aria-label="Settings" title="Settings">&#9881;</button>
@@ -81,6 +81,7 @@
             <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd></td><td>BPM &minus;/+ 1</td></tr>
             <tr><td><kbd>&rarr;</kbd> / <kbd>&larr;</kbd></td><td>BPM &minus;/+ 5</td></tr>
             <tr><td><kbd>Ctrl</kbd></td><td>Cycle subdivision</td></tr>
+            <tr><td><kbd>S</kbd></td><td>Start / Stop stopwatch / timer</td></tr>
           </table>
           <div class="sc-group">Game Mode</div>
           <table class="sc-table">
@@ -88,7 +89,7 @@
             <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd></td><td>Minutes + / &minus;</td></tr>
             <tr><td><kbd>Space</kbd></td><td>Start / Stop run</td></tr>
           </table>
-          <div class="sc-hint">Shortcuts ignore typing in input fields.</div>
+          <div class="sc-hint">Shortcuts ignore typing in input fields. <kbd>Enter</kbd> confirms a number field.</div>
         </div>
       </div>
     </div>
@@ -97,7 +98,7 @@
     <div class="beta-gate" id="betaGate" hidden>
       <div class="beta-gate-card">
         <button class="beta-gate-close" id="betaGateClose" aria-label="Close">&#10005;</button>
-        <img class="beta-gate-logo" src="logo.png?v=1" alt="">
+        <img class="beta-gate-logo" src="assets/img/logo.png?v=2" alt="">
         <div class="beta-gate-state" data-state="signin">
           <div class="beta-gate-title">Join the Beta</div>
           <p class="beta-gate-msg">Game Mode is in limited beta (250 spots). Sign in with Google to claim yours — your runs, stats and leaderboard rank save to your account.</p>
@@ -246,26 +247,48 @@
           </div>
         </div>
 
-        <div class="interval-toggle-row interval-subrow">
-          <span class="section-label">1-Bar Count-In</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="countInToggle" checked>
-            <span class="toggle-slider"></span>
-          </label>
+        <div class="interval-subrow count-in-block">
+          <span class="section-label">Count-In (bars)</span>
+          <div class="sw-mode-row count-in-row" id="countInRow">
+            <button class="stopwatch-btn ci-btn" data-cibars="0">Off</button>
+            <button class="stopwatch-btn ci-btn active" data-cibars="1">1</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="2">2</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="3">3</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="4">4</button>
+          </div>
+        </div>
+
+        <div class="ramp-favs">
+          <select id="rampFavSelect" class="config-input ramp-fav-select">
+            <option value="">&mdash; Saved ramps &mdash;</option>
+          </select>
+          <div class="ramp-favs-btns">
+            <button type="button" class="ramp-fav-btn save" id="rampFavSave">Save current</button>
+            <button type="button" class="ramp-fav-btn danger" id="rampFavDelete">Delete</button>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Section D: Stopwatch -->
+    <!-- Section D: Stopwatch / Timer -->
     <section class="stopwatch-section">
       <div class="interval-toggle-row">
-        <span class="section-label">Stopwatch</span>
+        <span class="section-label">Stopwatch / Timer</span>
         <label class="toggle-switch">
           <input type="checkbox" id="stopwatchToggle">
           <span class="toggle-slider"></span>
         </label>
       </div>
       <div class="stopwatch-body" id="stopwatchBody">
+        <div class="sw-mode-row">
+          <button class="stopwatch-btn sw-mode-btn active" id="swModeStopwatch" data-swmode="stopwatch">STOPWATCH</button>
+          <button class="stopwatch-btn sw-mode-btn" id="swModeTimer" data-swmode="timer">TIMER</button>
+        </div>
+        <div class="sw-timer-set time-input" id="swTimerSet" hidden>
+          <input type="number" id="timerMins" min="0" max="60" value="5" class="time-part" placeholder="mm">
+          <span class="time-sep">:</span>
+          <input type="number" id="timerSecs" min="0" max="59" value="0" class="time-part" placeholder="ss">
+        </div>
         <div class="stopwatch-display" id="stopwatchDisplay">0:00</div>
         <div class="stopwatch-controls">
           <button class="stopwatch-btn start-stop" id="stopwatchStartStop">START</button>
@@ -297,6 +320,7 @@
           <!-- Opens in its own (reused) tab so the game page stays live — your
                calibration, input connection and Game Mode aren't reset on return. -->
           <a class="cloud-stats-link" href="stats.html" target="gmstats">Stats &amp; Leaderboard ▸</a>
+          <a class="cloud-stats-link" href="sandbox/vs-sandbox.html" target="gmvs">Local VS Sandbox (beta) ▸</a>
         </div>
 
         <!-- Step 1: Drum (compulsory — runs + leaderboards are separate per drum) -->
@@ -474,17 +498,17 @@
   <!-- All deferred so HTML/CSS paint immediately. sounds.js (2.4MB of cue audio)
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
-  <script defer src="metronome.js?v=20260603e"></script>
-  <script defer src="app.js?v=20260603f"></script>
-  <script defer src="audio-input.js?v=4"></script>
-  <script defer src="achievements.js?v=5"></script>
-  <script defer src="sfx.js?v=5"></script>
-  <script defer src="settings.js?v=3"></script>
-  <script defer src="roguelite.js?v=20260605b"></script>
+  <script defer src="assets/js/metronome.js?v=20260612c"></script>
+  <script defer src="assets/js/app.js?v=20260612a"></script>
+  <script defer src="assets/js/audio-input.js?v=5"></script>
+  <script defer src="assets/js/achievements.js?v=6"></script>
+  <script defer src="assets/js/sfx.js?v=7"></script>
+  <script defer src="assets/js/settings.js?v=3"></script>
+  <script defer src="assets/js/roguelite.js?v=20260611c"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="cloud.js?v=20260605a"></script>
+  <script defer src="assets/js/cloud.js?v=20260605a"></script>
   <script>
     // Mount the auth bar once Cloud is ready (deferred scripts run after this).
     (function mountAuth() {
@@ -498,7 +522,7 @@
     window.addEventListener('load', function () {
       setTimeout(function () {
         var s = document.createElement('script');
-        s.src = 'sounds.js?v=20260524b';
+        s.src = 'assets/js/sounds.js?v=20260524b';
         s.onload = function () { try { MetronomeEngine.loadSoundBank(); } catch (e) {} };
         document.body.appendChild(s);
       }, 200);

@@ -11,8 +11,8 @@
    Files live in sounds/ (mono 256kbps mp3). Ranks D/C/B share one reveal clip.
    ════════════════════════════════════════════════════════════════════════════ */
 (function () {
-  const BASE = 'sounds/';
-  const V = '1';   // cache-bust — bump if a clip is re-exported
+  const BASE = '/sounds/';
+  const V = '2';   // cache-bust — bump if a clip is re-exported
   const MANIFEST = {
     // Rank-reveal flourish (fires when the emblem bursts in)
     rankE: 'rank-e.mp3',
@@ -32,7 +32,7 @@
 
   const cache = {};
   let enabled = true;
-  const LEVEL = 0.63;   // −4 dB (10^(−4/20)) — base trim for the reward sounds vs the click
+  const LEVEL = 0.501;   // −6 dB (10^(−6/20)) — base trim for the reward sounds vs the click
   // Extra per-key trim (linear, relative to LEVEL). 0.841 = −1.5 dB.
   const TRIM = {
     trophyPop: 0.841,

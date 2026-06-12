@@ -5,7 +5,7 @@
 
    Static-site friendly: everything runs client-side with the public ANON key
    (safe to ship — Row Level Security in the DB is what actually protects data;
-   see supabase-schema.sql). Loaded on both index.html and stats.html so the
+   see sql/supabase-schema.sql). Loaded on both index.html and stats.html so the
    login session is shared (same origin → same localStorage).
 
    Public API (window.Cloud):

@@ -32,7 +32,7 @@ Body font is **Rajdhani**; display/numbers/titles are **Orbitron**.
 - Each emblem must contain the **letter mark** (A / S / SS) integrated into the design —
   Orbitron-style heavy italic, or a custom angular sci-fi letterform that reads instantly.
 - Consistent framing/scale across all three so they swap cleanly.
-- Deliver as: `rank-a.png`, `rank-s.png`, `rank-ss.png`.
+- Deliver as: `assets/img/rank/a.png`, `assets/img/rank/s.png`, `assets/img/rank/ss.png`.
 
 They will be dropped into the existing layout via CSS `background-image` on
 `.rogue-result-rank[data-rank="A"|"S"|"SS"]` (markup already exposes `data-rank`), so the
@@ -110,5 +110,5 @@ Icon shorthand currently in use (emoji placeholders to be replaced by your art):
 ---
 
 ## Delivery checklist
-- [ ] `rank-a.png`, `rank-s.png`, `rank-ss.png` — 1024×1024 transparent, consistent framing
+- [ ] `assets/img/rank/a.png`, `assets/img/rank/s.png`, `assets/img/rank/ss.png` — 1024×1024 transparent, consistent framing
 - [ ] (later) 16 trophy badge arts, square transparent, same art language

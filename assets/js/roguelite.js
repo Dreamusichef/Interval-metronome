@@ -40,7 +40,7 @@
 /* ───────────────────────────────────────────────────────────────────────────
    PURE TIMING MATH
    No DOM, no MIDI, no engine. Kept pure so it can be unit-tested in node
-   (see roguelite.selftest.cjs) — the detection/calibration formulas are the
+   (see tests/roguelite.test.cjs) — the detection/calibration formulas are the
    one place a sign error or a clock-domain bug would silently corrupt
    everything, so they get tested in isolation.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -201,7 +201,7 @@ function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, early
 
 const RL_TimingMath = { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot };
 
-// node export for the self-test; harmless/ignored in the browser.
+// node export for unit tests; harmless/ignored in the browser.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = RL_TimingMath;
 }
@@ -335,6 +335,7 @@ const RogueliteMode = (() => {
     hitsCleared: 0,             // cleared 16th-note slots this run
     totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
+    hitLog: [],                 // per-16th timeline: { off, rank } (for the result-card chart)
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
     // kickNote is a single number today; widening it to a Set later is the only
@@ -975,6 +976,7 @@ const RogueliteMode = (() => {
 
     runState.hitsCleared = 0;
     runState.tally = { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 };
+    runState.hitLog = [];
     runState.diedAtBpm = null;
     runState.survivalSec = 0;
     runState.gatingStartPerf = 0;
@@ -1178,6 +1180,10 @@ const RogueliteMode = (() => {
       hudBeatOff[beatIndex] = off;   // keep the most extreme neutral direction this beat
     }
     setHudVerdict(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
+
+    // Timeline log: one entry per evaluated 16th, for the result-card chart. A drop
+    // has no timing offset (nothing landed) → off=null so the chart can mark a gap.
+    runState.hitLog.push({ rank, off: (c.result === 'clear' || (c.result === 'cram' && c.offset != null)) ? off : null });
 
     // Consume matched kicks so they can't satisfy later slots. (In audio mode a
     // 'cram' is a present slot — count it cleared and consume all its hits.)
@@ -1490,11 +1496,11 @@ const RogueliteMode = (() => {
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
     const { rank } = runResultRankPct();
-    // Every rank E..SS has a hero emblem PNG (rank-<x>.png). If the art is ever
+    // Every rank E..SS has a hero emblem PNG (assets/img/rank/<x>.png). If the art is ever
     // missing, onerror swaps the <img> back to the plain glowing letter.
     const rankCell =
       '<span class="rogue-result-rank ' + rankClass(rank) + ' has-art" data-rank="' + rank + '">' +
-        '<img class="rank-art" src="rank-' + rank.toLowerCase() + '.png?v=2" alt="Rank ' + rank + '" ' +
+        '<img class="rank-art" src="/assets/img/rank/' + rank.toLowerCase() + '.png?v=3" alt="Rank ' + rank + '" ' +
         'onerror="var p=this.parentNode;p.classList.remove(\'has-art\');p.textContent=\'' + rank + '\';"></span>';
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
@@ -1505,6 +1511,60 @@ const RogueliteMode = (() => {
           '<span class="rogue-result-pct">' + pct + '%</span>' +
         '</div>' +
       '</div>';
+  }
+
+  // Per-hit timeline chart (collapsible). A line chart of every evaluated 16th by
+  // its signed timing offset: above the centre line = RUSH (early), below = DRAG
+  // (late). Each segment/point is colour-coded by verdict — green (good), orange
+  // (neutral & rushing), yellow (neutral & dragging), red (bad). A dropped 16th
+  // (nothing landed) breaks the line and is marked × on the centre line. Pure
+  // string-built SVG — no chart library, no canvas.
+  function hitTimelineChart() {
+    const log = runState.hitLog || [];
+    if (!log.length) return '';
+    const W = 520, H = 132, padL = 44, padR = 12, padT = 14, padB = 14;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const mid = padT + plotH / 2;
+    let maxAbs = 30;                                   // floor so a tight run still reads
+    log.forEach(h => { if (h.off != null) maxAbs = Math.max(maxAbs, Math.abs(h.off)); });
+    maxAbs = Math.ceil(maxAbs / 10) * 10;
+    const n = log.length;
+    const x = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const y = off => mid + (off / maxAbs) * (plotH / 2);   // +off (late/drag) plots below
+    const colorFor = h => {
+      if (h.off == null || h.rank === 2) return '#ff5566';     // bad / drop
+      if (h.rank === 0) return '#00e87a';                      // good
+      return h.off < 0 ? '#ff9d3a' : '#ffd24a';                // neutral: rush / drag
+    };
+    let segs = '', dots = '';
+    for (let i = 0; i < n; i++) {
+      const h = log[i];
+      if (h.off == null) {                                     // dropped 16th → × marker
+        const cx = x(i).toFixed(1);
+        dots += '<path d="M' + (cx - 3) + ' ' + (mid - 3) + ' l6 6 M' + (cx - 3) + ' ' +
+          (mid + 3) + ' l6 -6" stroke="#ff5566" stroke-width="1.5"/>';
+        continue;
+      }
+      const cx = x(i), cy = y(h.off);
+      if (i > 0 && log[i - 1].off != null) {                   // connect from previous point
+        const px = x(i - 1), py = y(log[i - 1].off);
+        segs += '<line x1="' + px.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + cx.toFixed(1) +
+          '" y2="' + cy.toFixed(1) + '" stroke="' + colorFor(h) + '" stroke-width="1.6"/>';
+      }
+      dots += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2" fill="' + colorFor(h) + '"/>';
+    }
+    const grid =
+      '<line x1="' + padL + '" y1="' + mid + '" x2="' + (W - padR) + '" y2="' + mid + '" stroke="rgba(150,180,200,.35)" stroke-width="1"/>' +
+      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="rgba(150,180,200,.18)" stroke-width="1"/>';
+    const labels =
+      '<text x="4" y="' + (padT + 8) + '" fill="#8ab0c8" font-size="10" font-weight="700">RUSH</text>' +
+      '<text x="6" y="' + (mid + 3) + '" fill="#8ab0c8" font-size="9">0</text>' +
+      '<text x="4" y="' + (H - padB + 2) + '" fill="#8ab0c8" font-size="10" font-weight="700">DRAG</text>';
+    const svg =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" class="rl-timeline-svg" preserveAspectRatio="xMidYMid meet" role="img" ' +
+      'aria-label="Per-hit timing timeline">' + grid + segs + dots + labels + '</svg>';
+    return '<details class="rl-timeline"><summary>Show hit timeline (' + n + ' sixteenths)</summary>' +
+      svg + '</details>';
   }
 
   function showGameOver(c) {
@@ -1523,7 +1583,8 @@ const RogueliteMode = (() => {
     el.overlayBody.innerHTML =
       headline +
       '<div class="rogue-diag-line">' + line + '</div>' +
-      resultTable();
+      resultTable() +
+      hitTimelineChart();
     el.overlay.classList.add('visible');
     revealResults(false);
   }
@@ -1543,7 +1604,7 @@ const RogueliteMode = (() => {
       ctx = runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
     }
     el.overlayBody.innerHTML =
-      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable();
+      '<div class="rogue-diag-line">' + ctx + '</div>' + resultTable() + hitTimelineChart();
     el.overlay.classList.add('visible');
     revealResults(true);
   }
