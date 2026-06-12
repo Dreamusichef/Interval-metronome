@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260605a">
+  <link rel="stylesheet" href="/assets/css/style.css?v=20260611f">
   <style>
     body { background: #05080f; color: #cfe0ee; font-family: 'Rajdhani', sans-serif; margin: 0; }
     .sb-wrap { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
@@ -91,8 +91,8 @@
     </div>
   </div>
 
-  <script defer src="achievements.js?v=5"></script>
-  <script defer src="sfx.js?v=5"></script>
+  <script defer src="/assets/js/achievements.js?v=6"></script>
+  <script defer src="/assets/js/sfx.js?v=6"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
@@ -112,7 +112,7 @@
 
     function rankCell(rank) {
       return '<span class="rogue-result-rank rank-' + rank.toLowerCase() + ' has-art" data-rank="' + rank + '">' +
-        '<img class="rank-art" src="rank-' + rank.toLowerCase() + '.png?v=2" alt="Rank ' + rank + '" ' +
+        '<img class="rank-art" src="/assets/img/rank/' + rank.toLowerCase() + '.png?v=3" alt="Rank ' + rank + '" ' +
         'onerror="var p=this.parentNode;p.classList.remove(\'has-art\');p.textContent=\'' + rank + '\';"></span>';
     }
     function resultHTML(rank) {

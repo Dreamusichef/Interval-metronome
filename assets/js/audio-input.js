@@ -71,7 +71,7 @@ const AudioInput = (() => {
     }
 
     try {
-      if (!moduleAdded) { await ctx.audioWorklet.addModule('onset-detector.js?v=4'); moduleAdded = true; }
+      if (!moduleAdded) { await ctx.audioWorklet.addModule('/assets/js/onset-detector.js?v=5'); moduleAdded = true; }
     } catch (e) {
       fail('Could not load the onset detector (browser too old?): ' + (e && e.message ? e.message : e));
       stopStream();

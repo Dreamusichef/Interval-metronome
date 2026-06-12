@@ -32,19 +32,32 @@ Edit any `.js` / `.html` / `.css` file, refresh the browser, and your change is 
   referenced with a `?v=...` token. Bump that version when you change a file, or
   browsers may serve a stale cached copy.
 - **Validate JS before committing:** `node --check yourfile.js` to catch syntax errors.
-- **Unit tests:** `npm test` (runs `roguelite.selftest.cjs`). CI runs this on every PR and on pushes to `dev`.
+- **Unit tests:** `npm test` (timing math + trophy evaluation). CI runs this on every PR and on pushes to `dev`.
 - **Deploy = push to `main`.** GitHub Pages auto-publishes in ~1 minute.
-- **Secrets:** the Supabase **anon public key** is committed in `cloud.js` and is safe
+- **Secrets:** the Supabase **anon public key** is committed in `assets/js/cloud.js` and is safe
   (Row Level Security protects the data). Never commit a `service_role` key or any other
   API secrets — those belong server-side only.
+
+## Project layout
+
+```
+index.html, stats.html     — entry pages (root, for GitHub Pages)
+assets/css/                — stylesheets
+assets/js/                 — application scripts
+assets/img/                — logo; rank/ and trophy/ emblem art
+sounds/                    — mp3 reward clips
+sql/                       — Supabase schema & migrations
+sandbox/                   — dev sandboxes (preview-reveal, vs-sandbox)
+tests/                     — unit tests (roguelite + achievements)
+```
 
 ## How it works
 
 - `index.html` — main app (metronome + Game Mode UI).
-- `metronome.js` — Web Audio scheduler (precise tempo/click engine).
-- `app.js` — ramp/session engine, metronome controls, keyboard shortcuts.
-- `roguelite.js` — Game Mode core (calibration, scoring, ranks, result reveal).
-- `cloud.js` — Supabase auth, run saving, leaderboard.
-- `stats.js` / `stats.html` — Stats & Leaderboard page.
+- `assets/js/metronome.js` — Web Audio scheduler (precise tempo/click engine).
+- `assets/js/app.js` — ramp/session engine, metronome controls, keyboard shortcuts.
+- `assets/js/roguelite.js` — Game Mode core (calibration, scoring, ranks, result reveal).
+- `assets/js/cloud.js` — Supabase auth, run saving, leaderboard.
+- `assets/js/stats.js` / `stats.html` — Stats & Leaderboard page.
 
 See `CLAUDE.md` for the full project brief, file map, and backend details.
