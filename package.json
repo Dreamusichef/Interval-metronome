@@ -1,0 +1,7 @@
+{
+  "name": "interval-metronome",
+  "private": true,
+  "scripts": {
+    "test": "node roguelite.selftest.cjs"
+  }
+}
