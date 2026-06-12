@@ -11,8 +11,8 @@
    Files live in sounds/ (mono 256kbps mp3). Ranks D/C/B share one reveal clip.
    ════════════════════════════════════════════════════════════════════════════ */
 (function () {
-  const BASE = 'sounds/';
-  const V = '1';   // cache-bust — bump if a clip is re-exported
+  const BASE = '/sounds/';
+  const V = '2';   // cache-bust — bump if a clip is re-exported
   const MANIFEST = {
     // Rank-reveal flourish (fires when the emblem bursts in)
     rankE: 'rank-e.mp3',

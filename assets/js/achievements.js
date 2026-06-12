@@ -15,6 +15,8 @@
      reachedMap(runs)          → { id: reachedTierCount }  (for diffing)
      diff(before, after)       → [{ ach, reached }]  newly-raised tiers
      badgeHtml(ach, reached)   → hexagon badge markup (shared by grid + popup)
+
+   Pure evaluation logic is unit-tested in node (see tests/achievements.selftest.cjs).
    ════════════════════════════════════════════════════════════════════════════ */
 const Achievements = (() => {
   const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
@@ -155,10 +157,10 @@ const Achievements = (() => {
 
   function badgeHtml(ach, reached, compact) {
     const lock = reached <= 0 ? '<span class="trophy-lock">🔒</span>' : '';
-    // Art badge (trophy-<id>.png). If the art is missing, onerror reverts to the
+    // Art badge (assets/img/trophy/<id>.png). If the art is missing, onerror reverts to the
     // emoji + hexagon fill. Tier is conveyed by the CSS glow (Option A), not by
     // recolouring the art.
-    const art = '<img class="trophy-art" src="trophy-' + ach.id + '.png?v=1" alt="" ' +
+    const art = '<img class="trophy-art" src="/assets/img/trophy/' + ach.id + '.png?v=2" alt="" ' +
       'onerror="this.parentNode.classList.remove(\'has-art\');' +
       'this.outerHTML=\'<span class=&quot;trophy-icon&quot;>' + ach.icon + '</span>\';">';
     return '<div class="trophy-badge has-art' + (compact ? ' sm' : '') + ' ' + tierClass(ach, reached) + '">' +
@@ -168,3 +170,5 @@ const Achievements = (() => {
   return { LIST, TIER_NAMES, LADDER_10, deriveMetrics, evaluate, reachedMap, diff, badgeHtml, tierClass, tierName, fmtMMSS };
 })();
 if (typeof window !== 'undefined') window.Achievements = Achievements;
+// node export for unit tests; harmless/ignored in the browser.
+if (typeof module !== 'undefined' && module.exports) module.exports = Achievements;

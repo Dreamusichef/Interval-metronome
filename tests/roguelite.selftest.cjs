@@ -13,10 +13,10 @@
   logs raw kick offsets on the first calibration hits — they must read as tens of
   ms, not thousands). This covers the formulas.
 
-  Run:  node roguelite.selftest.cjs
-*/
+  Run:  node tests/roguelite.selftest.cjs
+ */
 
-const M = require('./roguelite.js');
+const M = require('../assets/js/roguelite.js');
 const { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot } = M;
 
 let failures = 0;

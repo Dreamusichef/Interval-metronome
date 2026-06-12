@@ -40,7 +40,7 @@
 /* ───────────────────────────────────────────────────────────────────────────
    PURE TIMING MATH
    No DOM, no MIDI, no engine. Kept pure so it can be unit-tested in node
-   (see roguelite.selftest.cjs) — the detection/calibration formulas are the
+   (see tests/roguelite.selftest.cjs) — the detection/calibration formulas are the
    one place a sign error or a clock-domain bug would silently corrupt
    everything, so they get tested in isolation.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -1496,11 +1496,11 @@ const RogueliteMode = (() => {
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
     const { rank } = runResultRankPct();
-    // Every rank E..SS has a hero emblem PNG (rank-<x>.png). If the art is ever
+    // Every rank E..SS has a hero emblem PNG (assets/img/rank/<x>.png). If the art is ever
     // missing, onerror swaps the <img> back to the plain glowing letter.
     const rankCell =
       '<span class="rogue-result-rank ' + rankClass(rank) + ' has-art" data-rank="' + rank + '">' +
-        '<img class="rank-art" src="rank-' + rank.toLowerCase() + '.png?v=2" alt="Rank ' + rank + '" ' +
+        '<img class="rank-art" src="/assets/img/rank/' + rank.toLowerCase() + '.png?v=3" alt="Rank ' + rank + '" ' +
         'onerror="var p=this.parentNode;p.classList.remove(\'has-art\');p.textContent=\'' + rank + '\';"></span>';
     return '<div class="rogue-result">' +
         row('rogue-good', 'Good', t.good) +
