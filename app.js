@@ -35,6 +35,10 @@ const stopwatchStartStop = document.getElementById('stopwatchStartStop');
 const stopwatchReset     = document.getElementById('stopwatchReset');
 const stopwatchToggle    = document.getElementById('stopwatchToggle');
 const stopwatchBody      = document.getElementById('stopwatchBody');
+const swModeBtns         = document.querySelectorAll('.sw-mode-btn');
+const swTimerSet         = document.getElementById('swTimerSet');
+const timerMinsInput     = document.getElementById('timerMins');
+const timerSecsInput     = document.getElementById('timerSecs');
 const pauseBtn           = document.getElementById('pauseBtn');
 
 // Guard: if MetronomeEngine failed to load, show a recoverable error state
@@ -98,11 +102,15 @@ const session = {
   currentBpm: 0, timeRemaining: 0, totalDuration: 0,
 };
 
-// ── Stopwatch ─────────────────────────────────────────────────────────────────
-let swSeconds = 0;
+// ── Stopwatch / Timer ───────────────────────────────────────────────────────
+// Two modes share one display + START/RESET controls:
+//   'stopwatch' counts UP from 0:00, capped at 60:00.
+//   'timer'     counts DOWN from a user-set mm:ss (up to 60:00) and stops at 0.
+let swMode    = 'stopwatch';   // 'stopwatch' | 'timer'
+let swSeconds = 0;             // stopwatch: elapsed · timer: remaining
 let swRunning = false;
 let swTimer   = null;
-const SW_MAX  = 3600;
+const SW_MAX  = 3600;          // 60 minutes, the ceiling for both modes
 
 function formatStopwatch(secs) {
   if (secs >= 3600) return '1:00:00';
@@ -111,44 +119,78 @@ function formatStopwatch(secs) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// Timer's configured duration (seconds), clamped to [0, 60:00].
+function timerDurationSecs() {
+  const m = Math.max(0, Math.min(60, parseInt(timerMinsInput?.value, 10) || 0));
+  const s = Math.max(0, Math.min(59, parseInt(timerSecsInput?.value, 10) || 0));
+  return Math.min(SW_MAX, m * 60 + s);
+}
+
+function swStopTicking() {
+  clearInterval(swTimer);
+  swTimer = null;
+  swRunning = false;
+  stopwatchStartStop.textContent = 'START';
+  stopwatchStartStop.classList.remove('running');
+}
+
+// Reset the display to the mode's starting value (0:00 for stopwatch, the set
+// duration for timer) and stop any run in progress.
+function swResetDisplay() {
+  swStopTicking();
+  swSeconds = (swMode === 'timer') ? timerDurationSecs() : 0;
+  stopwatchDisplay.textContent = formatStopwatch(swSeconds);
+}
+
+function setSwMode(mode) {
+  swMode = (mode === 'timer') ? 'timer' : 'stopwatch';
+  swModeBtns.forEach(b => b.classList.toggle('active', b.dataset.swmode === swMode));
+  if (swTimerSet) swTimerSet.hidden = (swMode !== 'timer');
+  swResetDisplay();
+}
+
 stopwatchToggle.addEventListener('change', () => {
   stopwatchBody.classList.toggle('visible', stopwatchToggle.checked);
 });
 
+swModeBtns.forEach(b => b.addEventListener('click', () => setSwMode(b.dataset.swmode)));
+
+// Re-seed the timer display when the duration inputs change (only when idle, so a
+// running countdown isn't disturbed).
+[timerMinsInput, timerSecsInput].forEach(inp => inp && inp.addEventListener('change', () => {
+  if (swMode === 'timer' && !swRunning) swResetDisplay();
+}));
+
 stopwatchStartStop.addEventListener('click', () => {
-  if (swRunning) {
-    clearInterval(swTimer);
-    swTimer = null;
-    swRunning = false;
-    stopwatchStartStop.textContent = 'START';
-    stopwatchStartStop.classList.remove('running');
+  if (swRunning) { swStopTicking(); return; }
+
+  if (swMode === 'timer') {
+    // Starting fresh (display at 0) re-arms from the configured duration.
+    if (swSeconds <= 0) swSeconds = timerDurationSecs();
+    if (swSeconds <= 0) return;                     // nothing to count down
   } else {
-    if (swSeconds >= SW_MAX) return;
-    swRunning = true;
-    stopwatchStartStop.textContent = 'STOP';
-    stopwatchStartStop.classList.add('running');
-    swTimer = setInterval(() => {
+    if (swSeconds >= SW_MAX) return;                // stopwatch already maxed
+  }
+
+  swRunning = true;
+  stopwatchStartStop.textContent = 'STOP';
+  stopwatchStartStop.classList.add('running');
+  swTimer = setInterval(() => {
+    if (swMode === 'timer') {
+      swSeconds--;
+      stopwatchDisplay.textContent = formatStopwatch(Math.max(0, swSeconds));
+      if (swSeconds <= 0) { swStopTicking(); stopwatchDisplay.classList.add('sw-done'); }
+    } else {
       swSeconds++;
       stopwatchDisplay.textContent = formatStopwatch(swSeconds);
-      if (swSeconds >= SW_MAX) {
-        clearInterval(swTimer);
-        swTimer = null;
-        swRunning = false;
-        stopwatchStartStop.textContent = 'START';
-        stopwatchStartStop.classList.remove('running');
-      }
-    }, 1000);
-  }
+      if (swSeconds >= SW_MAX) swStopTicking();
+    }
+  }, 1000);
 });
 
 stopwatchReset.addEventListener('click', () => {
-  clearInterval(swTimer);
-  swTimer = null;
-  swRunning = false;
-  swSeconds = 0;
-  stopwatchDisplay.textContent = '0:00';
-  stopwatchStartStop.textContent = 'START';
-  stopwatchStartStop.classList.remove('running');
+  stopwatchDisplay.classList.remove('sw-done');
+  swResetDisplay();
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -280,12 +322,31 @@ subBtns.forEach(btn => {
 });
 
 // ── Keyboard shortcuts (metronome / ramp) ─────────────────────────────────────
-//   Space  start / stop · Alt  pause / resume (ramp) · ↑/↓ ±1 BPM · ←/→ ±5 BPM.
+//   Space  start / stop · Alt  pause / resume (ramp) · ↑/↓ ±1 BPM · ←/→ ±5 BPM ·
+//   S  start / stop stopwatch / timer.
 // Suppressed in Game Mode (roguelite handles its own keys) and while typing.
+
+// Enter confirms (commits) any number field, so you don't need a mouse click —
+// blur fires that field's existing 'change' handler. Runs even while focused in
+// an input (the main shortcut handler below bails out on inputs, by design).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const t = e.target;
+  if (t && t.tagName === 'INPUT' && t.type === 'number') { e.preventDefault(); t.blur(); }
+});
+
 document.addEventListener('keydown', (e) => {
   if (window.__gameModeActive) return;
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  // A focused toggle switch (checkbox) eats Space to flip itself by default,
+  // which hijacks the Start/Stop shortcut. Block that default and blur it so
+  // Space falls through to the switch below instead of toggling the switch.
+  if (t && t.tagName === 'INPUT' && t.type === 'checkbox' && e.key === ' ') {
+    e.preventDefault();
+    t.blur();
+  } else if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+    return;
+  }
   if (e.key === 'Alt') {                       // pause / resume an active ramp session
     if (!e.repeat && appState !== States.IDLE) { e.preventDefault(); pauseBtn.click(); }
     return;
@@ -307,6 +368,7 @@ document.addEventListener('keydown', (e) => {
     case 'ArrowDown':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 1)); break;
     case 'ArrowRight': e.preventDefault(); setDisplayBpm(clampBpm(bpm() + 5)); break;
     case 'ArrowLeft':  e.preventDefault(); setDisplayBpm(clampBpm(bpm() - 5)); break;
+    case 's': case 'S': e.preventDefault(); stopwatchStartStop.click(); break;
   }
 });
 
@@ -403,6 +465,100 @@ function parseIntVal(el, fallback) {
   const v = parseInt(el.value, 10);
   return isNaN(v) ? fallback : v;
 }
+
+// ── Favourite ramps ───────────────────────────────────────────────────────────
+// Save the current ramp config under a name and reload it later with one pick.
+// Device-local (localStorage) — no sign-in needed. Saving a name that already
+// exists overwrites it (that's how you "edit" a favourite).
+const RAMP_FAVS_KEY = 'gm_favramps';
+const rampFavSelect = document.getElementById('rampFavSelect');
+const rampFavSave   = document.getElementById('rampFavSave');
+const rampFavDelete = document.getElementById('rampFavDelete');
+
+function readRampFavs() {
+  try { const a = JSON.parse(localStorage.getItem(RAMP_FAVS_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function writeRampFavs(list) {
+  try { localStorage.setItem(RAMP_FAVS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function currentRampConfig() {
+  return {
+    startBpm:     parseIntVal(startBpmInput, 80),
+    numSets:      parseIntVal(numSetsInput, 4),
+    setMins:      parseIntVal(setMinsInput, 2),
+    setSecs:      parseIntVal(setSecsInput, 0),
+    bpmIncrement: parseIntVal(bpmIncrInput, 5),
+    restMins:     parseIntVal(restMinsInput, 0),
+    restSecs:     parseIntVal(restSecsInput, 30),
+    countIn:      !!(countInToggle && countInToggle.checked),
+  };
+}
+function applyRampConfig(c) {
+  if (!c) return;
+  startBpmInput.value = c.startBpm;
+  numSetsInput.value  = c.numSets;
+  setMinsInput.value  = c.setMins;
+  setSecsInput.value  = c.setSecs;
+  bpmIncrInput.value  = c.bpmIncrement;
+  restMinsInput.value = c.restMins;
+  restSecsInput.value = c.restSecs;
+  if (countInToggle && typeof c.countIn === 'boolean') {
+    countInToggle.checked = c.countIn;
+    localStorage.setItem('gm_rampcountin', c.countIn ? '1' : '0');
+  }
+}
+function renderRampFavs(selectName) {
+  if (!rampFavSelect) return;
+  const list = readRampFavs();
+  rampFavSelect.innerHTML = '<option value="">— Saved ramps —</option>';
+  list.forEach((f, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = f.name;
+    rampFavSelect.appendChild(o);
+  });
+  if (selectName != null) {
+    const idx = list.findIndex(f => f.name === selectName);
+    if (idx >= 0) rampFavSelect.value = String(idx);
+  }
+}
+
+if (rampFavSelect) {
+  rampFavSelect.addEventListener('change', () => {
+    const idx = parseInt(rampFavSelect.value, 10);
+    if (isNaN(idx)) return;
+    applyRampConfig(readRampFavs()[idx]);
+  });
+}
+if (rampFavSave) {
+  rampFavSave.addEventListener('click', () => {
+    const name = (prompt('Name this ramp:', '') || '').trim();
+    if (!name) return;
+    const list = readRampFavs();
+    const cfg  = currentRampConfig();
+    cfg.name = name;
+    const existing = list.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+    if (existing >= 0) list[existing] = cfg;   // same name → edit in place
+    else list.push(cfg);
+    writeRampFavs(list);
+    renderRampFavs(name);
+  });
+}
+if (rampFavDelete) {
+  rampFavDelete.addEventListener('click', () => {
+    const idx = parseInt(rampFavSelect.value, 10);
+    if (isNaN(idx)) return;
+    const list = readRampFavs();
+    const f = list[idx];
+    if (!f) return;
+    if (!confirm('Delete saved ramp "' + f.name + '"?')) return;
+    list.splice(idx, 1);
+    writeRampFavs(list);
+    renderRampFavs();
+  });
+}
+renderRampFavs();
 
 function startIntervalSession() {
   const totalSets    = Math.max(1, parseIntVal(numSetsInput, 1));
