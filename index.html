@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260611f">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260612c">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -247,12 +247,15 @@
           </div>
         </div>
 
-        <div class="interval-toggle-row interval-subrow">
-          <span class="section-label">1-Bar Count-In</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="countInToggle" checked>
-            <span class="toggle-slider"></span>
-          </label>
+        <div class="interval-subrow count-in-block">
+          <span class="section-label">Count-In (bars)</span>
+          <div class="sw-mode-row count-in-row" id="countInRow">
+            <button class="stopwatch-btn ci-btn" data-cibars="0">Off</button>
+            <button class="stopwatch-btn ci-btn active" data-cibars="1">1</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="2">2</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="3">3</button>
+            <button class="stopwatch-btn ci-btn" data-cibars="4">4</button>
+          </div>
         </div>
 
         <div class="ramp-favs">
@@ -495,11 +498,11 @@
   <!-- All deferred so HTML/CSS paint immediately. sounds.js (2.4MB of cue audio)
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
-  <script defer src="assets/js/metronome.js?v=20260603e"></script>
-  <script defer src="assets/js/app.js?v=20260611c"></script>
+  <script defer src="assets/js/metronome.js?v=20260612c"></script>
+  <script defer src="assets/js/app.js?v=20260612a"></script>
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
-  <script defer src="assets/js/sfx.js?v=6"></script>
+  <script defer src="assets/js/sfx.js?v=7"></script>
   <script defer src="assets/js/settings.js?v=3"></script>
   <script defer src="assets/js/roguelite.js?v=20260611c"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
