@@ -27,8 +27,9 @@ const MetronomeEngine = (() => {
   // effectively +2dB louder relative to them (click already carries its own +2dB).
   const WELCOME_GAIN = 0.473;   // welcome greeting  −6.5dB (was −5dB, trimmed −1.5dB more)
   const COWBELL_GAIN = 1.122;   // cowbell click     +1dB (the metronome's other voice — kept louder)
-  const CUE_GAIN     = 0.708;   // set start + practice-complete cues  −3dB (−1 requested −2)
+  const CUE_GAIN     = 0.708;   // set start cue  −3dB (−1 requested −2)
   const SET_END_GAIN = 0.398;   // set-end cue: CUE_GAIN −5dB (quieter than the others by request)
+  const PRACTICE_COMPLETE_GAIN = 0.562;   // practice-complete (ramp) cue: CUE_GAIN −2dB more (−5dB total)
 
   let audioCtx = null;
   let setEndBuffer = null;
@@ -315,8 +316,9 @@ const MetronomeEngine = (() => {
   // the Web MIDI / performance.now() clock. Returns null until init() has run.
   function getAudioContext() { return audioCtx; }
 
-  function playSyntheticCue(pitches, spacing) {
+  function playSyntheticCue(pitches, spacing, peakGain) {
     if (!audioCtx) return;
+    if (peakGain == null) peakGain = 0.389;   // −3dB, matches the set-start/set-end cue buffers
     pitches.forEach((freq, i) => {
       const t    = audioCtx.currentTime + i * spacing;
       const osc  = audioCtx.createOscillator();
@@ -324,7 +326,7 @@ const MetronomeEngine = (() => {
       osc.type = 'sine';
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.389, t + 0.005);   // −3dB, matches the cue buffers
+      gain.gain.linearRampToValueAtTime(peakGain, t + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -349,7 +351,7 @@ const MetronomeEngine = (() => {
 
   function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer,           SET_END_GAIN); else playSyntheticCue([880, 660, 440],       0.12); }
   function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer,         CUE_GAIN); else playSyntheticCue([440, 660, 880],       0.18); }
-  function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer, CUE_GAIN); else playSyntheticCue([440, 550, 660, 880], 0.15); }
+  function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer, PRACTICE_COMPLETE_GAIN); else playSyntheticCue([440, 550, 660, 880], 0.15, 0.309); }
 
   function setSoundMode(mode) { if (mode === 'click' || mode === 'cowbell') soundMode = mode; }
   function getSoundMode()     { return soundMode; }

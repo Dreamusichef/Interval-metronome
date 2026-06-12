@@ -32,7 +32,7 @@
 
   const cache = {};
   let enabled = true;
-  const LEVEL = 0.63;   // −4 dB (10^(−4/20)) — base trim for the reward sounds vs the click
+  const LEVEL = 0.501;   // −6 dB (10^(−6/20)) — base trim for the reward sounds vs the click
   // Extra per-key trim (linear, relative to LEVEL). 0.841 = −1.5 dB.
   const TRIM = {
     trophyPop: 0.841,
