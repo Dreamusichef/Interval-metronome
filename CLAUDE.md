@@ -16,7 +16,9 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 ## How it runs & deploys
 - **Vanilla JS, no build step, no framework.** Static files served by GitHub Pages.
 - **Deploy = merge to `main`.** GitHub Pages auto-publishes ~1 min after `main` changes.
-- **CI:** `.github/workflows/test.yml` runs `npm test` on every PR and on pushes to `dev`.
+- **CI:** `.github/workflows/test.yml` runs `npm test` (`node --test`) on every PR and on
+  pushes to `dev`. VS Code Testing tab: install `connor4312.nodejs-testing` (see
+  `.vscode/extensions.json`).
 - **`main` is branch-protected** (since 2026-06): direct pushes are blocked, so every change
   goes on a feature branch → **Pull Request → 1 approval from the owner (@Dreamusichef) → merge**.
   CODEOWNERS (`.github/CODEOWNERS`) auto-requests the owner as reviewer. Repo *admins* are exempt
@@ -65,8 +67,8 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - `sounds/` — mp3 reward clips.
 - `sql/supabase-schema.sql` — canonical DB schema (tables, RLS, get_leaderboard RPC).
 - `sandbox/` — dev sandboxes (`preview-reveal.html`, `vs-sandbox.html`).
-- `tests/roguelite.selftest.cjs` — timing-math unit tests.
-- `tests/achievements.selftest.cjs` — trophy metric / tier / retroactive-diff unit tests.
+- `tests/roguelite.test.cjs` — timing-math unit tests (`node:test`).
+- `tests/achievements.test.cjs` — trophy metric / tier / retroactive-diff unit tests (`node:test`).
 
 ## Backend (Supabase) — project ref `mmdmibimpipxckgfmhmz`
 - Tables: `profiles`, `runs`, `beta_members`, `beta_allowlist`, `beta_waitlist`. RLS on all.

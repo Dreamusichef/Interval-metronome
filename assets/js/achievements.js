@@ -16,7 +16,7 @@
      diff(before, after)       → [{ ach, reached }]  newly-raised tiers
      badgeHtml(ach, reached)   → hexagon badge markup (shared by grid + popup)
 
-   Pure evaluation logic is unit-tested in node (see tests/achievements.selftest.cjs).
+   Pure evaluation logic is unit-tested in node (see tests/achievements.test.cjs).
    ════════════════════════════════════════════════════════════════════════════ */
 const Achievements = (() => {
   const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };

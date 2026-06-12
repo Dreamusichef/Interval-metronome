@@ -2,6 +2,6 @@
   "name": "interval-metronome",
   "private": true,
   "scripts": {
-    "test": "node tests/roguelite.selftest.cjs && node tests/achievements.selftest.cjs"
+    "test": "node --test tests/roguelite.test.cjs tests/achievements.test.cjs"
   }
 }

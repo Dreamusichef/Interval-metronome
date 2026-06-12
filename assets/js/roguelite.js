@@ -40,7 +40,7 @@
 /* ───────────────────────────────────────────────────────────────────────────
    PURE TIMING MATH
    No DOM, no MIDI, no engine. Kept pure so it can be unit-tested in node
-   (see tests/roguelite.selftest.cjs) — the detection/calibration formulas are the
+   (see tests/roguelite.test.cjs) — the detection/calibration formulas are the
    one place a sign error or a clock-domain bug would silently corrupt
    everything, so they get tested in isolation.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -201,7 +201,7 @@ function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, early
 
 const RL_TimingMath = { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot };
 
-// node export for the self-test; harmless/ignored in the browser.
+// node export for unit tests; harmless/ignored in the browser.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = RL_TimingMath;
 }
