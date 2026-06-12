@@ -2,7 +2,12 @@
 
 const MetronomeEngine = (() => {
   const SCHEDULE_AHEAD_TIME = 0.1;
+  // While the tab is hidden, browsers throttle timers (and may freeze them), so we
+  // queue far more audio ahead — already-scheduled buffer sources keep playing on
+  // the audio thread through a frozen main thread, giving gapless background audio.
+  const HIDDEN_SCHEDULE_AHEAD = 1.5;
   const SCHEDULER_INTERVAL = 25;
+  function scheduleAhead() { return document.hidden ? HIDDEN_SCHEDULE_AHEAD : SCHEDULE_AHEAD_TIME; }
 
   const SUBDIVISION_TICKS = {
     quarter:   1,
@@ -22,7 +27,8 @@ const MetronomeEngine = (() => {
   // effectively +2dB louder relative to them (click already carries its own +2dB).
   const WELCOME_GAIN = 0.473;   // welcome greeting  −6.5dB (was −5dB, trimmed −1.5dB more)
   const COWBELL_GAIN = 1.122;   // cowbell click     +1dB (the metronome's other voice — kept louder)
-  const CUE_GAIN     = 0.708;   // set start/end + practice-complete cues  −3dB (−1 requested −2)
+  const CUE_GAIN     = 0.708;   // set start + practice-complete cues  −3dB (−1 requested −2)
+  const SET_END_GAIN = 0.398;   // set-end cue: CUE_GAIN −5dB (quieter than the others by request)
 
   let audioCtx = null;
   let setEndBuffer = null;
@@ -96,7 +102,7 @@ const MetronomeEngine = (() => {
     tickInterval         = 60 / bpm / ticksPerBeat;
     const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
 
-    while (nextTickTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
+    while (nextTickTime < audioCtx.currentTime + scheduleAhead()) {
       const beatIndex  = Math.floor(currentTick / ticksPerBeat) % beatsPerMeasure;
       const tickInBeat = currentTick % ticksPerBeat;
       const isFirst    = tickInBeat === 0;
@@ -120,7 +126,10 @@ const MetronomeEngine = (() => {
         scheduleCallback(nextTickTime, soundType, beatIndex, tickInBeat);
       }
 
-      if (isFirst) {
+      // Beat-pip visuals only matter when on-screen. requestAnimationFrame is paused
+      // while hidden, so skip queueing then — otherwise the backlog drains as a flash
+      // burst on return.
+      if (isFirst && !document.hidden) {
         pendingVisuals.push({ time: nextTickTime, beatIndex, soundType });
       }
 
@@ -193,13 +202,58 @@ const MetronomeEngine = (() => {
     else fire();
   }
 
+  // The scheduler is driven by a Web Worker timer rather than a main-thread
+  // setInterval. Background tabs heavily throttle (or pause) main-thread timers,
+  // which is what made the audio drop out when switching away; a worker timer keeps
+  // firing, and combined with the larger hidden look-ahead the audio stays gapless.
+  // Falls back to setInterval if Workers are unavailable.
+  let schedulerWorker = null;
+  function startSchedulerClock() {
+    stopSchedulerClock();
+    try {
+      const src = 'let t=null;onmessage=function(e){' +
+        'if(e.data==="start"){t=setInterval(function(){postMessage(0);},' + SCHEDULER_INTERVAL + ');}' +
+        'else if(e.data==="stop"){clearInterval(t);t=null;}};';
+      const blob = new Blob([src], { type: 'application/javascript' });
+      schedulerWorker = new Worker(URL.createObjectURL(blob));
+      schedulerWorker.onmessage = () => { if (running) scheduler(); };
+      schedulerWorker.postMessage('start');
+    } catch (e) {
+      schedulerTimer = setInterval(scheduler, SCHEDULER_INTERVAL);
+    }
+  }
+  function stopSchedulerClock() {
+    if (schedulerWorker) {
+      try { schedulerWorker.postMessage('stop'); schedulerWorker.terminate(); } catch (_) {}
+      schedulerWorker = null;
+    }
+    if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
+  }
+
+  // After a background gap the audio clock has moved on while nextTickTime stalled.
+  // Skip the missed ticks — advancing currentTick with them so the beat-grid phase is
+  // preserved — instead of restarting the bar at beat 1 or firing a burst of catch-up
+  // clicks. No-op when we're not actually behind (audio kept playing seamlessly).
+  function resyncClock() {
+    if (!audioCtx || !running) return;
+    const ticksPerBeat    = SUBDIVISION_TICKS[subdivision] || 1;
+    const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
+    tickInterval          = 60 / bpm / ticksPerBeat;
+    const now = audioCtx.currentTime;
+    if (nextTickTime >= now - 0.05) return;   // not behind → leave phase untouched
+    while (nextTickTime < now + 0.02) {
+      nextTickTime += tickInterval;
+      currentTick   = (currentTick + 1) % ticksPerMeasure;
+    }
+  }
+
   function doStart() {
     if (running) return;
     running      = true;
     currentTick  = 0;
     nextTickTime = audioCtx.currentTime + 0.05;
     scheduler();
-    schedulerTimer = setInterval(scheduler, SCHEDULER_INTERVAL);
+    startSchedulerClock();
     rafId = requestAnimationFrame(visualLoop);
   }
 
@@ -218,8 +272,7 @@ const MetronomeEngine = (() => {
   function stop() {
     if (!running) return;
     running = false;
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
+    stopSchedulerClock();
     pendingVisuals = [];
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }
@@ -294,7 +347,7 @@ const MetronomeEngine = (() => {
     src.start();
   }
 
-  function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer,           CUE_GAIN); else playSyntheticCue([880, 660, 440],       0.18); }
+  function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer,           SET_END_GAIN); else playSyntheticCue([880, 660, 440],       0.12); }
   function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer,         CUE_GAIN); else playSyntheticCue([440, 660, 880],       0.18); }
   function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer, CUE_GAIN); else playSyntheticCue([440, 550, 660, 880], 0.15); }
 
@@ -304,22 +357,19 @@ const MetronomeEngine = (() => {
   function getCurrentBpm() { return bpm; }
   function isRunning()     { return running; }
 
+  // Resume a suspended context (mobile suspends it on background/lock) and re-align
+  // the schedule WITHOUT restarting the bar. The metronome only stops on an explicit
+  // stop() — switching apps/tabs never restarts it.
   document.addEventListener('touchstart', () => {
     if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().then(() => {
-        if (running) { nextTickTime = audioCtx.currentTime + 0.05; currentTick = 0; }
-      });
+      audioCtx.resume().then(resyncClock).catch(() => {});
     }
   }, { passive: true });
 
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && audioCtx && running) {
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => { nextTickTime = audioCtx.currentTime + 0.05; currentTick = 0; });
-      } else {
-        nextTickTime = audioCtx.currentTime + 0.05; currentTick = 0;
-      }
-    }
+    if (document.hidden || !audioCtx || !running) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().then(resyncClock).catch(() => {});
+    else resyncClock();
   });
 
   return {

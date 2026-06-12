@@ -66,24 +66,32 @@ let appState = States.IDLE;
 let countdownTimer = null;
 let countInTimer = null;
 
-// Ramp "1-bar count-in" toggle (persisted). One bar of clicks plays before each
-// set's timer starts, so you're ready. Skipped in Game Mode (it has its own count-in).
-const countInToggle = document.getElementById('countInToggle');
-if (countInToggle) {
-  const saved = localStorage.getItem('gm_rampcountin');
-  if (saved !== null) countInToggle.checked = (saved === '1');
-  countInToggle.addEventListener('change', () => localStorage.setItem('gm_rampcountin', countInToggle.checked ? '1' : '0'));
+// Ramp count-in (persisted): 0-4 bars of clicks play before each set's timer
+// starts, so you're ready. Skipped in Game Mode (it has its own count-in).
+const countInBtns = document.querySelectorAll('#countInRow .ci-btn');
+let countInBars = 1;
+{
+  const saved = parseInt(localStorage.getItem('gm_rampcountin'), 10);
+  if (!isNaN(saved) && saved >= 0 && saved <= 4) countInBars = saved;
 }
-function countInOn() { return !!(countInToggle && countInToggle.checked) && !window.__gameModeActive; }
+function setCountInBars(n) {
+  countInBars = n;
+  localStorage.setItem('gm_rampcountin', String(n));
+  countInBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.cibars, 10) === n));
+}
+countInBtns.forEach(b => b.addEventListener('click', () => setCountInBars(parseInt(b.dataset.cibars, 10))));
+setCountInBars(countInBars);
+
+function countInOn() { return countInBars > 0 && !window.__gameModeActive; }
 function oneBarMs() { return Math.round(currentBeats * 60000 / clampBpm(session.currentBpm || 120)); }
 
-// Begin a set: play a 1-bar count-in first (if enabled), then start the set timer.
+// Begin a set: play the count-in bars first (if enabled), then start the set timer.
 function beginSet(isFirst) {
   if (countInOn()) {
     appState = States.COUNTING_IN;
     updateStatusDisplay();
     clearTimeout(countInTimer);
-    countInTimer = setTimeout(() => startSetTiming(isFirst), oneBarMs());
+    countInTimer = setTimeout(() => startSetTiming(isFirst), oneBarMs() * countInBars);
   } else {
     startSetTiming(isFirst);
   }
@@ -491,7 +499,7 @@ function currentRampConfig() {
     bpmIncrement: parseIntVal(bpmIncrInput, 5),
     restMins:     parseIntVal(restMinsInput, 0),
     restSecs:     parseIntVal(restSecsInput, 30),
-    countIn:      !!(countInToggle && countInToggle.checked),
+    countInBars:  countInBars,
   };
 }
 function applyRampConfig(c) {
@@ -503,9 +511,10 @@ function applyRampConfig(c) {
   bpmIncrInput.value  = c.bpmIncrement;
   restMinsInput.value = c.restMins;
   restSecsInput.value = c.restSecs;
-  if (countInToggle && typeof c.countIn === 'boolean') {
-    countInToggle.checked = c.countIn;
-    localStorage.setItem('gm_rampcountin', c.countIn ? '1' : '0');
+  if (typeof c.countInBars === 'number') {
+    setCountInBars(Math.max(0, Math.min(4, c.countInBars)));
+  } else if (typeof c.countIn === 'boolean') {
+    setCountInBars(c.countIn ? 1 : 0);
   }
 }
 function renderRampFavs(selectName) {
