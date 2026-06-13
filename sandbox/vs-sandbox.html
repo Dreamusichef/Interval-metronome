@@ -84,13 +84,14 @@
     </div>
 
     <div class="sb-row">
-      <button class="sb-btn alt" id="calBtn">Calibrate (2 bars, both pads)</button>
+      <button class="sb-btn alt" id="calBtn">Calibrate (P1 pad)</button>
       <span class="sb-field" id="calStatus">No calibration yet (offset = 0ms).</span>
     </div>
 
     <div class="sb-row">
       <button class="sb-btn" id="startBtn">▶ Start run</button>
       <button class="sb-btn alt" id="stopBtn" disabled>■ Stop</button>
+      <span class="sb-field" id="runStatus"></span>
     </div>
 
     <div class="winner-banner" id="winnerBanner"></div>
@@ -100,15 +101,18 @@
     <div class="sb-ref">
       <h3>How it works</h3>
       • Both pads send MIDI note-on on the same input — routed to P1/P2 by note number.<br>
-      • <b>Calibrate</b> plays 2 bars of 16th clicks; hit both pads in time with them (in unison is fine) to
-      capture one shared latency offset, same as the main game's calibration principle.<br>
-      • <b>Run</b>: each 16th-note slot must contain exactly one unconsumed hit from a player to count as
+      • <b>Calibrate</b> uses P1's pad only (same offset is shared by both players), and matches the main
+      game's two-pass routine: a 2-bar count-off then 8 measured bars of QUARTERS (click = quarters,
+      you play quarters) for the gross offset, then another 2-bar count-off + 8 measured bars of 16THS
+      (click stays quarters, you play continuous 16ths) to refine your pocket.<br>
+      • <b>Run</b>: every run has a 2-bar count-in (ungated, just like Game Mode) before judging starts.
+      After that, each 16th-note slot must contain exactly one unconsumed hit from a player to count as
       'clear'. Zero hits = drop, 2+ hits = cram — either ends that player's run.<br>
-      • Run ends when both players are out, or after the configured number of bars if both survive.
+      • Run ends when both players are out, or after the configured number of measured bars if both survive.
     </div>
   </div>
 
-  <script defer src="/assets/js/metronome.js?v=20260603e"></script>
+  <script defer src="/assets/js/metronome.js?v=20260612c"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
@@ -150,7 +154,7 @@
     let p1Note = null, p2Note = null;
     let lastTs = { p1: 0, p2: 0 };
     const DEBOUNCE_MS = 60;
-    let calibrating = false, calEvents = [], calExpected = [];
+    let calibrating = false, calEvents = [];
 
     async function connectMidi() {
       if (!navigator.requestMIDIAccess) { setStatus('Web MIDI not supported in this browser.', true); return; }
@@ -202,7 +206,7 @@
       if (learning === 'p2') { p2Note = note; learning = null; updateNoteLabels(); log('P2 pad learned: note ' + note); return; }
 
       if (calibrating) {
-        if (note === p1Note || note === p2Note) calEvents.push(ts);
+        if (note === p1Note) calEvents.push(ts);   // P1's pad only — shared offset
         return;
       }
 
@@ -211,6 +215,7 @@
       else if (note === p2Note) pushEvent('p2', ts);
     }
     function pushEvent(pid, ts) {
+      if (!leadInDone) return;   // ignore hits during the 2-bar count-in
       if (ts - lastTs[pid] < DEBOUNCE_MS) return;
       lastTs[pid] = ts;
       players[pid].events.push({ t: ts, consumed: false });
@@ -230,38 +235,143 @@
     });
 
     // ── Calibration ────────────────────────────────────────────────────────
+    // Mirrors roguelite.js's two-pass routine: pass 1 (quarters → gross offset)
+    // then pass 2 (continuous 16ths → refined pocket), each a 2-bar count-off +
+    // 8 measured bars, click = quarters throughout. P1's pad only.
+    const CAL_BEATS = 4;
+    const CAL_COUNTOFF_BARS = 2;
+    const CAL_MEASURE_BARS = 8;
+    const CAL_CAPTURE_WINDOW_MS = 150;
+    const CAL_MIN_SAMPLES = 8;
     let meanOffset = 0;
+    let calGrossOffset = 0;
+    let calState = null;
+
+    function signed(n) { return (n >= 0 ? '+' : '') + n.toFixed(1); }
+
     $('calBtn').addEventListener('click', () => {
-      if (p1Note == null || p2Note == null) { setStatus('Learn both pads before calibrating.', true); return; }
-      calibrating = true; calEvents = []; calExpected = [];
-      const bpm = getBpm();
-      MetronomeEngine.setSubdivision('sixteenth');
-      MetronomeEngine.setBeatsPerMeasure(4);
-      MetronomeEngine.setBpm(bpm);
-      let sync = null;
-      const TARGET = 32; // 2 bars of 16ths
-      MetronomeEngine.onSchedule((t) => {
-        if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
-        if (calExpected.length < TARGET) calExpected.push(audioToPerfMs(t, sync));
-      });
-      MetronomeEngine.start();
-      log('Calibrating: play both pads along with the 16th clicks for 2 bars…');
-      const sixteenthMs = (60000 / bpm) / 4;
-      setTimeout(() => {
-        MetronomeEngine.stop();
-        MetronomeEngine.onSchedule(null);
-        calibrating = false;
-        const cal = computeCalibration(calExpected, calEvents, 150);
-        meanOffset = cal.meanOffset;
-        $('calStatus').textContent = 'Calibrated: offset ' + meanOffset.toFixed(1) + 'ms (sd ' + cal.sd.toFixed(1) + 'ms, ' + cal.sampleCount + ' samples).';
-        log('Calibration done — offset ' + meanOffset.toFixed(1) + 'ms, sd ' + cal.sd.toFixed(1) + 'ms.');
-      }, TARGET * sixteenthMs + 400);
+      if (p1Note == null) { setStatus('Learn P1 pad before calibrating.', true); return; }
+      $('calBtn').disabled = true;
+      startCalPass(1);
     });
 
+    function startCalPass(pass) {
+      calibrating = true; calEvents = [];
+      const bpm = getBpm();
+      MetronomeEngine.setBeatsPerMeasure(CAL_BEATS);
+      MetronomeEngine.setSubdivision('quarter');   // audible quarter pulse for both passes
+      MetronomeEngine.setBpm(bpm);
+      calState = {
+        pass, bpm, tickCount: 0,
+        countoffTicks: CAL_COUNTOFF_BARS * CAL_BEATS,
+        totalTicks: (CAL_COUNTOFF_BARS + CAL_MEASURE_BARS) * CAL_BEATS,
+        expected: [],
+        lastTickPerf: 0,
+        sync: null,
+      };
+      MetronomeEngine.onSchedule(onCalTick);
+      MetronomeEngine.start();
+      log('Calibration pass ' + pass + ' (' + (pass === 1 ? 'QUARTERS' : '16THS') + '): ' +
+        CAL_COUNTOFF_BARS + '-bar count-off, then ' + CAL_MEASURE_BARS + ' measured bars — play ' +
+        (pass === 1 ? 'quarters' : 'continuous 16ths') + ' along with the (quarter) click.');
+    }
+
+    function onCalTick(tickTimeSec) {
+      if (!calState) return;
+      if (!calState.sync) {
+        const ctx = MetronomeEngine.getAudioContext();
+        calState.sync = { a0: ctx.currentTime, p0: performance.now() };
+      }
+      const idx = calState.tickCount++;
+      const perf = audioToPerfMs(tickTimeSec, calState.sync);
+      calState.lastTickPerf = perf;
+
+      const bar = Math.floor(idx / CAL_BEATS) + 1;
+      const inCountoff = idx < calState.countoffTicks;
+      const label = calState.pass === 1 ? 'QUARTERS' : '16THS';
+      if (inCountoff) {
+        $('calStatus').textContent = label + ' · COUNT-OFF ' + bar + '/' + CAL_COUNTOFF_BARS +
+          ' — get ready to play ' + (calState.pass === 1 ? 'quarters' : '16ths');
+      } else if (idx < calState.totalTicks) {
+        $('calStatus').textContent = label + ' — measuring bar ' + (bar - CAL_COUNTOFF_BARS) + '/' + CAL_MEASURE_BARS;
+      }
+
+      if (idx >= calState.countoffTicks && idx < calState.totalTicks) {
+        if (calState.pass === 1) {
+          calState.expected.push(perf);
+        } else {
+          const s = 60 / calState.bpm / 4;   // 16th interval (sec) at this pass's tempo
+          for (let k = 0; k < 4; k++) calState.expected.push(audioToPerfMs(tickTimeSec + k * s, calState.sync));
+        }
+      }
+
+      if (idx + 1 === calState.totalTicks) {
+        const delay = (calState.lastTickPerf + CAL_CAPTURE_WINDOW_MS + 35) - performance.now();
+        setTimeout(finishCalPass, Math.max(0, delay));
+      }
+    }
+
+    function finishCalPass() {
+      if (!calState) return;
+      MetronomeEngine.onSchedule(null);
+      MetronomeEngine.stop();
+      calibrating = false;
+
+      const pass = calState.pass;
+      const passBpm = calState.bpm;
+      const expectedTimes = calState.expected;
+      const eventTimes = calEvents.slice();
+      calState = null;
+
+      if (pass === 1) {
+        const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
+        if (gross.sampleCount < CAL_MIN_SAMPLES) {
+          $('calStatus').textContent = 'Quarters: only ' + gross.sampleCount + ' hits detected — play a hit on every click, then try again.';
+          log('Calibration aborted — not enough quarter hits.');
+          $('calBtn').disabled = false;
+          return;
+        }
+        calGrossOffset = gross.meanOffset;
+        log('Pass 1 (quarters) done — gross offset ' + signed(calGrossOffset) + 'ms (' + gross.sampleCount + ' hits).');
+        $('calStatus').textContent = 'Quarters done (' + signed(calGrossOffset) + 'ms). Starting 16ths pass…';
+        setTimeout(() => startCalPass(2), 800);
+        return;
+      }
+
+      // Pass 2 (16ths): de-alias against the pass-1 gross offset, then refine.
+      const G = calGrossOffset;
+      const spacing16 = 60000 / passBpm / 4;
+      const tight = spacing16 * 0.45;
+      const rough = computeCalibration(expectedTimes.map(t => t + G), eventTimes, tight);
+
+      let mean, sd, n;
+      if (rough.sampleCount >= CAL_MIN_SAMPLES) {
+        const M0 = G + rough.meanOffset;
+        const refined = computeCalibration(expectedTimes.map(t => t + M0), eventTimes, tight);
+        mean = M0 + refined.meanOffset; sd = refined.sd; n = refined.sampleCount;
+      } else {
+        mean = G + rough.meanOffset; sd = rough.sd; n = rough.sampleCount;
+      }
+
+      $('calBtn').disabled = false;
+      if (n < CAL_MIN_SAMPLES) {
+        meanOffset = G;
+        $('calStatus').textContent = '16ths: only ' + n + ' matched — keeping quarters offset ' + signed(G) + 'ms.';
+        log('Calibration: 16ths refine failed, using quarters offset ' + signed(G) + 'ms.');
+        return;
+      }
+
+      meanOffset = mean;
+      $('calStatus').textContent = 'Calibrated: offset ' + signed(meanOffset) + 'ms (sd ' + sd.toFixed(1) + 'ms, ' + n + ' samples).';
+      log('Calibration done — offset ' + signed(meanOffset) + 'ms, sd ' + sd.toFixed(1) + 'ms (' + n + ' samples).');
+    }
+
     // ── Run ────────────────────────────────────────────────────────────────
+    const RUN_LEAD_IN_BARS = 2;   // ungated count-in before judging starts, same as Game Mode
     let players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
     let pendingSlots = [], slotCounter = 0, maxSlots = 64, halfWindowMs = 0;
     let runActive = false, judgeTimer = null, sync = null;
+    let leadInTicks = 0, tickCounter = 0, leadInDone = false;
 
     function getBpm() {
       let v = parseInt($('bpmInput').value, 10) || 100;
@@ -274,6 +384,8 @@
       const bpm = getBpm();
       const bars = Math.max(1, Math.min(16, parseInt($('barsInput').value, 10) || 4));
       maxSlots = bars * 16;
+      leadInTicks = RUN_LEAD_IN_BARS * 16;
+      tickCounter = 0; leadInDone = false;
       players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
       pendingSlots = []; slotCounter = 0; sync = null;
       halfWindowMs = (60000 / bpm) / 8; // half of a 16th
@@ -281,6 +393,7 @@
       $('p2Status').textContent = 'ALIVE'; $('p2Status').className = 'status-alive';
       $('p1Cleared').textContent = '0'; $('p2Cleared').textContent = '0';
       $('winnerBanner').classList.remove('show');
+      $('runStatus').textContent = 'COUNT-IN 1/' + RUN_LEAD_IN_BARS;
 
       MetronomeEngine.setSubdivision('sixteenth');
       MetronomeEngine.setBeatsPerMeasure(4);
@@ -290,14 +403,23 @@
       judgeTimer = setInterval(judgeTick, 15);
       runActive = true;
       $('startBtn').disabled = true; $('stopBtn').disabled = false;
-      log('Run started: ' + bpm + ' BPM, ' + bars + ' bar(s), offset ' + meanOffset.toFixed(1) + 'ms.');
+      log('Run started: ' + bpm + ' BPM, ' + bars + ' measured bar(s) (+' + RUN_LEAD_IN_BARS + '-bar count-in), offset ' + signed(meanOffset) + 'ms.');
     });
 
     $('stopBtn').addEventListener('click', () => endRun('Stopped by user.'));
 
     function onSchedule(tickTimeSec) {
-      if (slotCounter >= maxSlots) { MetronomeEngine.onSchedule(null); return; }
+      const totalTicks = leadInTicks + maxSlots;
+      if (tickCounter >= totalTicks) { MetronomeEngine.onSchedule(null); return; }
       if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
+      const idx = tickCounter++;
+      if (idx < leadInTicks) {
+        const bar = Math.floor(idx / 16) + 1;
+        $('runStatus').textContent = 'COUNT-IN ' + bar + '/' + RUN_LEAD_IN_BARS;
+        if (idx + 1 === leadInTicks) leadInDone = true;
+        return;
+      }
+      if (idx === leadInTicks) $('runStatus').textContent = 'LIVE';
       pendingSlots.push({ expectedPerf: audioToPerfMs(tickTimeSec, sync), idx: slotCounter++ });
     }
 
