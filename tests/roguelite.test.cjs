@@ -17,7 +17,10 @@
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const M = require('../assets/js/roguelite.js');
-const { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot } = M;
+const {
+  audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
+  rankFor, endurancePct, accuracyPct, runResultPct, liveGaugePct,
+} = M;
 
 function approx(a, b, tol, msg) {
   assert.ok(Math.abs(a - b) <= tol, `${msg} (${a} vs ${b}, tol ${tol})`);
@@ -223,5 +226,66 @@ describe('first-slot leniency', () => {
   test('on-time start clears', () => {
     const r = classifyFirstSlot(centre, mean, h, E(1005), early);
     assert.equal(r.result, 'clear');
+  });
+});
+
+describe('run scoring', () => {
+  test('gauntlet fail: endurance pct = slots cleared ÷ full-run slots', () => {
+    const tally = { good: 50, neutral: 0, bad: 1 };
+    const r = runResultPct({
+      mode: 'gauntlet', status: 'failed', hitsCleared: 200, totalRunBeats: 450, tally,
+    });
+    assert.equal(r.pct, 11);   // 200 / (450×4) ≈ 11%
+    assert.equal(r.rank, 'E');
+    assert.notEqual(r.pct, accuracyPct(tally));   // not 50/51 ≈ 98%
+  });
+
+  test('gauntlet complete is always SS / 100%', () => {
+    const r = runResultPct({
+      mode: 'gauntlet', status: 'complete', hitsCleared: 0, totalRunBeats: 450, tally: {},
+    });
+    assert.equal(r.pct, 100);
+    assert.equal(r.rank, 'SS');
+  });
+
+  test('sudden death fail uses the same endurance formula', () => {
+    const r = runResultPct({
+      mode: 'suddendeath', status: 'failed', hitsCleared: 480, totalRunBeats: 360, tally: { good: 119, neutral: 1, bad: 1 },
+    });
+    assert.equal(r.pct, 33);   // 480 / 1440
+    assert.equal(r.rank, 'D');
+  });
+
+  test('time trial grades accuracy of beats played', () => {
+    const tally = { good: 90, neutral: 5, bad: 5 };
+    const r = runResultPct({
+      mode: 'timetrial', status: 'complete', hitsCleared: 400, totalRunBeats: 360, tally,
+    });
+    assert.equal(r.pct, 90);
+    assert.equal(r.rank, 'A');
+  });
+
+  test('liveGaugePct matches endurance scoring during gauntlet runs', () => {
+    const tally = { good: 80, neutral: 20, bad: 0 };
+    const g = liveGaugePct({
+      mode: 'gauntlet', hitsCleared: 400, totalRunBeats: 450, tally,
+    });
+    assert.equal(g, 22);
+    assert.notEqual(g, Math.round(tally.good / 450 * 100));
+  });
+
+  test('liveGaugePct for time trial uses good quarter-beats vs full target', () => {
+    const tally = { good: 80, neutral: 20, bad: 0 };
+    const g = liveGaugePct({
+      mode: 'timetrial', hitsCleared: 400, totalRunBeats: 360, tally,
+    });
+    assert.equal(g, 22);   // 80 / 360
+  });
+
+  test('rankFor bands', () => {
+    assert.equal(rankFor(100), 'SS');
+    assert.equal(rankFor(99), 'SS');
+    assert.equal(rankFor(91), 'S');
+    assert.equal(rankFor(25), 'E');
   });
 });

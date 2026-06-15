@@ -143,8 +143,8 @@ async function renderPersonal() {
     });
     const ordered = Object.values(by).sort((a, b) => a.bpm - b.bpm);
     if (state.mode === 'suddendeath') {
-      const rows = ordered.map(o => tr([ o.bpm + ' BPM', fmtMMSS(o.longest), rankPill(o.rank), o.count ]));
-      $('statsContent').innerHTML = table(['BPM', 'Longest survived', 'Best rank', 'Runs'], rows);
+      const rows = ordered.map(o => tr([ o.bpm + ' BPM', fmtMMSS(o.longest), rankPill(o.rank), o.green + '%', o.count ]));
+      $('statsContent').innerHTML = table(['BPM', 'Longest survived', 'Best rank', 'Best %', 'Runs'], rows);
     } else {
       const rows = ordered.map(o => tr([ o.bpm + ' BPM', rankPill(o.rank), o.green + '%', o.count ]));
       $('statsContent').innerHTML = table(['BPM', 'Best rank', 'Best %', 'Runs'], rows);
@@ -180,7 +180,7 @@ async function renderGlobal() {
   });
 
   const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Survived']
-    : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Green', 'Cleared']
+    : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Progress', 'Cleared']
     : ['#', 'Player', 'Grade', 'Green', 'Duration'];
   $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + where + '</div>' +
     table(head, body);

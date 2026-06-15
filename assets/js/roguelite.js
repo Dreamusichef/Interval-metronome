@@ -199,7 +199,56 @@ function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, early
   return { result: 'clear', count: 1, indices: [bestIdx], offset: bestSigned };
 }
 
-const RL_TimingMath = { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot };
+/*
+  Run scoring (pure — unit-tested in tests/roguelite.test.cjs).
+
+  Time Trial: accuracy — green % of all quarter-beats played.
+  Sudden Death / Gauntlet: ENDURANCE — 16th slots cleared ÷ 16th slots in the
+  full run (not accuracy among beats played so far).
+*/
+function rankFor(pct) {
+  if (pct >= 99) return 'SS';
+  if (pct >= 91) return 'S';
+  if (pct >= 81) return 'A';
+  if (pct >= 66) return 'B';
+  if (pct >= 50) return 'C';
+  if (pct >= 26) return 'D';
+  return 'E';
+}
+
+function endurancePct(hitsCleared, totalRunBeats) {
+  const totalSixteenths = (totalRunBeats || 0) * 4;
+  if (!totalSixteenths) return 0;
+  return Math.round(Math.min(100, hitsCleared / totalSixteenths * 100));
+}
+
+function accuracyPct(tally) {
+  const total = (tally.good || 0) + (tally.neutral || 0) + (tally.bad || 0);
+  return total ? Math.round(tally.good / total * 100) : 0;
+}
+
+function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally }) {
+  if (mode === 'suddendeath' || mode === 'gauntlet') {
+    if (status === 'complete') return { rank: 'SS', pct: 100 };
+    const pct = endurancePct(hitsCleared, totalRunBeats);
+    return { rank: rankFor(pct), pct };
+  }
+  const pct = accuracyPct(tally);
+  return { rank: rankFor(pct), pct };
+}
+
+function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally }) {
+  if (mode === 'suddendeath' || mode === 'gauntlet') {
+    return endurancePct(hitsCleared, totalRunBeats);
+  }
+  const good = (tally && tally.good) || 0;
+  return Math.max(0, Math.min(100, Math.round(good / (totalRunBeats || 1) * 100)));
+}
+
+const RL_TimingMath = {
+  audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
+  rankFor, endurancePct, accuracyPct, runResultPct, liveGaugePct,
+};
 
 // node export for unit tests; harmless/ignored in the browser.
 if (typeof module !== 'undefined' && module.exports) {
@@ -1222,8 +1271,8 @@ const RogueliteMode = (() => {
     if (sixteenthIdx === 3) {
       tallyBeat(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
       addLaneCell(verdictClass(hudBeatRank[beatIndex], hudBeatOff[beatIndex]));
-      updateScoreHud();   // gauge = good ÷ total run beats (fills, never drops)
     }
+    updateScoreHud();
     // Purge consumed/stale events a few slots behind the current expected time.
     pruneEvents(expectedPerf - presenceMs * 4);
   }
@@ -1352,16 +1401,13 @@ const RogueliteMode = (() => {
   //    would hand an A to someone who died 10 beats into a 5-minute run. Instead we
   //    score beats survived ÷ beats in the full run (clearing it = 100% = SS).
   function runResultRankPct() {
-    if (runState.mode === 'suddendeath' || runState.mode === 'gauntlet') {
-      if (runState.status === 'complete') return { rank: 'SS', pct: 100 };
-      const totalSixteenths = (runState.totalRunBeats || 0) * 4;   // totalRunBeats = quarter-beats
-      const pct = totalSixteenths ? Math.round(Math.min(100, runState.hitsCleared / totalSixteenths * 100)) : 0;
-      return { rank: rankFor(pct), pct };
-    }
-    const t = runState.tally;
-    const total = t.good + t.neutral + t.bad;
-    const pct = total ? Math.round(t.good / total * 100) : 0;
-    return { rank: rankFor(pct), pct };
+    return runResultPct({
+      mode: runState.mode,
+      status: runState.status,
+      hitsCleared: runState.hitsCleared,
+      totalRunBeats: runState.totalRunBeats,
+      tally: runState.tally,
+    });
   }
 
   // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent),
@@ -1486,8 +1532,6 @@ const RogueliteMode = (() => {
   // green percentage. Neutral row also shows the rush/drag split.
   function resultTable() {
     const t = runState.tally;
-    const total = t.good + t.neutral + t.bad;
-    const pct = total ? Math.round(t.good / total * 100) : 0;
     const split = t.neutral ? ' <span class="rl-split">(' + t.rush + ' rush · ' + t.drag + ' drag)</span>' : '';
     const row = (cls, label, n, extra) =>
       '<div class="rogue-result-row">' +
@@ -1495,7 +1539,7 @@ const RogueliteMode = (() => {
         '<span class="rl-lbl">' + label + (extra || '') + '</span>' +
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
-    const { rank } = runResultRankPct();
+    const { rank, pct } = runResultRankPct();
     // Every rank E..SS has a hero emblem PNG (assets/img/rank/<x>.png). If the art is ever
     // missing, onerror swaps the <img> back to the plain glowing letter.
     const rankCell =
@@ -1652,26 +1696,18 @@ const RogueliteMode = (() => {
     return 'GOOD';
   }
 
-  // Rank bands by green % (forgiving — SS no longer needs a flawless run, just 99%+):
-  //   SS ≥99 · S 91–98 · A 81–90 · B 66–80 · C 50–65 · D 26–49 · E 0–25
-  function rankFor(pct) {
-    if (pct >= 99)  return 'SS';
-    if (pct >= 91)  return 'S';
-    if (pct >= 81)  return 'A';
-    if (pct >= 66)  return 'B';
-    if (pct >= 50)  return 'C';
-    if (pct >= 26)  return 'D';
-    return 'E';
-  }
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
   const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#b06fff', D: '#8ab0c8', E: '#ff3838' };
 
-  // Style gauge = GOOD beats ÷ total beats in the run, as a %. It only ever FILLS
-  // (good beats add; neutral/bad just don't), so it climbs from E and never drops.
-  // Rank comes straight from the gauge via rankFor (SS at 99%+).
+  // Live gauge: endurance modes = slots cleared ÷ full-run slots; time trial = good
+  // quarter-beats ÷ full-run target. Only ever fills (never drops).
   function scoreRank() {
-    const t = runState.tally;
-    const g = Math.max(0, Math.min(100, Math.round(t.good / (runState.totalRunBeats || 1) * 100)));
+    const g = liveGaugePct({
+      mode: runState.mode,
+      hitsCleared: runState.hitsCleared,
+      totalRunBeats: runState.totalRunBeats,
+      tally: runState.tally,
+    });
     return { gauge: g, rank: rankFor(g) };
   }
 
