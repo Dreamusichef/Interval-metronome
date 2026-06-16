@@ -82,13 +82,12 @@
 
   // ── Provide Feedback (Tally form with hidden-field URL params) ──
   const FEEDBACK_URL = 'https://tally.so/r/kdr1od';
-  const APP_VERSION = '0.9.0';
   const feedbackBtn = document.getElementById('feedbackBtn');
 
   function feedbackFormUrl() {
     const user = window.Cloud && Cloud.currentUser ? Cloud.currentUser() : null;
     const params = new URLSearchParams({
-      app_version: APP_VERSION,
+      app_version: window.APP_VERSION || '',
       user_agent: navigator.userAgent,
       user_id: (user && user.id) || '',
       created_at: new Date().toISOString(),

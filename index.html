@@ -40,7 +40,7 @@
     <header class="app-brand">
       <img class="brand-logo" src="assets/img/logo.png?v=2" alt="Art of Drumming HQ">
       <span class="brand-word">GAME METRONOME</span>
-      <span class="brand-beta" title="v0.9.0 — beta">BETA</span>
+      <span class="brand-beta" id="brandBeta" title="">BETA</span>
       <button class="settings-gear" id="settingsGear" aria-label="Settings" title="Settings">&#9881;</button>
     </header>
 
@@ -503,12 +503,13 @@
   <!-- All deferred so HTML/CSS paint immediately. sounds.js (2.4MB of cue audio)
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
+  <script defer src="assets/js/version.js?v=20260616a"></script>
   <script defer src="assets/js/metronome.js?v=20260612c"></script>
   <script defer src="assets/js/app.js?v=20260612a"></script>
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
-  <script defer src="assets/js/settings.js?v=20260616a"></script>
+  <script defer src="assets/js/settings.js?v=20260616b"></script>
   <script defer src="assets/js/roguelite.js?v=20260615c"></script>
   <!-- Cloud: Supabase client (Google sign-in + run saving). Optional — the game
        works fully without it; signing in just logs progress + leaderboard. -->
