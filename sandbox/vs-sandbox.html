@@ -657,14 +657,11 @@
       p.verdict.textContent = text || verdictWord(rank, off);
       p.verdict.className = 'rogue-hud-verdict ' + verdictClass(rank, off);
     }
+    // Live HUD gauge — mirrors the game's scoreRank(): a filling meter of good beats
+    // over the full target (fills, never drops), identical in both modes. The mode-
+    // specific final grade lives in finalRankPct (endurance for SD, accuracy for TT).
     function liveRankPct(p) {
-      if (mode === 'suddendeath') {
-        const totalSixteenths = targetBeats * 4;
-        const pct = totalSixteenths ? Math.min(100, Math.round(p.hitsCleared / totalSixteenths * 100)) : 0;
-        return { rank: rankFor(pct), pct };
-      }
-      const t = p.tally, total = t.good + t.neutral + t.bad;
-      const pct = total ? Math.round(t.good / total * 100) : 0;
+      const pct = Math.max(0, Math.min(100, Math.round(p.tally.good / (targetBeats || 1) * 100)));
       return { rank: rankFor(pct), pct };
     }
     function updateScoreHud(p) {
