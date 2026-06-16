@@ -3,117 +3,248 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local VS Sandbox — 2-pad continuity test</title>
+  <title>Local VS Sandbox — 2-player Game Mode</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/style.css?v=20260611f">
+  <link rel="stylesheet" href="/assets/css/style.css?v=20260612c">
   <style>
-    body { background: #05080f; color: #cfe0ee; font-family: 'Rajdhani', sans-serif; margin: 0; }
-    .sb-wrap { max-width: 820px; margin: 0 auto; padding: 22px 16px 60px; }
-    .sb-h1 { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 1.1rem; letter-spacing: .04em; color: #fff; }
-    .sb-sub { font-size: .9rem; color: #8ab0c8; margin: 4px 0 18px; line-height: 1.4; }
+    /* ── VS sandbox local-only chrome (reuses the game's .rogue-* element styling) ── */
+    body { background: radial-gradient(ellipse at 40% 0%, #0a1220 0%, #060a10 65%); color: #e8f0f5;
+      font-family: 'Rajdhani', sans-serif; margin: 0; min-height: 100vh; }
+    .sb-wrap { max-width: 920px; margin: 0 auto; padding: 22px 16px 60px; }
+    .sb-h1 { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 1.15rem; letter-spacing: .04em; color: #fff; }
+    .sb-sub { font-size: .9rem; color: #8ab0c8; margin: 4px 0 18px; line-height: 1.45; }
     .sb-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
-    .sb-btn { font-family: 'Orbitron', monospace; font-weight: 700; font-size: .8rem; letter-spacing: .06em;
-      background: linear-gradient(155deg, #12a0ff, #0a66ff); color: #001018; border: 0; padding: 11px 18px;
+    .sb-step { background: linear-gradient(145deg, #0c1828, #070d18); border: 1px solid rgba(0,200,255,.18);
+      padding: 14px 16px; margin-bottom: 14px; }
+    .sb-step h2 { font-family: 'Orbitron', monospace; font-size: .82rem; letter-spacing: .06em; color: #9fe7ff;
+      margin: 0 0 10px; text-transform: uppercase; }
+    .sb-btn { font-family: 'Orbitron', monospace; font-weight: 700; font-size: .78rem; letter-spacing: .06em;
+      background: linear-gradient(155deg, #12a0ff, #0a66ff); color: #001018; border: 0; padding: 11px 16px;
       cursor: pointer; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
     .sb-btn.alt { background: linear-gradient(155deg, #2a3a4d, #16202e); color: #cfe0ee; }
-    .sb-btn:disabled { opacity: .35; cursor: default; }
+    .sb-btn.active { background: linear-gradient(155deg, #ffe066, #FFB800); color: #1a1000; }
+    .sb-btn.go { background: linear-gradient(145deg, #ffffff 0%, #ffe066 45%, #FFB800 100%); color: #1a1000; font-size: .9rem; padding: 13px 26px; }
+    .sb-btn:disabled { opacity: .32; cursor: default; }
     .sb-field { font-size: .85rem; color: #cfe0ee; display: flex; align-items: center; gap: 6px; }
-    .sb-field select, .sb-field input[type=number] { background: #0c1828; color: #fff; border: 1px solid rgba(0,200,255,.25); padding: 6px 8px; font-family: 'Rajdhani'; font-weight: 600; width: 80px; }
-    .sb-log { background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 12px 14px; font-family: 'Rajdhani'; font-size: .85rem; min-height: 100px; max-height: 260px; overflow-y: auto; line-height: 1.55; }
+    .sb-field select, .sb-field input[type=number] { background: #0c1828; color: #fff; border: 1px solid rgba(0,200,255,.25);
+      padding: 6px 8px; font-family: 'Rajdhani'; font-weight: 600; width: 90px; }
+    .sb-status { font-size: .85rem; color: #8ab0c8; }
+    .sb-status.error { color: #ff5566; }
+    .sb-stepper { display: inline-flex; align-items: center; gap: 8px; }
+    .sb-stepper button { font-family: 'Orbitron'; font-weight: 900; font-size: 1rem; width: 38px; height: 38px;
+      background: #16202e; color: #cfe0ee; border: 1px solid rgba(0,200,255,.25); cursor: pointer; }
+    .sb-stepper .val { font-family: 'Orbitron'; font-weight: 900; font-size: 1.3rem; color: #fff; min-width: 3.4ch; text-align: center; }
+    .sb-stepper .unit { font-size: .78rem; color: #8ab0c8; }
+    /* Player learn cards */
+    .sb-players { display: flex; gap: 14px; flex-wrap: wrap; }
+    .sb-pcard { flex: 1 1 200px; background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 12px 14px; }
+    .sb-pcard h3 { font-family: 'Orbitron'; font-size: .9rem; margin: 0 0 8px; letter-spacing: .04em; }
+    .sb-pcard.p1 h3 { color: #00e87a; }
+    .sb-pcard.p2 h3 { color: #ff7ad9; }
+    .sb-pcard .stat { font-size: .85rem; margin: 4px 0; color: #cfe0ee; }
+    .sb-pcard .stat b { color: #fff; }
+
+    /* ── Run view: two side-by-side game HUDs ── */
+    #runView { display: none; }
+    body.vs-run #setupView { display: none; }
+    body.vs-run #runView { display: block; }
+    .vs-hud-wrap { display: flex; gap: 18px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+    /* Each HUD: flex-basis 320px means two fit side-by-side on ≥680px, one-per-row below that. */
+    .vs-col { flex: 1 1 320px; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 14px 12px; background: linear-gradient(180deg, rgba(12,24,40,.55), rgba(7,13,24,.55)); border: 1px solid rgba(0,200,255,.16); }
+    .vs-col.p1 { border-top: 3px solid #00e87a; }
+    .vs-col.p2 { border-top: 3px solid #ff7ad9; }
+    .vs-col-name { font-family: 'Orbitron'; font-weight: 900; font-size: 1rem; letter-spacing: .05em; }
+    .vs-col.p1 .vs-col-name { color: #00e87a; }
+    .vs-col.p2 .vs-col-name { color: #ff7ad9; }
+    .vs-col.out { opacity: .55; }
+    .vs-col.out .vs-col-name::after { content: ' · OUT'; color: #ff5566; }
+    .vs-mid { display: flex; align-items: center; justify-content: center; font-family: 'Orbitron'; font-weight: 900;
+      color: #8ab0c8; font-size: 1.4rem; align-self: center; padding: 0 4px; }
+    /* verdict slightly smaller so two columns both fit on a laptop without overflow */
+    .vs-col .rogue-hud-verdict { font-size: 2.8rem; }
+    /* narrow screens: each col goes full-width, VS divider becomes a thin horizontal rule */
+    @media (max-width: 680px) {
+      .vs-col { flex-basis: 100%; max-width: 100%; }
+      .vs-mid { width: 100%; padding: 6px 0; border-top: 1px solid rgba(0,200,255,.15); border-bottom: 1px solid rgba(0,200,255,.15); font-size: 1rem; }
+    }
+    .vs-runbanner { font-family: 'Orbitron'; font-weight: 700; text-align: center; color: #9fe7ff; letter-spacing: .05em;
+      margin: 4px 0 14px; min-height: 1.2em; }
+
+    /* ── Result overlay: two cards + winner banner ── */
+    .vs-overlay { display: none; position: fixed; inset: 0; z-index: 150; background: rgba(2,6,12,.86);
+      align-items: flex-start; justify-content: center; padding: 24px 14px; overflow-y: auto; }
+    .vs-overlay.visible { display: flex; }
+    .vs-overlay-inner { max-width: 880px; width: 100%; text-align: center; }
+    .vs-winner { font-family: 'Orbitron'; font-weight: 900; font-size: 1.8rem; letter-spacing: .04em; margin: 6px 0 18px; }
+    .vs-cards { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+    .vs-rescard { flex: 1 1 320px; max-width: 380px; background: linear-gradient(155deg, #0c1828, #070d18);
+      border: 1px solid rgba(0,200,255,.2); padding: 16px; }
+    .vs-rescard.p1 { border-top: 3px solid #00e87a; }
+    .vs-rescard.p2 { border-top: 3px solid #ff7ad9; }
+    .vs-rescard h3 { font-family: 'Orbitron'; font-size: 1rem; margin: 0 0 4px; }
+    .vs-rescard.p1 h3 { color: #00e87a; }
+    .vs-rescard.p2 h3 { color: #ff7ad9; }
+    .vs-rescard.winner { box-shadow: 0 0 40px rgba(255,224,102,.35); }
+    .vs-rescard .rogue-diag-line { font-size: .9rem; color: #8ab0c8; margin-bottom: 6px; }
+
+    .sb-log { background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 10px 14px; font-size: .82rem;
+      max-height: 160px; overflow-y: auto; line-height: 1.5; margin-top: 14px; color: #b9d4e6; }
     .sb-log b { color: #ffd24a; font-family: 'Orbitron'; font-weight: 700; }
-    .sb-panel { display: flex; gap: 14px; margin-bottom: 14px; }
-    .player-card { flex: 1; background: #0a1422; border: 1px solid rgba(0,200,255,.18); padding: 14px 16px; }
-    .player-card h3 { font-family: 'Orbitron'; font-size: .9rem; margin: 0 0 8px; letter-spacing: .04em; }
-    .player-card.p1 h3 { color: #00e87a; }
-    .player-card.p2 h3 { color: #ff7ad9; }
-    .player-card .stat { font-size: .85rem; margin: 4px 0; }
-    .player-card .stat b { color: #fff; }
-    .status-alive { color: #00e87a; font-weight: 700; }
-    .status-out { color: #ff5566; font-weight: 700; }
-    .sb-ref { margin-top: 18px; font-size: .82rem; color: #8ab0c8; line-height: 1.6; }
-    .sb-ref code { color: #9fe7ff; font-family: 'Orbitron', monospace; font-size: .78rem; }
-    .sb-ref h3 { font-family: 'Orbitron'; font-size: .82rem; color: #fff; margin: 14px 0 6px; letter-spacing: .04em; }
-    .winner-banner { font-family: 'Orbitron'; font-weight: 900; font-size: 1.4rem; text-align: center; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(0,200,255,.3); display: none; }
-    .winner-banner.show { display: block; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="sb-wrap">
-    <div class="sb-row" style="margin-bottom:10px;">
-      <a class="sb-btn alt" href="/index.html" style="text-decoration:none;display:inline-block;">◂ Back to metronome</a>
-    </div>
-    <div class="sb-h1">Local VS Sandbox</div>
-    <div class="sb-sub">One e-drum/trigger module, two separate pad inputs mapped to two different MIDI notes.
-      Both players play 16th-note continuity against the same click at the same BPM (shared calibration).
-      First to drop or cram a slot is OUT — survive longer than your opponent to win. This is a standalone
-      prototype (not wired into Game Mode yet).</div>
-
-    <div class="sb-row">
-      <button class="sb-btn" id="connectBtn">Connect MIDI</button>
-      <label class="sb-field">Input
-        <select id="deviceSel" style="width:auto;"><option>—</option></select>
-      </label>
-      <label class="sb-field">BPM
-        <input type="number" id="bpmInput" value="100" min="50" max="250" step="5">
-      </label>
-      <label class="sb-field">Bars
-        <input type="number" id="barsInput" value="4" min="1" max="16" step="1">
-      </label>
-    </div>
-    <div class="sb-row">
-      <span id="midiStatus" class="sb-sub" style="margin:0;">Not connected.</span>
-    </div>
-
-    <div class="sb-panel">
-      <div class="player-card p1">
-        <h3>PLAYER 1</h3>
-        <div class="stat">Note: <b id="p1Note">—</b></div>
-        <div class="stat">Status: <b id="p1Status">—</b></div>
-        <div class="stat">16ths survived: <b id="p1Cleared">0</b></div>
-        <button class="sb-btn alt" id="learnP1">Learn P1 pad</button>
+    <!-- ════════════════ SETUP ════════════════ -->
+    <div id="setupView">
+      <div class="sb-row" style="margin-bottom:10px;">
+        <a class="sb-btn alt" href="/index.html" style="text-decoration:none;display:inline-block;">◂ Back to metronome</a>
       </div>
-      <div class="player-card p2">
-        <h3>PLAYER 2</h3>
-        <div class="stat">Note: <b id="p2Note">—</b></div>
-        <div class="stat">Status: <b id="p2Status">—</b></div>
-        <div class="stat">16ths survived: <b id="p2Cleared">0</b></div>
-        <button class="sb-btn alt" id="learnP2">Learn P2 pad</button>
+      <div class="sb-h1">Local VS Sandbox — 2-Player Game Mode</div>
+      <div class="sb-sub">The full Game Mode, head-to-head. One e-drum module, two pads on different MIDI notes →
+        two players. Same calibration, same 2-bar count-in, same 16th-note continuity gating, same ranks and
+        result reveal as the live game — just rendered for both players at once. Local testing only, not wired
+        into the live app. (VS is MIDI-only: a single mic can't tell two players apart.)</div>
+
+      <!-- Step 1 — input -->
+      <div class="sb-step">
+        <h2>1 · Connect &amp; learn pads</h2>
+        <div class="sb-row">
+          <button class="sb-btn" id="connectBtn">Connect MIDI</button>
+          <label class="sb-field">Input
+            <select id="deviceSel" style="width:auto;"><option>—</option></select>
+          </label>
+          <span id="midiStatus" class="sb-status">Not connected.</span>
+        </div>
+        <div class="sb-players">
+          <div class="sb-pcard p1">
+            <h3>PLAYER 1</h3>
+            <div class="stat">Note: <b id="p1Note">—</b></div>
+            <button class="sb-btn alt" id="learnP1">Learn P1 pad</button>
+          </div>
+          <div class="sb-pcard p2">
+            <h3>PLAYER 2</h3>
+            <div class="stat">Note: <b id="p2Note">—</b></div>
+            <button class="sb-btn alt" id="learnP2">Learn P2 pad</button>
+          </div>
+        </div>
       </div>
+
+      <!-- Step 2 — calibration -->
+      <div class="sb-step">
+        <h2>2 · Calibrate (shared offset)</h2>
+        <div class="sb-sub" style="margin:0 0 10px;">Same two-pass routine as the game — Player 1 calibrates for both
+          (one module = one latency). 2-bar count-off + 8 measured bars of QUARTERS, then again for 16THS.</div>
+        <div class="sb-row">
+          <label class="sb-field">Cal BPM <input type="number" id="calBpm" value="100" min="40" max="200" step="5"></label>
+          <button class="sb-btn alt" id="calQuartersBtn">Calibrate quarters</button>
+          <button class="sb-btn alt" id="cal16Btn" disabled>Refine 16ths</button>
+        </div>
+        <div class="sb-row">
+          <span class="sb-status" id="calStatus">No calibration yet (offset = 0ms).</span>
+        </div>
+        <div class="sb-row">
+          <label class="sb-field">…or skip: offset <input type="number" id="manualOffset" placeholder="ms"></label>
+          <button class="sb-btn alt" id="manualBtn">Use offset</button>
+        </div>
+      </div>
+
+      <!-- Step 3 — mode + params -->
+      <div class="sb-step">
+        <h2>3 · Mode &amp; target</h2>
+        <div class="sb-row">
+          <button class="sb-btn active" id="modeTT" data-rmode="timetrial">Time Trial</button>
+          <button class="sb-btn alt" id="modeSD" data-rmode="suddendeath">Sudden Death</button>
+        </div>
+        <div class="sb-row">
+          <div class="sb-stepper">
+            <button id="bpmDec">−</button>
+            <span class="val" id="bpmVal">120</span>
+            <button id="bpmInc">+</button>
+            <span class="unit">BPM</span>
+          </div>
+          <div class="sb-stepper" style="margin-left:18px;">
+            <button id="minsDec">−</button>
+            <span class="val" id="minsVal">3</span>
+            <button id="minsInc">+</button>
+            <span class="unit">min</span>
+          </div>
+        </div>
+        <div class="sb-sub" id="modeHint" style="margin:6px 0 0;">Time Trial: play the whole target, highest green % wins.
+          Neither player can be knocked out.</div>
+      </div>
+
+      <!-- Step 4 — go -->
+      <div class="sb-row">
+        <button class="sb-btn go" id="startBtn">▶ Start VS run</button>
+        <span class="sb-status" id="runStatus"></span>
+      </div>
+
+      <div class="sb-log" id="log">Connect MIDI, learn each player's pad, calibrate (or enter an offset), pick a mode, then start.</div>
     </div>
 
-    <div class="sb-row">
-      <button class="sb-btn alt" id="calBtn">Calibrate (2 bars, both pads)</button>
-      <span class="sb-field" id="calStatus">No calibration yet (offset = 0ms).</span>
-    </div>
-
-    <div class="sb-row">
-      <button class="sb-btn" id="startBtn">▶ Start run</button>
-      <button class="sb-btn alt" id="stopBtn" disabled>■ Stop</button>
-    </div>
-
-    <div class="winner-banner" id="winnerBanner"></div>
-
-    <div class="sb-log" id="log">Connect MIDI, learn each player's pad note, optionally calibrate, then start.</div>
-
-    <div class="sb-ref">
-      <h3>How it works</h3>
-      • Both pads send MIDI note-on on the same input — routed to P1/P2 by note number.<br>
-      • <b>Calibrate</b> plays 2 bars of 16th clicks; hit both pads in time with them (in unison is fine) to
-      capture one shared latency offset, same as the main game's calibration principle.<br>
-      • <b>Run</b>: each 16th-note slot must contain exactly one unconsumed hit from a player to count as
-      'clear'. Zero hits = drop, 2+ hits = cram — either ends that player's run.<br>
-      • Run ends when both players are out, or after the configured number of bars if both survive.
+    <!-- ════════════════ RUN HUD ════════════════ -->
+    <div id="runView">
+      <div class="vs-runbanner" id="runBanner">READY</div>
+      <div class="vs-hud-wrap">
+        <div class="vs-col p1" id="col1">
+          <div class="vs-col-name">PLAYER 1</div>
+          <div class="rogue-hud-banner" id="hud1Banner">READY</div>
+          <div class="rogue-hud-verdict" id="hud1Verdict">—</div>
+          <div class="rogue-lane" id="hud1Lane"></div>
+          <div class="rogue-hud-score">
+            <span class="rogue-hud-rank rank-e" id="hud1Rank">E</span>
+            <span class="rogue-hud-gauge"><i class="rogue-hud-gauge-fill" id="hud1Gauge"></i></span>
+          </div>
+          <div class="rogue-hud-bpm" id="hud1Bpm"></div>
+        </div>
+        <div class="vs-mid">VS</div>
+        <div class="vs-col p2" id="col2">
+          <div class="vs-col-name">PLAYER 2</div>
+          <div class="rogue-hud-banner" id="hud2Banner">READY</div>
+          <div class="rogue-hud-verdict" id="hud2Verdict">—</div>
+          <div class="rogue-lane" id="hud2Lane"></div>
+          <div class="rogue-hud-score">
+            <span class="rogue-hud-rank rank-e" id="hud2Rank">E</span>
+            <span class="rogue-hud-gauge"><i class="rogue-hud-gauge-fill" id="hud2Gauge"></i></span>
+          </div>
+          <div class="rogue-hud-bpm" id="hud2Bpm"></div>
+        </div>
+      </div>
+      <div class="sb-row" style="justify-content:center;margin-top:22px;">
+        <button class="sb-btn alt" id="stopBtn">■ Stop run</button>
+      </div>
     </div>
   </div>
 
-  <script defer src="/assets/js/metronome.js?v=20260603e"></script>
+  <!-- ════════════════ RESULT OVERLAY ════════════════ -->
+  <div class="vs-overlay" id="overlay">
+    <div class="vs-overlay-inner">
+      <div class="vs-winner" id="winner">—</div>
+      <div class="vs-cards">
+        <div class="vs-rescard p1" id="res1"><h3>PLAYER 1</h3><div id="res1Body"></div></div>
+        <div class="vs-rescard p2" id="res2"><h3>PLAYER 2</h3><div id="res2Body"></div></div>
+      </div>
+      <div class="sb-row" style="justify-content:center;margin-top:22px;">
+        <button class="sb-btn go" id="overlayClose">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="/assets/js/metronome.js?v=20260612c"></script>
+  <script defer src="/assets/js/sfx.js?v=7"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
 
-    // ── pure timing math (mirrors RL_TimingMath in roguelite.js) ─────────────
+    // ════════════════════════════════════════════════════════════════════════
+    // PURE TIMING MATH — copied verbatim from roguelite.js RL_TimingMath so the
+    // sandbox grades identically to the live game. (Standalone by design: this
+    // page must never depend on the live game's run engine.)
+    // ════════════════════════════════════════════════════════════════════════
     function audioToPerfMs(audioSec, sync) { return (audioSec - sync.a0) * 1000 + sync.p0; }
     function computeCalibration(expectedPerfTimes, eventPerfTimes, captureWindowMs) {
       const offsets = [];
@@ -139,234 +270,534 @@
         const d = events[i].t - centre;
         if (d >= -halfWindowMs && d < halfWindowMs) indices.push(i);
       }
-      if (indices.length === 0) return { result: 'drop', count: 0, indices };
-      if (indices.length === 1) return { result: 'clear', count: 1, indices };
-      return { result: 'cram', count: indices.length, indices };
+      if (indices.length === 0) return { result: 'drop', count: 0, indices, offset: null };
+      if (indices.length === 1) return { result: 'clear', count: 1, indices, offset: events[indices[0]].t - centre };
+      return { result: 'cram', count: indices.length, indices, offset: null };
+    }
+    function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, earlyReachMs) {
+      const centre = expectedPerf + meanOffset;
+      let bestIdx = -1, bestAbs = Infinity, bestSigned = 0;
+      for (let i = 0; i < events.length; i++) {
+        if (events[i].consumed) continue;
+        const d = events[i].t - centre;
+        if (d >= -earlyReachMs && d < halfWindowMs) {
+          const a = Math.abs(d);
+          if (a < bestAbs) { bestAbs = a; bestIdx = i; bestSigned = d; }
+        }
+      }
+      if (bestIdx === -1) return { result: 'drop', count: 0, indices: [], offset: null };
+      return { result: 'clear', count: 1, indices: [bestIdx], offset: bestSigned };
     }
 
-    // ── MIDI ───────────────────────────────────────────────────────────────
+    // ── Run / scoring constants (mirror roguelite.js) ──
+    const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
+    const GAME_MINS_MIN = 1, GAME_MINS_MAX = 60;
+    const CAL_BEATS = 4, CAL_COUNTOFF_BARS = 2, CAL_MEASURE_BARS = 8;
+    const CAL_CAPTURE_WINDOW_MS = 150, CAL_MIN_SAMPLES = 8;
+    const RUN_PRESENCE_FACTOR = 0.5;
+    const RUN_FIRST_SLOT_EARLY_MULT = 3;
+    const RUN_LEAD_IN_BARS = 2;
+    const EVAL_MARGIN_MS = 35;
+    const KICK_DEBOUNCE_MS = 15;
+    const LANE_VISIBLE = 10;
+    function goodFraction(bpm) {
+      if (bpm < 60)  return 0.50;
+      if (bpm < 80)  return 0.55;
+      if (bpm < 100) return 0.60;
+      if (bpm < 120) return 0.65;
+      if (bpm < 140) return 0.70;
+      if (bpm < 160) return 0.75;
+      if (bpm < 180) return 0.80;
+      return 0.85;
+    }
+    function rankFor(pct) {
+      if (pct >= 99)  return 'SS';
+      if (pct >= 91)  return 'S';
+      if (pct >= 81)  return 'A';
+      if (pct >= 66)  return 'B';
+      if (pct >= 50)  return 'C';
+      if (pct >= 26)  return 'D';
+      return 'E';
+    }
+    function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }
+    const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#b06fff', D: '#8ab0c8', E: '#ff3838' };
+    function verdictClass(rank, off) {
+      if (rank === 2) return 'rogue-bad';
+      if (rank === 1) return off < 0 ? 'rogue-rush' : 'rogue-drag';
+      return 'rogue-good';
+    }
+    function verdictWord(rank, off) {
+      if (rank === 2) return 'BAD';
+      if (rank === 1) return off < 0 ? 'RUSH' : 'DRAG';
+      return 'GOOD';
+    }
+    function signed(n) { return (n >= 0 ? '+' : '') + n.toFixed(1); }
+    function fmtMMSS(sec) { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60); const s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MIDI
+    // ════════════════════════════════════════════════════════════════════════
     let midiAccess = null, midiInputs = [], selectedInputId = null;
-    let learning = null;          // null | 'p1' | 'p2'
+    let learning = null;                 // null | 'p1' | 'p2'
     let p1Note = null, p2Note = null;
-    let lastTs = { p1: 0, p2: 0 };
-    const DEBOUNCE_MS = 60;
-    let calibrating = false, calEvents = [], calExpected = [];
+    let calibrating = false, calEvents = [];
+
+    function setStatus(node, msg, isErr) { node.textContent = msg; node.classList.toggle('error', !!isErr); }
 
     async function connectMidi() {
-      if (!navigator.requestMIDIAccess) { setStatus('Web MIDI not supported in this browser.', true); return; }
-      try {
-        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
-      } catch (e) {
-        setStatus('MIDI access denied: ' + (e && e.message ? e.message : e), true);
-        return;
-      }
+      if (!navigator.requestMIDIAccess) { setStatus($('midiStatus'), 'Web MIDI not supported in this browser (use Chrome/Edge).', true); return; }
+      try { midiAccess = await navigator.requestMIDIAccess({ sysex: false }); }
+      catch (e) { setStatus($('midiStatus'), 'MIDI access denied: ' + (e && e.message ? e.message : e), true); return; }
       midiAccess.onstatechange = refreshInputs;
       refreshInputs();
     }
     function refreshInputs() {
       midiInputs = [];
       for (const input of midiAccess.inputs.values()) midiInputs.push({ id: input.id, name: input.name || input.id });
-      const sel = $('deviceSel');
-      sel.innerHTML = '';
-      if (!midiInputs.length) {
-        sel.innerHTML = '<option>—</option>';
-        setStatus('No MIDI inputs found. Connect your module and try again.', true);
-        return;
-      }
-      midiInputs.forEach(i => {
-        const o = document.createElement('option');
-        o.value = i.id; o.textContent = i.name;
-        sel.appendChild(o);
-      });
+      const sel = $('deviceSel'); sel.innerHTML = '';
+      if (!midiInputs.length) { sel.innerHTML = '<option>—</option>'; setStatus($('midiStatus'), 'No MIDI inputs found. Connect your module and try again.', true); return; }
+      midiInputs.forEach(i => { const o = document.createElement('option'); o.value = i.id; o.textContent = i.name; sel.appendChild(o); });
       if (!midiInputs.some(i => i.id === selectedInputId)) selectedInputId = midiInputs[0].id;
-      sel.value = selectedInputId;
-      bindInput();
-      setStatus('Connected: ' + (midiInputs.find(i => i.id === selectedInputId) || {}).name);
+      sel.value = selectedInputId; bindInput();
+      setStatus($('midiStatus'), 'Connected: ' + (midiInputs.find(i => i.id === selectedInputId) || {}).name);
     }
     function bindInput() {
-      for (const input of midiAccess.inputs.values()) {
-        input.onmidimessage = (input.id === selectedInputId) ? handleMidiMessage : null;
-      }
+      for (const input of midiAccess.inputs.values()) input.onmidimessage = (input.id === selectedInputId) ? handleMidiMessage : null;
     }
     $('deviceSel').addEventListener('change', e => { selectedInputId = e.target.value; bindInput(); });
 
     function handleMidiMessage(e) {
       const status = e.data[0] & 0xf0, note = e.data[1], vel = e.data[2];
-      if (status !== 0x90 || vel === 0) return; // note-on only
-
+      if (status !== 0x90 || vel === 0) return;                       // note-on only
       const recv = performance.now();
       let ts = e.timeStamp;
       if (typeof ts !== 'number' || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
 
-      if (learning === 'p1') { p1Note = note; learning = null; updateNoteLabels(); log('P1 pad learned: note ' + note); return; }
-      if (learning === 'p2') { p2Note = note; learning = null; updateNoteLabels(); log('P2 pad learned: note ' + note); return; }
+      if (learning === 'p1') { p1Note = note; learning = null; $('p1Note').textContent = note; log('P1 pad learned: note ' + note); updateGates(); return; }
+      if (learning === 'p2') { p2Note = note; learning = null; $('p2Note').textContent = note; log('P2 pad learned: note ' + note); updateGates(); return; }
+      if (calibrating) { if (note === p1Note) calEvents.push(ts); return; }   // P1 pad only
+      if (!runActive) return;
+      if (note === p1Note) pushEvent(P1, ts);
+      else if (note === p2Note) pushEvent(P2, ts);
+    }
+    function pushEvent(p, ts) {
+      if (!p.leadInDone || !p.alive) return;            // ignore count-in hits + dead players
+      if (ts - p.lastTs < KICK_DEBOUNCE_MS) return;     // collapse hardware double-triggers
+      p.lastTs = ts;
+      p.events.push({ t: ts, consumed: false });
+    }
 
-      if (calibrating) {
-        if (note === p1Note || note === p2Note) calEvents.push(ts);
+    $('learnP1').addEventListener('click', () => { if (!midiAccess) { setStatus($('midiStatus'), 'Connect MIDI first.', true); return; } learning = 'p1'; log("Learning P1 — hit P1's pad…"); });
+    $('learnP2').addEventListener('click', () => { if (!midiAccess) { setStatus($('midiStatus'), 'Connect MIDI first.', true); return; } learning = 'p2'; log("Learning P2 — hit P2's pad…"); });
+    $('connectBtn').addEventListener('click', connectMidi);
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CALIBRATION — two-pass (quarters → gross, 16ths → refined), P1 pad only.
+    // ════════════════════════════════════════════════════════════════════════
+    let meanOffset = 0, calGrossOffset = 0, calState = null, calibrated = false, calPass1Done = false;
+    function getCalBpm() { return Math.max(40, Math.min(200, parseInt($('calBpm').value, 10) || 100)); }
+
+    $('calQuartersBtn').addEventListener('click', () => {
+      if (p1Note == null) { setStatus($('calStatus'), 'Learn P1 pad before calibrating.', true); return; }
+      startCalPass(1);
+    });
+    $('cal16Btn').addEventListener('click', () => {
+      if (!calPass1Done) { setStatus($('calStatus'), 'Calibrate quarters first.', true); return; }
+      startCalPass(2);
+    });
+    $('manualBtn').addEventListener('click', () => {
+      const v = parseFloat($('manualOffset').value);
+      if (isNaN(v)) { setStatus($('calStatus'), 'Enter an offset in ms.', true); return; }
+      meanOffset = v; calGrossOffset = v; calibrated = true;
+      setStatus($('calStatus'), 'Manual offset set: ' + signed(v) + 'ms.');
+      log('Manual offset set: ' + signed(v) + 'ms.'); updateGates();
+    });
+
+    function startCalPass(pass) {
+      calibrating = true; calEvents = [];
+      const bpm = getCalBpm();
+      MetronomeEngine.init();
+      MetronomeEngine.setBeatsPerMeasure(CAL_BEATS);
+      MetronomeEngine.setSubdivision('quarter');
+      MetronomeEngine.setBpm(bpm);
+      calState = { pass, bpm, tickCount: 0, countoffTicks: CAL_COUNTOFF_BARS * CAL_BEATS,
+        totalTicks: (CAL_COUNTOFF_BARS + CAL_MEASURE_BARS) * CAL_BEATS, expected: [], lastTickPerf: 0, sync: null };
+      $('calQuartersBtn').disabled = true; $('cal16Btn').disabled = true;
+      MetronomeEngine.onSchedule(onCalTick);
+      MetronomeEngine.start();
+      log('Calibration pass ' + pass + ' (' + (pass === 1 ? 'QUARTERS' : '16THS') + '): ' + CAL_COUNTOFF_BARS +
+        '-bar count-off, then ' + CAL_MEASURE_BARS + ' measured bars — play ' + (pass === 1 ? 'quarters' : 'continuous 16ths') + '.');
+    }
+    function onCalTick(tickTimeSec) {
+      if (!calState) return;
+      if (!calState.sync) { const ctx = MetronomeEngine.getAudioContext(); calState.sync = { a0: ctx.currentTime, p0: performance.now() }; }
+      const idx = calState.tickCount++;
+      const perf = audioToPerfMs(tickTimeSec, calState.sync);
+      calState.lastTickPerf = perf;
+      const bar = Math.floor(idx / CAL_BEATS) + 1;
+      const label = calState.pass === 1 ? 'QUARTERS' : '16THS';
+      if (idx < calState.countoffTicks) {
+        $('calStatus').textContent = label + ' · COUNT-OFF ' + bar + '/' + CAL_COUNTOFF_BARS + ' — get ready';
+      } else if (idx < calState.totalTicks) {
+        $('calStatus').textContent = label + ' — measuring bar ' + (bar - CAL_COUNTOFF_BARS) + '/' + CAL_MEASURE_BARS;
+      }
+      if (idx >= calState.countoffTicks && idx < calState.totalTicks) {
+        if (calState.pass === 1) calState.expected.push(perf);
+        else { const s = 60 / calState.bpm / 4; for (let k = 0; k < 4; k++) calState.expected.push(audioToPerfMs(tickTimeSec + k * s, calState.sync)); }
+      }
+      if (idx + 1 === calState.totalTicks) {
+        const delay = (calState.lastTickPerf + CAL_CAPTURE_WINDOW_MS + EVAL_MARGIN_MS) - performance.now();
+        setTimeout(finishCalPass, Math.max(0, delay));
+      }
+    }
+    function finishCalPass() {
+      if (!calState) return;
+      MetronomeEngine.onSchedule(null); MetronomeEngine.stop();
+      calibrating = false;
+      const pass = calState.pass, passBpm = calState.bpm, expectedTimes = calState.expected, eventTimes = calEvents.slice();
+      calState = null;
+      $('calQuartersBtn').disabled = false;
+      if (pass === 1) {
+        const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
+        if (gross.sampleCount < CAL_MIN_SAMPLES) { setStatus($('calStatus'), 'Quarters: only ' + gross.sampleCount + ' hits — play a hit on every click, then retry.', true); log('Calibration aborted — not enough quarter hits.'); return; }
+        calGrossOffset = gross.meanOffset; meanOffset = gross.meanOffset; calibrated = true; calPass1Done = true;
+        $('cal16Btn').disabled = false;
+        setStatus($('calStatus'), 'Quarters @ ' + passBpm + ' BPM: offset ' + signed(calGrossOffset) + 'ms (' + gross.sampleCount + ' hits). Optional: refine 16ths.');
+        log('Pass 1 (quarters) done — gross offset ' + signed(calGrossOffset) + 'ms.'); updateGates();
         return;
       }
+      const G = calGrossOffset, spacing16 = 60000 / passBpm / 4, tight = spacing16 * 0.45;
+      const rough = computeCalibration(expectedTimes.map(t => t + G), eventTimes, tight);
+      let mean, sd, n;
+      if (rough.sampleCount >= CAL_MIN_SAMPLES) {
+        const M0 = G + rough.meanOffset;
+        const refined = computeCalibration(expectedTimes.map(t => t + M0), eventTimes, tight);
+        mean = M0 + refined.meanOffset; sd = refined.sd; n = refined.sampleCount;
+      } else { mean = G + rough.meanOffset; sd = rough.sd; n = rough.sampleCount; }
+      $('cal16Btn').disabled = false;
+      if (n < CAL_MIN_SAMPLES) { meanOffset = G; setStatus($('calStatus'), '16ths: only ' + n + ' matched — keeping quarters offset ' + signed(G) + 'ms.', true); log('16ths refine failed; using quarters offset.'); return; }
+      meanOffset = mean;
+      setStatus($('calStatus'), 'Calibrated: offset ' + signed(meanOffset) + 'ms (sd ' + sd.toFixed(1) + 'ms, ' + n + ' samples).');
+      log('Calibration done — offset ' + signed(meanOffset) + 'ms, sd ' + sd.toFixed(1) + 'ms.'); updateGates();
+    }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // MODE + PARAM PICKERS
+    // ════════════════════════════════════════════════════════════════════════
+    let mode = 'timetrial';     // 'timetrial' | 'suddendeath'
+    let gameBpm = 120, gameMins = 3;
+    function selectMode(m) {
+      mode = m;
+      $('modeTT').classList.toggle('active', m === 'timetrial'); $('modeTT').classList.toggle('alt', m !== 'timetrial');
+      $('modeSD').classList.toggle('active', m === 'suddendeath'); $('modeSD').classList.toggle('alt', m !== 'suddendeath');
+      $('modeHint').textContent = m === 'suddendeath'
+        ? 'Sudden Death: one dropped/crammed 16th knocks you out. Last player standing — or furthest survived — wins.'
+        : 'Time Trial: play the whole target, highest green % wins. Neither player can be knocked out.';
+    }
+    $('modeTT').addEventListener('click', () => selectMode('timetrial'));
+    $('modeSD').addEventListener('click', () => selectMode('suddendeath'));
+    function renderBpm() { $('bpmVal').textContent = gameBpm; }
+    function renderMins() { $('minsVal').textContent = gameMins; }
+    $('bpmDec').addEventListener('click', () => { gameBpm = Math.max(GAME_BPM_MIN, gameBpm - GAME_BPM_STEP); renderBpm(); });
+    $('bpmInc').addEventListener('click', () => { gameBpm = Math.min(GAME_BPM_MAX, gameBpm + GAME_BPM_STEP); renderBpm(); });
+    $('minsDec').addEventListener('click', () => { gameMins = Math.max(GAME_MINS_MIN, gameMins - 1); renderMins(); });
+    $('minsInc').addEventListener('click', () => { gameMins = Math.min(GAME_MINS_MAX, gameMins + 1); renderMins(); });
+
+    function updateGates() {
+      const ready = (p1Note != null && p2Note != null && calibrated);
+      $('startBtn').disabled = !ready;
+      $('runStatus').textContent = ready ? '' :
+        (p1Note == null || p2Note == null ? 'Learn both pads first.' : 'Calibrate (or enter an offset) first.');
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RUN ENGINE — one shared metronome clock drives both players' gating/HUD.
+    // ════════════════════════════════════════════════════════════════════════
+    function makePlayer(idx) {
+      return {
+        idx,
+        col:     $('col' + idx),
+        banner:  $('hud' + idx + 'Banner'),
+        verdict: $('hud' + idx + 'Verdict'),
+        lane:    $('hud' + idx + 'Lane'),
+        rankEl:  $('hud' + idx + 'Rank'),
+        gauge:   $('hud' + idx + 'Gauge'),
+        bpmEl:   $('hud' + idx + 'Bpm'),
+        events: [], lastTs: 0, alive: true, leadInDone: false, pendingFirstGated: false,
+        hitsCleared: 0, hitLog: [], tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },
+        curBeatId: -1, curRank: 0, curOff: 0,
+        diedAtBpm: null, survivalSec: 0,
+      };
+    }
+    let P1 = null, P2 = null, players = [];
+    let runActive = false, runGating = false, tickCounter = 0, leadInTicks = 0;
+    let targetBeats = 0, gatedBeats = 0, sync = null, gatingStartPerf = 0;
+    let pendingEvalTimers = [];
+    let revealRankTimer = null;
+
+    $('startBtn').addEventListener('click', startRun);
+    $('stopBtn').addEventListener('click', () => endRun('stopped'));
+    $('overlayClose').addEventListener('click', () => { $('overlay').classList.remove('visible'); document.body.classList.remove('vs-run'); });
+
+    function startRun() {
+      if (p1Note == null || p2Note == null || !calibrated) { updateGates(); return; }
+      P1 = makePlayer(1); P2 = makePlayer(2); players = [P1, P2];
+      runActive = true; runGating = false; tickCounter = 0; gatedBeats = 0; sync = null; gatingStartPerf = 0;
+      pendingEvalTimers = [];
+      leadInTicks = RUN_LEAD_IN_BARS * CAL_BEATS;
+      targetBeats = Math.max(1, Math.round(gameMins * gameBpm));   // gated quarter-beats over the target minutes
+      players.forEach(p => { p.col.classList.remove('out'); p.banner.textContent = 'COUNT-IN 1 / ' + RUN_LEAD_IN_BARS; p.banner.className = 'rogue-hud-banner countin';
+        p.verdict.textContent = 'READY'; p.verdict.className = 'rogue-hud-verdict'; p.lane.innerHTML = '';
+        p.rankEl.textContent = 'E'; p.rankEl.className = 'rogue-hud-rank rank-e'; p.gauge.style.width = '0'; p.bpmEl.textContent = ''; });
+      $('runBanner').textContent = mode === 'suddendeath' ? 'SUDDEN DEATH · ' + gameBpm + ' BPM' : 'TIME TRIAL · ' + gameBpm + ' BPM · ' + gameMins + ' min';
+      document.body.classList.add('vs-run');
+
+      MetronomeEngine.init();
+      MetronomeEngine.setBeatsPerMeasure(CAL_BEATS);
+      MetronomeEngine.setSubdivision('quarter');
+      MetronomeEngine.setBpm(gameBpm);
+      MetronomeEngine.onSchedule(onRunTick);
+      MetronomeEngine.start();
+      log('VS run started: ' + mode + ', ' + gameBpm + ' BPM, target ' + gameMins + ':00 (' + targetBeats + ' beats), offset ' + signed(meanOffset) + 'ms.');
+    }
+
+    function onRunTick(tickTimeSec, soundType, beatIndex, tickInBeat) {
       if (!runActive) return;
-      if (note === p1Note) pushEvent('p1', ts);
-      else if (note === p2Note) pushEvent('p2', ts);
-    }
-    function pushEvent(pid, ts) {
-      if (ts - lastTs[pid] < DEBOUNCE_MS) return;
-      lastTs[pid] = ts;
-      players[pid].events.push({ t: ts, consumed: false });
-    }
-
-    function updateNoteLabels() {
-      $('p1Note').textContent = p1Note == null ? '—' : p1Note;
-      $('p2Note').textContent = p2Note == null ? '—' : p2Note;
-    }
-    $('learnP1').addEventListener('click', () => {
-      if (!midiAccess) { setStatus('Connect MIDI first.', true); return; }
-      learning = 'p1'; log("Learning P1 — hit P1's pad…");
-    });
-    $('learnP2').addEventListener('click', () => {
-      if (!midiAccess) { setStatus('Connect MIDI first.', true); return; }
-      learning = 'p2'; log("Learning P2 — hit P2's pad…");
-    });
-
-    // ── Calibration ────────────────────────────────────────────────────────
-    let meanOffset = 0;
-    $('calBtn').addEventListener('click', () => {
-      if (p1Note == null || p2Note == null) { setStatus('Learn both pads before calibrating.', true); return; }
-      calibrating = true; calEvents = []; calExpected = [];
-      const bpm = getBpm();
-      MetronomeEngine.setSubdivision('sixteenth');
-      MetronomeEngine.setBeatsPerMeasure(4);
-      MetronomeEngine.setBpm(bpm);
-      let sync = null;
-      const TARGET = 32; // 2 bars of 16ths
-      MetronomeEngine.onSchedule((t) => {
-        if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
-        if (calExpected.length < TARGET) calExpected.push(audioToPerfMs(t, sync));
-      });
-      MetronomeEngine.start();
-      log('Calibrating: play both pads along with the 16th clicks for 2 bars…');
-      const sixteenthMs = (60000 / bpm) / 4;
-      setTimeout(() => {
-        MetronomeEngine.stop();
-        MetronomeEngine.onSchedule(null);
-        calibrating = false;
-        const cal = computeCalibration(calExpected, calEvents, 150);
-        meanOffset = cal.meanOffset;
-        $('calStatus').textContent = 'Calibrated: offset ' + meanOffset.toFixed(1) + 'ms (sd ' + cal.sd.toFixed(1) + 'ms, ' + cal.sampleCount + ' samples).';
-        log('Calibration done — offset ' + meanOffset.toFixed(1) + 'ms, sd ' + cal.sd.toFixed(1) + 'ms.');
-      }, TARGET * sixteenthMs + 400);
-    });
-
-    // ── Run ────────────────────────────────────────────────────────────────
-    let players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
-    let pendingSlots = [], slotCounter = 0, maxSlots = 64, halfWindowMs = 0;
-    let runActive = false, judgeTimer = null, sync = null;
-
-    function getBpm() {
-      let v = parseInt($('bpmInput').value, 10) || 100;
-      v = Math.round(v / 5) * 5;
-      return Math.max(50, Math.min(250, v));
-    }
-
-    $('startBtn').addEventListener('click', () => {
-      if (p1Note == null || p2Note == null) { setStatus('Learn both pads before starting.', true); return; }
-      const bpm = getBpm();
-      const bars = Math.max(1, Math.min(16, parseInt($('barsInput').value, 10) || 4));
-      maxSlots = bars * 16;
-      players = { p1: { events: [], alive: true, cleared: 0 }, p2: { events: [], alive: true, cleared: 0 } };
-      pendingSlots = []; slotCounter = 0; sync = null;
-      halfWindowMs = (60000 / bpm) / 8; // half of a 16th
-      $('p1Status').textContent = 'ALIVE'; $('p1Status').className = 'status-alive';
-      $('p2Status').textContent = 'ALIVE'; $('p2Status').className = 'status-alive';
-      $('p1Cleared').textContent = '0'; $('p2Cleared').textContent = '0';
-      $('winnerBanner').classList.remove('show');
-
-      MetronomeEngine.setSubdivision('sixteenth');
-      MetronomeEngine.setBeatsPerMeasure(4);
-      MetronomeEngine.setBpm(bpm);
-      MetronomeEngine.onSchedule(onSchedule);
-      MetronomeEngine.start();
-      judgeTimer = setInterval(judgeTick, 15);
-      runActive = true;
-      $('startBtn').disabled = true; $('stopBtn').disabled = false;
-      log('Run started: ' + bpm + ' BPM, ' + bars + ' bar(s), offset ' + meanOffset.toFixed(1) + 'ms.');
-    });
-
-    $('stopBtn').addEventListener('click', () => endRun('Stopped by user.'));
-
-    function onSchedule(tickTimeSec) {
-      if (slotCounter >= maxSlots) { MetronomeEngine.onSchedule(null); return; }
       if (!sync) { const ctx = MetronomeEngine.getAudioContext(); sync = { a0: ctx.currentTime, p0: performance.now() }; }
-      pendingSlots.push({ expectedPerf: audioToPerfMs(tickTimeSec, sync), idx: slotCounter++ });
+      const idx = tickCounter++;
+
+      // Count-in: bars 1–2 ungated.
+      if (idx < leadInTicks) {
+        if (beatIndex === 0 && tickInBeat === 0) {
+          const bar = Math.floor(idx / CAL_BEATS) + 1;
+          players.forEach(p => { p.banner.textContent = 'COUNT-IN ' + bar + ' / ' + RUN_LEAD_IN_BARS; p.banner.className = 'rogue-hud-banner countin'; setHudVerdict(p, -1, 0, 'READY'); });
+        }
+        return;
+      }
+      // First gated tick → arm gating.
+      if (!runGating) {
+        runGating = true;
+        gatingStartPerf = performance.now();
+        players.forEach(p => { p.events = []; p.leadInDone = true; p.pendingFirstGated = true; p.banner.textContent = 'Keep the 16ths going'; p.banner.className = 'rogue-hud-banner live'; p.bpmEl.textContent = gameBpm + ' BPM'; });
+      }
+
+      const beatId = gatedBeats++;
+      const bpm = gameBpm;
+      const sixteenthMs = 60000 / bpm / 4;
+      const presenceMs = sixteenthMs * RUN_PRESENCE_FACTOR;
+      const goodMs = presenceMs * goodFraction(bpm);
+      const sixteenthSec = sixteenthMs / 1000;
+      const runOffset = meanOffset;
+      for (let k = 0; k < 4; k++) {
+        const subPerf = audioToPerfMs(tickTimeSec + k * sixteenthSec, sync);
+        const evalAt = subPerf + runOffset + presenceMs + EVAL_MARGIN_MS;
+        const delay = Math.max(0, evalAt - performance.now());
+        players.forEach(p => { pendingEvalTimers.push(setTimeout(() => evaluateHit(p, subPerf, presenceMs, goodMs, beatId, k, runOffset), delay)); });
+      }
+      // Reached the target — let the last beat's evals settle, then finish.
+      if (beatId + 1 >= targetBeats) {
+        MetronomeEngine.onSchedule(null);
+        const settle = (audioToPerfMs(tickTimeSec + 3 * sixteenthSec, sync) + runOffset + presenceMs + EVAL_MARGIN_MS + 60) - performance.now();
+        setTimeout(() => endRun('complete'), Math.max(0, settle));
+      }
     }
 
-    function judgeTick() {
-      const now = performance.now();
-      while (pendingSlots.length && now >= pendingSlots[0].expectedPerf + meanOffset + halfWindowMs) {
-        const slot = pendingSlots.shift();
-        for (const pid of ['p1', 'p2']) {
-          const pl = players[pid];
-          if (!pl.alive) continue;
-          const res = classifySlot(slot.expectedPerf, meanOffset, halfWindowMs, pl.events);
-          if (res.result === 'clear') {
-            pl.cleared++;
-            pl.events[res.indices[0]].consumed = true;
-            $(pid + 'Cleared').textContent = pl.cleared;
-          } else {
-            pl.alive = false;
-            $(pid + 'Status').textContent = 'OUT (' + res.result.toUpperCase() + ')';
-            $(pid + 'Status').className = 'status-out';
-            log(pid.toUpperCase() + ' is OUT at slot ' + (slot.idx + 1) + ' (' + res.result + ') — survived ' + pl.cleared + ' 16ths.');
-          }
-        }
-        if (!players.p1.alive && !players.p2.alive) { endRun(); return; }
+    function evaluateHit(p, expectedPerf, presenceMs, goodMs, beatId, k, offset) {
+      if (!runActive || !p.alive) return;
+      const firstGated = p.pendingFirstGated;
+      p.pendingFirstGated = false;
+      const c = firstGated
+        ? classifyFirstSlot(expectedPerf, offset, presenceMs, p.events, presenceMs * RUN_FIRST_SLOT_EARLY_MULT)
+        : classifySlot(expectedPerf, offset, presenceMs, p.events);
+
+      let rank, off = 0;
+      if (c.result === 'clear') { off = c.offset; rank = firstGated ? 0 : ((Math.abs(off) > goodMs) ? 1 : 0); }
+      else rank = 2;   // MIDI is strict: drop or cram both fail
+
+      // Aggregate the beat from its 4 sixteenths (worst rank wins; keep extreme neutral dir).
+      if (p.curBeatId !== beatId || k === 0) { p.curBeatId = beatId; p.curRank = rank; p.curOff = off; }
+      else if (rank > p.curRank) { p.curRank = rank; p.curOff = off; }
+      else if (rank === 1 && p.curRank === 1 && Math.abs(off) > Math.abs(p.curOff)) { p.curOff = off; }
+      setHudVerdict(p, p.curRank, p.curOff);
+
+      p.hitLog.push({ rank, off: (c.result === 'clear') ? off : null });
+      if (c.result === 'clear') { p.events[c.indices[0]].consumed = true; p.hitsCleared++; }
+      else if (c.result === 'cram') { c.indices.forEach(i => { p.events[i].consumed = true; }); }
+
+      // Sudden death: a bad beat knocks this player out immediately.
+      if (rank === 2 && mode === 'suddendeath') {
+        addLaneCell(p, 'rogue-bad'); p.tally.bad++;
+        failPlayer(p, c);
+        return;
       }
-      if (slotCounter >= maxSlots && pendingSlots.length === 0) endRun();
+      if (k === 3) {
+        tallyBeat(p, p.curRank, p.curOff);
+        addLaneCell(p, verdictClass(p.curRank, p.curOff));
+        updateScoreHud(p);
+      }
+      pruneEvents(p, expectedPerf - presenceMs * 4);
     }
+
+    function tallyBeat(p, rank, off) {
+      const t = p.tally;
+      if (rank === 2) { t.bad++; return; }
+      if (rank === 1) { t.neutral++; if (off < 0) t.rush++; else t.drag++; return; }
+      t.good++;
+    }
+    function pruneEvents(p, beforePerf) { if (p.events.length < 64) return; p.events = p.events.filter(e => !e.consumed && e.t >= beforePerf); }
+
+    function failPlayer(p, c) {
+      p.alive = false;
+      p.diedAtBpm = gameBpm;
+      p.survivalSec = gatingStartPerf ? (performance.now() - gatingStartPerf) / 1000 : 0;
+      p.col.classList.add('out');
+      p.banner.textContent = (c && c.result === 'cram') ? 'OUT — crammed an extra hit' : 'OUT — dropped a 16th';
+      p.banner.className = 'rogue-hud-banner';
+      log('PLAYER ' + p.idx + ' is OUT (' + (c ? c.result : 'fail') + ') — survived ' + fmtMMSS(p.survivalSec) + ' to ' + p.diedAtBpm + ' BPM.');
+      if (players.every(pl => !pl.alive)) { MetronomeEngine.onSchedule(null); setTimeout(() => endRun('complete'), 120); }
+    }
+
+    // ── HUD writers (reuse the live game's .rogue-* element classes) ──
+    function setHudVerdict(p, rank, off, text) {
+      if (rank === -1) { p.verdict.textContent = text || '—'; p.verdict.className = 'rogue-hud-verdict'; return; }
+      p.verdict.textContent = text || verdictWord(rank, off);
+      p.verdict.className = 'rogue-hud-verdict ' + verdictClass(rank, off);
+    }
+    // Live HUD gauge — mirrors the game's scoreRank(): a filling meter of good beats
+    // over the full target (fills, never drops), identical in both modes. The mode-
+    // specific final grade lives in finalRankPct (endurance for SD, accuracy for TT).
+    function liveRankPct(p) {
+      const pct = Math.max(0, Math.min(100, Math.round(p.tally.good / (targetBeats || 1) * 100)));
+      return { rank: rankFor(pct), pct };
+    }
+    function updateScoreHud(p) {
+      const { rank, pct } = liveRankPct(p);
+      p.rankEl.textContent = rank; p.rankEl.className = 'rogue-hud-rank ' + rankClass(rank);
+      p.gauge.style.width = pct + '%'; p.gauge.style.background = RANK_COLOR[rank] || 'var(--cyan)';
+    }
+    function addLaneCell(p, cls) {
+      p.lane.querySelectorAll('.rogue-lane-cell.leaving').forEach(c => c.remove());
+      const cell = document.createElement('div');
+      cell.className = 'rogue-lane-cell ' + cls;
+      p.lane.appendChild(cell);
+      while (p.lane.children.length > LANE_VISIBLE + 1) p.lane.removeChild(p.lane.firstChild);
+      if (p.lane.children.length > LANE_VISIBLE) { const old = p.lane.firstChild; old.classList.add('leaving'); setTimeout(() => { if (old.parentNode) old.remove(); }, 240); }
+    }
+
+    function clearPendingEvals() { pendingEvalTimers.forEach(t => clearTimeout(t)); pendingEvalTimers = []; }
 
     function endRun(reason) {
-      MetronomeEngine.stop();
-      MetronomeEngine.onSchedule(null);
-      if (judgeTimer) { clearInterval(judgeTimer); judgeTimer = null; }
       if (!runActive) return;
-      runActive = false;
-      $('startBtn').disabled = false; $('stopBtn').disabled = true;
-      showResult(reason);
+      runActive = false; runGating = false;
+      MetronomeEngine.onSchedule(null); MetronomeEngine.stop();
+      clearPendingEvals();
+      players.forEach(p => { if (p.alive && mode === 'suddendeath') { p.survivalSec = gatingStartPerf ? (performance.now() - gatingStartPerf) / 1000 : 0; } });
+      if (reason === 'stopped') { log('Run stopped by user.'); document.body.classList.remove('vs-run'); return; }
+      showResults();
     }
 
-    function showResult(reason) {
-      const p1 = players.p1, p2 = players.p2;
-      const banner = $('winnerBanner');
-      let text;
-      if (p1.alive && p2.alive) {
-        text = 'BOTH SURVIVED ' + maxSlots + ' 16ths — try a higher BPM or more bars.';
-      } else if (p1.cleared === p2.cleared) {
-        text = "IT'S A TIE — " + p1.cleared + ' 16ths each.';
-      } else {
-        const winner = p1.cleared > p2.cleared ? 'P1' : 'P2';
-        text = winner + ' WINS — ' + Math.max(p1.cleared, p2.cleared) + ' vs ' + Math.min(p1.cleared, p2.cleared) + ' 16ths.';
+    // ════════════════════════════════════════════════════════════════════════
+    // RESULTS — per-player result card (table + rank emblem + timeline) + winner.
+    // ════════════════════════════════════════════════════════════════════════
+    function finalRankPct(p) {
+      if (mode === 'suddendeath') {
+        if (p.alive) return { rank: 'SS', pct: 100 };       // survived the whole target
+        const totalSixteenths = targetBeats * 4;
+        const pct = totalSixteenths ? Math.round(Math.min(100, p.hitsCleared / totalSixteenths * 100)) : 0;
+        return { rank: rankFor(pct), pct };
       }
-      banner.textContent = text;
-      banner.classList.add('show');
-      log((reason || 'Run finished.') + ' ' + text);
+      const t = p.tally, total = t.good + t.neutral + t.bad;
+      const pct = total ? Math.round(t.good / total * 100) : 0;
+      return { rank: rankFor(pct), pct };
+    }
+    function resultTableHtml(p) {
+      const t = p.tally, total = t.good + t.neutral + t.bad;
+      const pct = total ? Math.round(t.good / total * 100) : 0;
+      const split = t.neutral ? ' <span class="rl-split">(' + t.rush + ' rush · ' + t.drag + ' drag)</span>' : '';
+      const row = (cls, label, n, extra) => '<div class="rogue-result-row"><span class="rogue-hex ' + cls + '"></span><span class="rl-lbl">' + label + (extra || '') + '</span><span class="rl-n">' + n + '</span></div>';
+      const { rank } = finalRankPct(p);
+      const rankCell = '<span class="rogue-result-rank ' + rankClass(rank) + ' has-art" data-rank="' + rank + '">' +
+        '<img class="rank-art" src="/assets/img/rank/' + rank.toLowerCase() + '.png?v=3" alt="Rank ' + rank + '" ' +
+        'onerror="var p=this.parentNode;p.classList.remove(\'has-art\');p.textContent=\'' + rank + '\';"></span>';
+      return '<div class="rogue-result">' + row('rogue-good', 'Good', t.good) + row('rogue-drag', 'Neutral', t.neutral, split) +
+        row('rogue-bad', 'Bad', t.bad) + '<div class="rogue-result-score">' + rankCell + '<span class="rogue-result-pct">' + pct + '%</span></div></div>';
+    }
+    function hitTimelineHtml(p) {
+      const log = p.hitLog || []; if (!log.length) return '';
+      const W = 520, H = 132, padL = 44, padR = 12, padT = 14, padB = 14;
+      const plotW = W - padL - padR, plotH = H - padT - padB, mid = padT + plotH / 2;
+      let maxAbs = 30; log.forEach(h => { if (h.off != null) maxAbs = Math.max(maxAbs, Math.abs(h.off)); });
+      maxAbs = Math.ceil(maxAbs / 10) * 10;
+      const n = log.length;
+      const x = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+      const y = off => mid + (off / maxAbs) * (plotH / 2);
+      const colorFor = h => { if (h.off == null || h.rank === 2) return '#ff5566'; if (h.rank === 0) return '#00e87a'; return h.off < 0 ? '#ff9d3a' : '#ffd24a'; };
+      let segs = '', dots = '';
+      for (let i = 0; i < n; i++) {
+        const h = log[i];
+        if (h.off == null) { const cx = x(i).toFixed(1); dots += '<path d="M' + (cx - 3) + ' ' + (mid - 3) + ' l6 6 M' + (cx - 3) + ' ' + (mid + 3) + ' l6 -6" stroke="#ff5566" stroke-width="1.5"/>'; continue; }
+        const cx = x(i), cy = y(h.off);
+        if (i > 0 && log[i - 1].off != null) { const px = x(i - 1), py = y(log[i - 1].off); segs += '<line x1="' + px.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y2="' + cy.toFixed(1) + '" stroke="' + colorFor(h) + '" stroke-width="1.6"/>'; }
+        dots += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2" fill="' + colorFor(h) + '"/>';
+      }
+      const grid = '<line x1="' + padL + '" y1="' + mid + '" x2="' + (W - padR) + '" y2="' + mid + '" stroke="rgba(150,180,200,.35)" stroke-width="1"/><line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="rgba(150,180,200,.18)" stroke-width="1"/>';
+      const labels = '<text x="4" y="' + (padT + 8) + '" fill="#8ab0c8" font-size="10" font-weight="700">RUSH</text><text x="6" y="' + (mid + 3) + '" fill="#8ab0c8" font-size="9">0</text><text x="4" y="' + (H - padB + 2) + '" fill="#8ab0c8" font-size="10" font-weight="700">DRAG</text>';
+      const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="rl-timeline-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Per-hit timing timeline">' + grid + segs + dots + labels + '</svg>';
+      return '<details class="rl-timeline"><summary>Show hit timeline (' + n + ' sixteenths)</summary>' + svg + '</details>';
+    }
+    function playerContextLine(p) {
+      if (mode === 'suddendeath') {
+        return p.alive ? 'Survived the full ' + gameMins + ':00 · no dropped beat'
+          : 'Survived ' + fmtMMSS(p.survivalSec) + ' · out at ' + p.diedAtBpm + ' BPM';
+      }
+      return gameBpm + ' BPM · ' + gameMins + ' min';
     }
 
-    // ── status / log helpers ─────────────────────────────────────────────
-    function setStatus(msg, isErr) {
-      const el = $('midiStatus');
-      el.textContent = msg;
-      el.style.color = isErr ? '#ff5566' : '#8ab0c8';
-    }
-    function log(msg) {
-      const el = $('log');
-      const line = document.createElement('div');
-      line.textContent = msg;
-      el.appendChild(line);
-      el.scrollTop = el.scrollHeight;
+    function showResults() {
+      const r1 = finalRankPct(P1), r2 = finalRankPct(P2);
+      // Winner: SD → last alive, else more survived/cleared; TT → higher green %.
+      let winnerIdx = 0;   // 0 = tie
+      if (mode === 'suddendeath') {
+        if (P1.alive && !P2.alive) winnerIdx = 1;
+        else if (P2.alive && !P1.alive) winnerIdx = 2;
+        else if (P1.alive && P2.alive) winnerIdx = r1.pct === r2.pct ? 0 : (r1.pct > r2.pct ? 1 : 2);
+        else { const a = P1.hitsCleared, b = P2.hitsCleared; winnerIdx = a === b ? 0 : (a > b ? 1 : 2); }
+      } else { winnerIdx = r1.pct === r2.pct ? 0 : (r1.pct > r2.pct ? 1 : 2); }
+
+      $('res1Body').innerHTML = '<div class="rogue-diag-line">' + playerContextLine(P1) + '</div>' + resultTableHtml(P1) + hitTimelineHtml(P1);
+      $('res2Body').innerHTML = '<div class="rogue-diag-line">' + playerContextLine(P2) + '</div>' + resultTableHtml(P2) + hitTimelineHtml(P2);
+      $('res1').classList.toggle('winner', winnerIdx === 1);
+      $('res2').classList.toggle('winner', winnerIdx === 2);
+      const w = $('winner');
+      if (winnerIdx === 0) { w.textContent = "IT'S A TIE — " + r1.pct + '% each'; w.style.color = '#8ab0c8'; }
+      else { w.textContent = 'PLAYER ' + winnerIdx + ' WINS'; w.style.color = winnerIdx === 1 ? '#00e87a' : '#ff7ad9'; }
+      log('Result — P1 ' + r1.rank + ' ' + r1.pct + '% · P2 ' + r2.rank + ' ' + r2.pct + '% → ' + (winnerIdx === 0 ? 'tie' : 'P' + winnerIdx + ' wins'));
+
+      $('overlay').classList.add('visible');
+      // In SD, if all players died the run is a loss — play fail stinger. Otherwise play the complete stinger.
+      const isCompleteRun = mode !== 'suddendeath' || players.some(p => p.alive);
+      try {
+        if (window.GameSfx) {
+          if (!isCompleteRun) {
+            window.GameSfx('fail');
+          } else {
+            const rk = winnerIdx === 1 ? r1.rank : winnerIdx === 2 ? r2.rank : r1.rank;
+            window.GameSfx(window.GameSfx.completeKey ? window.GameSfx.completeKey(mode, mode === 'suddendeath', rk) : 'completeTT-DCBA');
+          }
+        }
+      } catch (e) {}
+      // Reveal rank emblems a beat after the cards land — rank SFX only on a complete run (mirrors live game).
+      clearTimeout(revealRankTimer);
+      revealRankTimer = setTimeout(() => {
+        document.querySelectorAll('#overlay .rogue-result-rank').forEach(el => el.classList.add('revealed'));
+        try { if (window.GameSfx && isCompleteRun) { window.GameSfx('rank' + r1.rank); window.GameSfx('rank' + r2.rank); } } catch (e) {}
+      }, 950);
     }
 
-    $('connectBtn').addEventListener('click', connectMidi);
+    // ── log helper ──
+    function log(msg) { const el = $('log'); const line = document.createElement('div'); line.textContent = msg; el.appendChild(line); el.scrollTop = el.scrollHeight; }
+
+    selectMode('timetrial'); renderBpm(); renderMins(); updateGates();
   });
   </script>
 </body>
