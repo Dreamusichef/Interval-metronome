@@ -51,6 +51,7 @@
     body.vs-run #setupView { display: none; }
     body.vs-run #runView { display: block; }
     .vs-hud-wrap { display: flex; gap: 18px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+    /* Each HUD: flex-basis 320px means two fit side-by-side on ≥680px, one-per-row below that. */
     .vs-col { flex: 1 1 320px; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 6px;
       padding: 14px 12px; background: linear-gradient(180deg, rgba(12,24,40,.55), rgba(7,13,24,.55)); border: 1px solid rgba(0,200,255,.16); }
     .vs-col.p1 { border-top: 3px solid #00e87a; }
@@ -62,8 +63,13 @@
     .vs-col.out .vs-col-name::after { content: ' · OUT'; color: #ff5566; }
     .vs-mid { display: flex; align-items: center; justify-content: center; font-family: 'Orbitron'; font-weight: 900;
       color: #8ab0c8; font-size: 1.4rem; align-self: center; padding: 0 4px; }
-    /* the verdict in two columns can be a touch smaller so both fit on a laptop */
+    /* verdict slightly smaller so two columns both fit on a laptop without overflow */
     .vs-col .rogue-hud-verdict { font-size: 2.8rem; }
+    /* narrow screens: each col goes full-width, VS divider becomes a thin horizontal rule */
+    @media (max-width: 680px) {
+      .vs-col { flex-basis: 100%; max-width: 100%; }
+      .vs-mid { width: 100%; padding: 6px 0; border-top: 1px solid rgba(0,200,255,.15); border-bottom: 1px solid rgba(0,200,255,.15); font-size: 1rem; }
+    }
     .vs-runbanner { font-family: 'Orbitron'; font-weight: 700; text-align: center; color: #9fe7ff; letter-spacing: .05em;
       margin: 4px 0 14px; min-height: 1.2em; }
 
