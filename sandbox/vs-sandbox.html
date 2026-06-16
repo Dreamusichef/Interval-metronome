@@ -388,7 +388,7 @@
     // ════════════════════════════════════════════════════════════════════════
     // CALIBRATION — two-pass (quarters → gross, 16ths → refined), P1 pad only.
     // ════════════════════════════════════════════════════════════════════════
-    let meanOffset = 0, calGrossOffset = 0, calState = null, calibrated = false;
+    let meanOffset = 0, calGrossOffset = 0, calState = null, calibrated = false, calPass1Done = false;
     function getCalBpm() { return Math.max(40, Math.min(200, parseInt($('calBpm').value, 10) || 100)); }
 
     $('calQuartersBtn').addEventListener('click', () => {
@@ -396,7 +396,7 @@
       startCalPass(1);
     });
     $('cal16Btn').addEventListener('click', () => {
-      if (!calGrossOffset && calGrossOffset !== 0) { setStatus($('calStatus'), 'Calibrate quarters first.', true); return; }
+      if (!calPass1Done) { setStatus($('calStatus'), 'Calibrate quarters first.', true); return; }
       startCalPass(2);
     });
     $('manualBtn').addEventListener('click', () => {
@@ -454,7 +454,7 @@
       if (pass === 1) {
         const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
         if (gross.sampleCount < CAL_MIN_SAMPLES) { setStatus($('calStatus'), 'Quarters: only ' + gross.sampleCount + ' hits — play a hit on every click, then retry.', true); log('Calibration aborted — not enough quarter hits.'); return; }
-        calGrossOffset = gross.meanOffset; meanOffset = gross.meanOffset; calibrated = true;
+        calGrossOffset = gross.meanOffset; meanOffset = gross.meanOffset; calibrated = true; calPass1Done = true;
         $('cal16Btn').disabled = false;
         setStatus($('calStatus'), 'Quarters @ ' + passBpm + ' BPM: offset ' + signed(calGrossOffset) + 'ms (' + gross.sampleCount + ' hits). Optional: refine 16ths.');
         log('Pass 1 (quarters) done — gross offset ' + signed(calGrossOffset) + 'ms.'); updateGates();
@@ -517,7 +517,7 @@
         rankEl:  $('hud' + idx + 'Rank'),
         gauge:   $('hud' + idx + 'Gauge'),
         bpmEl:   $('hud' + idx + 'Bpm'),
-        events: [], lastTs: 0, alive: true, leadInDone: false,
+        events: [], lastTs: 0, alive: true, leadInDone: false, pendingFirstGated: false,
         hitsCleared: 0, hitLog: [], tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },
         curBeatId: -1, curRank: 0, curOff: 0,
         diedAtBpm: null, survivalSec: 0,
@@ -531,7 +531,7 @@
 
     $('startBtn').addEventListener('click', startRun);
     $('stopBtn').addEventListener('click', () => endRun('stopped'));
-    $('overlayClose').addEventListener('click', () => { $('overlay').classList.remove('visible'); document.body.classList.remove('vs-run'); resetSetupHud(); });
+    $('overlayClose').addEventListener('click', () => { $('overlay').classList.remove('visible'); document.body.classList.remove('vs-run'); });
 
     function startRun() {
       if (p1Note == null || p2Note == null || !calibrated) { updateGates(); return; }
@@ -689,7 +689,7 @@
       MetronomeEngine.onSchedule(null); MetronomeEngine.stop();
       clearPendingEvals();
       players.forEach(p => { if (p.alive && mode === 'suddendeath') { p.survivalSec = gatingStartPerf ? (performance.now() - gatingStartPerf) / 1000 : 0; } });
-      if (reason === 'stopped') { log('Run stopped by user.'); document.body.classList.remove('vs-run'); resetSetupHud(); return; }
+      if (reason === 'stopped') { log('Run stopped by user.'); document.body.classList.remove('vs-run'); return; }
       showResults();
     }
 
@@ -771,16 +771,25 @@
       log('Result — P1 ' + r1.rank + ' ' + r1.pct + '% · P2 ' + r2.rank + ' ' + r2.pct + '% → ' + (winnerIdx === 0 ? 'tie' : 'P' + winnerIdx + ' wins'));
 
       $('overlay').classList.add('visible');
-      // Reveal rank emblems a beat after the cards land (+ stinger), like the game.
-      try { if (window.GameSfx) { const rk = winnerIdx === 1 ? r1.rank : r2.rank; window.GameSfx(window.GameSfx.completeKey ? window.GameSfx.completeKey(mode, mode === 'suddendeath', rk) : 'completeTT-DCBA'); } } catch (e) {}
+      // In SD, if all players died the run is a loss — play fail stinger. Otherwise play the complete stinger.
+      const isCompleteRun = mode !== 'suddendeath' || players.some(p => p.alive);
+      try {
+        if (window.GameSfx) {
+          if (!isCompleteRun) {
+            window.GameSfx('fail');
+          } else {
+            const rk = winnerIdx === 1 ? r1.rank : winnerIdx === 2 ? r2.rank : r1.rank;
+            window.GameSfx(window.GameSfx.completeKey ? window.GameSfx.completeKey(mode, mode === 'suddendeath', rk) : 'completeTT-DCBA');
+          }
+        }
+      } catch (e) {}
+      // Reveal rank emblems a beat after the cards land — rank SFX only on a complete run (mirrors live game).
       clearTimeout(revealRankTimer);
       revealRankTimer = setTimeout(() => {
         document.querySelectorAll('#overlay .rogue-result-rank').forEach(el => el.classList.add('revealed'));
-        try { if (window.GameSfx) { window.GameSfx('rank' + r1.rank); window.GameSfx('rank' + r2.rank); } } catch (e) {}
+        try { if (window.GameSfx && isCompleteRun) { window.GameSfx('rank' + r1.rank); window.GameSfx('rank' + r2.rank); } } catch (e) {}
       }, 950);
     }
-
-    function resetSetupHud() { /* nothing persistent to tear down; setup view returns automatically */ }
 
     // ── log helper ──
     function log(msg) { const el = $('log'); const line = document.createElement('div'); line.textContent = msg; el.appendChild(line); el.scrollTop = el.scrollHeight; }
