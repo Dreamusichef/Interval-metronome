@@ -472,6 +472,7 @@ const RogueliteMode = (() => {
 
   // ── DOM refs (populated in initUI) ─────────────────────────────────────────
   let el = {};
+  let applyGameModeToggle = null;
 
   // ───────────────────────────────────────────────────────────────────────────
   // MIDI
@@ -1823,13 +1824,30 @@ const RogueliteMode = (() => {
     const C = window.Cloud;
     if (!C || !C.claimBetaSpot) return true;   // cloud not available → don't lock out
     const u = C.getSessionUser ? await C.getSessionUser() : (C.currentUser && C.currentUser());
-    if (!u) { showBetaGate('signin'); return false; }
+    if (!u) {
+      try { sessionStorage.setItem('cloud:reopenGameMode', '1'); } catch (e) {}
+      showBetaGate('signin');
+      // Localhost: skip the Google button — open the dev user picker immediately.
+      if (window.__CLOUD_MODE__ === 'mock' && C.signIn) C.signIn();
+      return false;
+    }
     showBetaGate('checking');
     let res = 'error';
     try { res = await C.claimBetaSpot(); } catch (e) {}
     if (res === 'ok') { betaOk = true; hideBetaGate(); return true; }
     showBetaGate(res === 'full' ? 'full' : 'error');
     return false;
+  }
+
+  // After sign-in (Google redirect on prod, dev picker on localhost), restore Game Mode.
+  async function reopenGameModeAfterSignIn() {
+    try {
+      if (sessionStorage.getItem('cloud:reopenGameMode') !== '1') return;
+      sessionStorage.removeItem('cloud:reopenGameMode');
+      if (!applyGameModeToggle || !el.toggle) return;
+      el.toggle.checked = true;
+      await applyGameModeToggle();
+    } catch (e) {}
   }
 
   // BPM ladder stepper (Time Trial / Sudden Death): snaps to 10s, clamps 60–240.
@@ -1945,10 +1963,18 @@ const RogueliteMode = (() => {
         try { MetronomeEngine.playWelcomeGreeting(); } catch (e) {}
       }
     };
+    applyGameModeToggle = applyToggle;
     el.toggle.addEventListener('change', applyToggle);
 
+    // Localhost beta gate: dev picker instead of Google OAuth.
+    if (window.__CLOUD_MODE__ === 'mock') {
+      if (el.betaSignIn) el.betaSignIn.textContent = 'Dev sign in ▾';
+      const signinMsg = el.betaGate && el.betaGate.querySelector('.beta-gate-state[data-state="signin"] .beta-gate-msg');
+      if (signinMsg) signinMsg.textContent = 'Game Mode uses a local mock database on localhost. Pick a dev user to continue.';
+    }
+
     // Beta gate controls.
-    if (el.betaGateClose) el.betaGateClose.addEventListener('click', () => { hideBetaGate(); el.toggle.checked = false; el.body.classList.remove('visible'); window.__gameModeActive = false; });
+    if (el.betaGateClose) el.betaGateClose.addEventListener('click', () => { hideBetaGate(); el.toggle.checked = false; el.body.classList.remove('visible'); window.__gameModeActive = false; try { sessionStorage.removeItem('cloud:reopenGameMode'); } catch (e) {} });
     if (el.betaSignIn) el.betaSignIn.addEventListener('click', () => { try { window.Cloud && window.Cloud.signIn(); } catch (e) {} });
     if (el.betaRetry) el.betaRetry.addEventListener('click', () => { el.toggle.checked = true; applyToggle(); });
     if (el.betaWaitForm) el.betaWaitForm.addEventListener('submit', async (e) => {
@@ -1966,13 +1992,9 @@ const RogueliteMode = (() => {
 
     // Returning from a Google sign-in redirect reloads the page; re-open Game Mode
     // so the user lands back where they were (the sign-in button lives in here).
-    try {
-      if (sessionStorage.getItem('cloud:reopenGameMode') === '1') {
-        sessionStorage.removeItem('cloud:reopenGameMode');
-        el.toggle.checked = true;
-        applyToggle();
-      }
-    } catch (e) {}
+    // On localhost the dev picker fires cloud:signedIn instead (no page reload).
+    document.addEventListener('cloud:signedIn', () => { reopenGameModeAfterSignIn(); });
+    reopenGameModeAfterSignIn();
 
     el.instrBtns.forEach(b => b.addEventListener('click', () => selectInstrument(b.dataset.instr)));
     el.inputBtns.forEach(b => b.addEventListener('click', () => selectInputSource(b.dataset.src)));
