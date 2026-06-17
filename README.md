@@ -38,7 +38,7 @@ Edit any `.js` / `.html` / `.css` file, refresh the browser, and your change is 
   [node:test runner](https://marketplace.visualstudio.com/items?itemName=connor4312.nodejs-testing)
   extension (recommended via `.vscode/extensions.json`).
 - **Deploy = push to `main`.** GitHub Pages auto-publishes in ~1 minute.
-- **Secrets:** the Supabase **anon public key** is committed in `assets/js/cloud.js` and is safe
+- **Secrets:** the Supabase **anon public key** is committed in `assets/js/cloud-supabase.js` and is safe
   (Row Level Security protects the data). Never commit a `service_role` key or any other
   API secrets — those belong server-side only.
 
