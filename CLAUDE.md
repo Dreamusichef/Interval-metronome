@@ -30,6 +30,11 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Local preview:** `npx http-server -p 8127 -c-1` (see `.claude/launch.json`), or the
   Claude Code preview tool (server name `metronome`). NOTE: the preview screenshot tool
   tends to hang on index.html (animated canvas) — use `preview_eval` to read state instead.
+  **On localhost / 127.0.0.1 the app uses a localStorage mock DB** (`cloud-mock.js`) instead
+  of production Supabase — dev sign-in picker (Alex / Wei / Sam), isolated leaderboards.
+  Seed data applies on first load per `STORAGE_KEY` in cloud-mock.js; bump that key when
+  seed users/runs change (or run `Cloud.resetMockData()` in the console).
+  Deployed hosts still use real Supabase + Google OAuth.
 - **Validate JS before committing:** `node --check <file>.js`.
 
 ## Conventions (follow these)
@@ -40,7 +45,7 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Database/DDL: Claude does NOT run SQL.** Write the SQL and **paste it in chat** for the
   human to run in the Supabase SQL editor (owner creds required). Pasting in chat is the
   user's stated preference (not a separate .sql file unless asked).
-- **Secrets:** the Supabase **anon public key IS committed** in cloud.js (safe — RLS
+- **Secrets:** the Supabase **anon public key IS committed** in cloud-supabase.js (safe — RLS
   protects data). The **service_role** key must NEVER be committed/shared. Any third-party
   API keys (e.g. Kit) must live server-side (Supabase Edge Function secret), never in client JS.
 - `.claude/settings.local.json` is gitignored. Source-art originals (`Rank *.png`,
@@ -58,7 +63,9 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
   ranks, result reveal sequence, beta gate, latency compensation. (Biggest file.)
 - `assets/js/achievements.js` — trophy definitions + evaluation (shared by game + stats pages).
 - `assets/js/sfx.js` — result-screen reward sounds (`window.GameSfx`), per-key volume, mp3 manifest.
-- `assets/js/cloud.js` — Supabase auth (Google), run saving, leaderboard RPC, beta claim/waitlist.
+- `assets/js/cloud.js` — Cloud facade (`window.Cloud`); picks mock vs Supabase by hostname.
+- `assets/js/cloud-supabase.js` — production backend: Google OAuth, runs, leaderboard RPC, beta.
+- `assets/js/cloud-mock.js` — localhost-only localStorage mock DB + dev user picker.
 - `assets/js/stats.js` — stats page logic.
 - `assets/js/audio-input.js`, `assets/js/onset-detector.js` — mic/interface hit detection (AudioWorklet).
 - `assets/js/sounds.js` — base64 metronome/cue samples (large; lazy-loaded).
