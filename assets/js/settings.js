@@ -79,4 +79,25 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && wanted()) acquire();
   });
+
+  // ── Provide Feedback (Tally form with hidden-field URL params) ──
+  const FEEDBACK_URL = 'https://tally.so/r/kdr1od';
+  const feedbackBtn = document.getElementById('feedbackBtn');
+
+  function feedbackFormUrl() {
+    const user = window.Cloud && Cloud.currentUser ? Cloud.currentUser() : null;
+    const params = new URLSearchParams({
+      app_version: window.APP_VERSION || '',
+      user_agent: navigator.userAgent,
+      user_id: (user && user.id) || '',
+      created_at: new Date().toISOString(),
+    });
+    return `${FEEDBACK_URL}?${params}`;
+  }
+
+  if (feedbackBtn) {
+    feedbackBtn.addEventListener('click', () => {
+      window.open(feedbackFormUrl(), '_blank', 'noopener,noreferrer');
+    });
+  }
 })();
