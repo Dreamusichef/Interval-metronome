@@ -121,6 +121,15 @@
           </form>
           <div class="beta-wait-msg" id="betaWaitMsg"></div>
         </div>
+        <div class="beta-gate-state" data-state="notallowed" hidden>
+          <div class="beta-gate-title">Invite-only beta</div>
+          <p class="beta-gate-msg">Game Mode is invite-only right now. Drop your email and we'll add you to the list — we'll send your invite when a spot opens.</p>
+          <form class="beta-wait" id="betaInviteForm">
+            <input type="email" id="betaInviteEmail" placeholder="you@email.com" required>
+            <button type="submit" class="rogue-btn">Request access</button>
+          </form>
+          <div class="beta-wait-msg" id="betaInviteMsg"></div>
+        </div>
         <div class="beta-gate-state" data-state="error" hidden>
           <div class="beta-gate-title">Couldn't verify access</div>
           <p class="beta-gate-msg">Something went wrong checking your beta spot. Please try again.</p>
@@ -510,7 +519,7 @@
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
   <script defer src="assets/js/settings.js?v=20260616b"></script>
-  <script defer src="assets/js/roguelite.js?v=20260615c"></script>
+  <script defer src="assets/js/roguelite.js?v=20260618a"></script>
   <!-- Cloud: localhost → mock DB; deployed → Supabase. Optional — game works without it. -->
   <script>
     (function loadCloudScripts() {
