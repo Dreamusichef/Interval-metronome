@@ -1871,7 +1871,7 @@ const RogueliteMode = (() => {
     let res = 'error';
     try { res = await C.claimBetaSpot(); } catch (e) {}
     if (res === 'ok') { betaOk = true; hideBetaGate(); return true; }
-    showBetaGate(res === 'full' ? 'full' : 'error');
+    showBetaGate(res === 'full' ? 'full' : res === 'not-allowed' ? 'notallowed' : 'error');
     return false;
   }
 
@@ -1916,6 +1916,9 @@ const RogueliteMode = (() => {
       betaWaitForm: document.getElementById('betaWaitForm'),
       betaWaitEmail:document.getElementById('betaWaitEmail'),
       betaWaitMsg:  document.getElementById('betaWaitMsg'),
+      betaInviteForm: document.getElementById('betaInviteForm'),
+      betaInviteEmail:document.getElementById('betaInviteEmail'),
+      betaInviteMsg:  document.getElementById('betaInviteMsg'),
       betaRetry:    document.getElementById('betaRetry'),
       instrBtns:    Array.from(document.querySelectorAll('.rogue-instr-btn')),
       instrStatus:  document.getElementById('rogueInstrStatus'),
@@ -2021,6 +2024,16 @@ const RogueliteMode = (() => {
       try { const r = await (window.Cloud && window.Cloud.joinWaitlist(email)); err = r && r.error; } catch (x) { err = x; }
       if (el.betaWaitMsg) el.betaWaitMsg.textContent = err ? 'Could not save — check the email and retry.' : "You're on the list! We'll be in touch.";
       if (!err && el.betaWaitForm) el.betaWaitForm.reset();
+    });
+    // Invite-only (not-allowlisted) waitlist form — same wiring as the "full" form.
+    if (el.betaInviteForm) el.betaInviteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = el.betaInviteEmail ? el.betaInviteEmail.value : '';
+      if (el.betaInviteMsg) el.betaInviteMsg.textContent = 'Adding you…';
+      let err = null;
+      try { const r = await (window.Cloud && window.Cloud.joinWaitlist(email)); err = r && r.error; } catch (x) { err = x; }
+      if (el.betaInviteMsg) el.betaInviteMsg.textContent = err ? 'Could not save — check the email and retry.' : "You're on the list! We'll be in touch.";
+      if (!err && el.betaInviteForm) el.betaInviteForm.reset();
     });
     // Android-Chrome label fallback, matching the existing toggles.
     const lbl = el.toggle.closest('.toggle-switch');
