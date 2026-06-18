@@ -517,8 +517,8 @@
       var h = location.hostname;
       window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/cloud-mock.js?v=20260615f', 'assets/js/cloud.js?v=20260615f']
-        : ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260615f', 'assets/js/cloud.js?v=20260615f'];
+        ? ['assets/js/cloud-mock.js?v=20260615f', 'assets/js/cloud.js?v=20260618a']
+        : ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260615f', 'assets/js/cloud.js?v=20260618a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');

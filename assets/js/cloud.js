@@ -111,7 +111,13 @@ const Cloud = (() => {
 
   async function joinWaitlist(email) {
     if (!init()) return { error: 'no-client' };
-    return backend.joinWaitlist(email);
+    // Basic format guard before hitting the DB. The real abuse protection is the
+    // server-side rate-limit RLS policy on beta_waitlist (issue #49); this just
+    // rejects obviously malformed input (incl. programmatic callers bypassing the
+    // form's required+type=email validation).
+    const e = (email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return { error: 'invalid-email' };
+    return backend.joinWaitlist(e);
   }
 
   async function saveRun(record) {
