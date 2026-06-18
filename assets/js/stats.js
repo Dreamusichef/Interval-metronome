@@ -34,6 +34,8 @@ function esc(s) {
 }
 
 // ── Auth wiring ──────────────────────────────────────────────────────────────
+// Cloud scripts load async (see stats.html loadCloudScripts); poll until Cloud
+// exists, then subscribe via onAuth — do not read currentUser() synchronously.
 function initAuthBars() {
   if (!window.Cloud) { setTimeout(initAuthBars, 100); return; }
   window.Cloud.mountAuthBar($('cloudAuthBar'));

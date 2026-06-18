@@ -99,6 +99,13 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - Perf: result reveal optimized (no animated filters); audio is mp3.
 
 ## Known gotchas
+- **Cloud auth timing:** `index.html` / `stats.html` load cloud scripts **async** (mock or
+  Supabase CDN → backend → `cloud.js`), while `stats.js` / `roguelite.js` run on `defer` and
+  may subscribe **after** `getSession()` resolves. UI must use `Cloud.onAuth(fn)`, never a
+  one-shot `currentUser()` on load. Backends must set `ready = true` **before** the first
+  `onAuthChange` call (`cloud-supabase.js` getSession, `cloud-mock.js` init); `cloud.js`
+  `onAuth` also re-checks `backend.isReady()` for late registrants. Breaking this leaves
+  Stats stuck on the signed-out screen even when a Google session exists.
 - **iOS/iPadOS: no Web MIDI** in any browser → MIDI mode can't work there; use audio-input.
   Web MIDI works on desktop (Chrome/Edge/Firefox) + Android Chrome.
 - **Laptop audio latency drifts** (power state) → 20–30ms calibration swings; the latency-comp
