@@ -26,7 +26,11 @@ function fmtMMSS(sec) {
 }
 function rankBetter(a, b) { return (RANK_ORDER[a] ?? -1) > (RANK_ORDER[b] ?? -1) ? a : b; }
 function rankPill(rank) {
-  return '<span class="stats-rank" style="color:' + (RANK_COLOR[rank] || '#fff') + '">' + (rank || '–') + '</span>';
+  // Whitelist to the 7 real ranks. `rank` comes from the DB; a spoofed row could
+  // carry arbitrary text, so anything not in RANK_ORDER renders as the neutral '–'
+  // and never reaches the DOM (stored-XSS guard, issue #48).
+  const r = (rank in RANK_ORDER) ? rank : '';
+  return '<span class="stats-rank" style="color:' + (RANK_COLOR[r] || '#fff') + '">' + (r || '–') + '</span>';
 }
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -170,8 +174,11 @@ async function renderGlobal() {
   }
 
   const body = rows.map((r, i) => {
+    // Only render https:// avatars — esc() blocks attribute breakout but not a
+    // javascript:/data: URL scheme. Google OAuth avatars are always https (#48).
+    const safeAvatar = (r.avatar_url && r.avatar_url.startsWith('https://')) ? esc(r.avatar_url) : '';
     const who = '<span class="stats-player">' +
-      (r.avatar_url ? '<img class="cloud-avatar sm" src="' + esc(r.avatar_url) + '" referrerpolicy="no-referrer">' : '') +
+      (safeAvatar ? '<img class="cloud-avatar sm" src="' + safeAvatar + '" referrerpolicy="no-referrer">' : '') +
       esc(r.display_name || 'Drummer') + '</span>';
     const pos = '<span class="stats-pos' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span>';
     if (state.mode === 'suddendeath') return tr([ pos, who, fmtMMSS(r.survival_sec) ]);
