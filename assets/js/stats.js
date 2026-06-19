@@ -110,9 +110,13 @@ async function render() {
   else await renderGlobal();
 }
 
+function validRuns(runs) {
+  return runs.filter(r => r.valid !== false);
+}
+
 async function renderPersonal() {
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
-  if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
+  if (!myRunsCache) myRunsCache = validRuns(await window.Cloud.myRuns());
   const runs = myRunsCache;
   const totalRuns = runs.length;
   const instr = state.instrument;
@@ -199,7 +203,7 @@ async function renderTrophies() {
   $('statsSummary').innerHTML = '';
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
   if (!window.Achievements) { $('statsContent').innerHTML = '<div class="stats-empty">Trophies unavailable.</div>'; return; }
-  if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
+  if (!myRunsCache) myRunsCache = validRuns(await window.Cloud.myRuns());
   const A = window.Achievements;
   const m = A.deriveMetrics(myRunsCache);
 
