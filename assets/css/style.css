@@ -1717,6 +1717,9 @@ body.rogue-run .rogue-section { display: none !important; }
    otherwise get flex-shrunk and look different from the others). */
 .settings-row .toggle-switch { flex: none; }
 .settings-row-btn { width: 100%; background: none; border: 0; border-top: 1px solid var(--border); margin-top: 4px; cursor: pointer; }
+.settings-feedback-btn { margin-top: 8px; }
+.settings-feedback-btn:hover .settings-row-label { color: var(--cyan); }
+.settings-feedback-btn:hover .settings-disclosure { color: var(--cyan); }
 .settings-disclosure { color: var(--text-dim); font-size: 0.9rem; transition: transform 0.15s; }
 .settings-shortcuts { border-top: 1px solid var(--border); padding-top: 8px; }
 .sc-group { font-family: 'Orbitron', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cyan); margin: 8px 0 3px; }

@@ -26,7 +26,11 @@ function fmtMMSS(sec) {
 }
 function rankBetter(a, b) { return (RANK_ORDER[a] ?? -1) > (RANK_ORDER[b] ?? -1) ? a : b; }
 function rankPill(rank) {
-  return '<span class="stats-rank" style="color:' + (RANK_COLOR[rank] || '#fff') + '">' + (rank || '–') + '</span>';
+  // Whitelist to the 7 real ranks. `rank` comes from the DB; a spoofed row could
+  // carry arbitrary text, so anything not in RANK_ORDER renders as the neutral '–'
+  // and never reaches the DOM (stored-XSS guard, issue #48).
+  const r = (rank in RANK_ORDER) ? rank : '';
+  return '<span class="stats-rank" style="color:' + (RANK_COLOR[r] || '#fff') + '">' + (r || '–') + '</span>';
 }
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -108,9 +112,13 @@ async function render() {
   else await renderGlobal();
 }
 
+function validRuns(runs) {
+  return runs.filter(r => r.valid !== false);
+}
+
 async function renderPersonal() {
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
-  if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
+  if (!myRunsCache) myRunsCache = validRuns(await window.Cloud.myRuns());
   const runs = myRunsCache;
   const totalRuns = runs.length;
   const instr = state.instrument;
@@ -145,8 +153,8 @@ async function renderPersonal() {
     });
     const ordered = Object.values(by).sort((a, b) => a.bpm - b.bpm);
     if (state.mode === 'suddendeath') {
-      const rows = ordered.map(o => tr([ o.bpm + ' BPM', fmtMMSS(o.longest), rankPill(o.rank), o.count ]));
-      $('statsContent').innerHTML = table(['BPM', 'Longest survived', 'Best rank', 'Runs'], rows);
+      const rows = ordered.map(o => tr([ o.bpm + ' BPM', fmtMMSS(o.longest), rankPill(o.rank), o.green + '%', o.count ]));
+      $('statsContent').innerHTML = table(['BPM', 'Longest survived', 'Best rank', 'Best %', 'Runs'], rows);
     } else {
       const rows = ordered.map(o => tr([ o.bpm + ' BPM', rankPill(o.rank), o.green + '%', o.count ]));
       $('statsContent').innerHTML = table(['BPM', 'Best rank', 'Best %', 'Runs'], rows);
@@ -172,8 +180,11 @@ async function renderGlobal() {
   }
 
   const body = rows.map((r, i) => {
+    // Only render https:// avatars — esc() blocks attribute breakout but not a
+    // javascript:/data: URL scheme. Google OAuth avatars are always https (#48).
+    const safeAvatar = (r.avatar_url && r.avatar_url.startsWith('https://')) ? esc(r.avatar_url) : '';
     const who = '<span class="stats-player">' +
-      (r.avatar_url ? '<img class="cloud-avatar sm" src="' + esc(r.avatar_url) + '" referrerpolicy="no-referrer">' : '') +
+      (safeAvatar ? '<img class="cloud-avatar sm" src="' + safeAvatar + '" referrerpolicy="no-referrer">' : '') +
       esc(r.display_name || 'Drummer') + '</span>';
     const pos = '<span class="stats-pos' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span>';
     if (state.mode === 'suddendeath') return tr([ pos, who, fmtMMSS(r.survival_sec) ]);
@@ -182,7 +193,7 @@ async function renderGlobal() {
   });
 
   const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Survived']
-    : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Green', 'Cleared']
+    : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Progress', 'Cleared']
     : ['#', 'Player', 'Grade', 'Green', 'Duration'];
   $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + where + '</div>' +
     table(head, body);
@@ -194,7 +205,7 @@ async function renderTrophies() {
   $('statsSummary').innerHTML = '';
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
   if (!window.Achievements) { $('statsContent').innerHTML = '<div class="stats-empty">Trophies unavailable.</div>'; return; }
-  if (!myRunsCache) myRunsCache = await window.Cloud.myRuns();
+  if (!myRunsCache) myRunsCache = validRuns(await window.Cloud.myRuns());
   const A = window.Achievements;
   const m = A.deriveMetrics(myRunsCache);
 

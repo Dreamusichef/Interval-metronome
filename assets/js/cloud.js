@@ -14,7 +14,8 @@
      signIn() / signOut()
      currentUser()                  — user object or null
      getSessionUser()               — fresh session read
-     saveRun(record)                — insert a run (no-op if signed out)
+     submitRun(record)              — validated insert via submit_run RPC / mock checks
+     saveRun(record)                — alias for submitRun
      myRuns()                       — this user's runs (for personal stats)
      leaderboard(mode, bpm, level, instrument) — global top-100 for a slice
      claimBetaSpot() / joinWaitlist(email)
@@ -123,12 +124,23 @@ const Cloud = (() => {
 
   async function joinWaitlist(email) {
     if (!init()) return { error: 'no-client' };
-    return backend.joinWaitlist(email);
+    // Basic format guard before hitting the DB. The real abuse protection is the
+    // server-side rate-limit RLS policy on beta_waitlist; this just rejects
+    // obviously malformed input (incl. programmatic callers bypassing the
+    // form's required+type=email validation).
+    const e = (email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return { error: 'invalid-email' };
+    return backend.joinWaitlist(e);
+  }
+
+  async function submitRun(record) {
+    if (!init()) return { skipped: 'no-client' };
+    if (backend.submitRun) return backend.submitRun(record);
+    return backend.saveRun(record);
   }
 
   async function saveRun(record) {
-    if (!init()) return { skipped: 'no-client' };
-    return backend.saveRun(record);
+    return submitRun(record);
   }
 
   async function myRuns() {
@@ -233,7 +245,7 @@ const Cloud = (() => {
 
   return {
     init, onAuth, signIn, signOut, currentUser, getSessionUser,
-    claimBetaSpot, joinWaitlist, saveRun, myRuns, leaderboard,
+    claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     mountAuthBar, resetMockData,
   };
 })();

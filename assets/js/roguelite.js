@@ -199,7 +199,56 @@ function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, early
   return { result: 'clear', count: 1, indices: [bestIdx], offset: bestSigned };
 }
 
-const RL_TimingMath = { audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot };
+/*
+  Run scoring (pure — unit-tested in tests/roguelite.test.cjs).
+
+  Time Trial: accuracy — green % of all quarter-beats played.
+  Sudden Death / Gauntlet: ENDURANCE — 16th slots cleared ÷ 16th slots in the
+  full run (not accuracy among beats played so far).
+*/
+function rankFor(pct) {
+  if (pct >= 99) return 'SS';
+  if (pct >= 91) return 'S';
+  if (pct >= 81) return 'A';
+  if (pct >= 66) return 'B';
+  if (pct >= 50) return 'C';
+  if (pct >= 26) return 'D';
+  return 'E';
+}
+
+function endurancePct(hitsCleared, totalRunBeats) {
+  const totalSixteenths = (totalRunBeats || 0) * 4;
+  if (!totalSixteenths) return 0;
+  return Math.round(Math.min(100, hitsCleared / totalSixteenths * 100));
+}
+
+function accuracyPct(tally) {
+  const total = (tally.good || 0) + (tally.neutral || 0) + (tally.bad || 0);
+  return total ? Math.round(tally.good / total * 100) : 0;
+}
+
+function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally }) {
+  if (mode === 'suddendeath' || mode === 'gauntlet') {
+    if (status === 'complete') return { rank: 'SS', pct: 100 };
+    const pct = endurancePct(hitsCleared, totalRunBeats);
+    return { rank: rankFor(pct), pct };
+  }
+  const pct = accuracyPct(tally);
+  return { rank: rankFor(pct), pct };
+}
+
+function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally }) {
+  if (mode === 'suddendeath' || mode === 'gauntlet') {
+    return endurancePct(hitsCleared, totalRunBeats);
+  }
+  const good = (tally && tally.good) || 0;
+  return Math.max(0, Math.min(100, Math.round(good / (totalRunBeats || 1) * 100)));
+}
+
+const RL_TimingMath = {
+  audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
+  rankFor, endurancePct, accuracyPct, runResultPct, liveGaugePct,
+};
 
 // node export for unit tests; harmless/ignored in the browser.
 if (typeof module !== 'undefined' && module.exports) {
@@ -336,6 +385,8 @@ const RogueliteMode = (() => {
     totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
     hitLog: [],                 // per-16th timeline: { off, rank } (for the result-card chart)
+    runId: null,                // UUID for cloud dedup (generated at run start)
+    startedAt: null,            // ISO wall-clock when gated play began
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
     // kickNote is a single number today; widening it to a Set later is the only
@@ -981,6 +1032,9 @@ const RogueliteMode = (() => {
     runState.diedAtBpm = null;
     runState.survivalSec = 0;
     runState.gatingStartPerf = 0;
+    runState.runId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID() : ('run-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    runState.startedAt = null;
     runState.status = 'running';
     window.__rogueSuppressDoneOverlay = false;
     window.__rogueSuppressCompleteCue = true;   // GameSfx owns completion audio for game runs
@@ -1108,7 +1162,10 @@ const RogueliteMode = (() => {
           pendingFirstGated = true;   // first scored 16th of this set gets early grace
           // Start the survival clock on the first gated beat of the run (used by
           // Sudden Death). Only the first set arms it; later sets don't reset it.
-          if (!runState.gatingStartPerf) runState.gatingStartPerf = performance.now();
+          if (!runState.gatingStartPerf) {
+            runState.gatingStartPerf = performance.now();
+            runState.startedAt = new Date().toISOString();
+          }
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
           setRunBanner('Keep the 16ths going', 'live');
@@ -1223,8 +1280,8 @@ const RogueliteMode = (() => {
     if (sixteenthIdx === 3) {
       tallyBeat(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
       addLaneCell(verdictClass(hudBeatRank[beatIndex], hudBeatOff[beatIndex]));
-      updateScoreHud();   // gauge = good ÷ total run beats (fills, never drops)
     }
+    updateScoreHud();
     // Purge consumed/stale events a few slots behind the current expected time.
     pruneEvents(expectedPerf - presenceMs * 4);
   }
@@ -1264,9 +1321,10 @@ const RogueliteMode = (() => {
     // app owns (there is no dedicated game-over asset in this build).
     try { MetronomeEngine.playSetEndCue(); } catch (e) {}
 
-    saveRunRecord();          // saves + computes any newly-unlocked trophies first
-    showGameOver(classification);
-    updateGates();
+    saveRunRecord().finally(() => {
+      showGameOver(classification);
+      updateGates();
+    });
   }
 
   // The ramp finished cleanly on its own (ran out of sets) before reaching the
@@ -1316,9 +1374,10 @@ const RogueliteMode = (() => {
       if (window.AppRamp && window.AppRamp.isRunning()) window.AppRamp.stop();
     }
 
-    saveRunRecord();          // saves + computes any newly-unlocked trophies first
-    showComplete();
-    updateGates();
+    saveRunRecord().finally(() => {
+      showComplete();
+      updateGates();
+    });
   }
 
   function currentRunBpm() {
@@ -1353,25 +1412,29 @@ const RogueliteMode = (() => {
   //    would hand an A to someone who died 10 beats into a 5-minute run. Instead we
   //    score beats survived ÷ beats in the full run (clearing it = 100% = SS).
   function runResultRankPct() {
-    if (runState.mode === 'suddendeath' || runState.mode === 'gauntlet') {
-      if (runState.status === 'complete') return { rank: 'SS', pct: 100 };
-      const totalSixteenths = (runState.totalRunBeats || 0) * 4;   // totalRunBeats = quarter-beats
-      const pct = totalSixteenths ? Math.round(Math.min(100, runState.hitsCleared / totalSixteenths * 100)) : 0;
-      return { rank: rankFor(pct), pct };
-    }
-    const t = runState.tally;
-    const total = t.good + t.neutral + t.bad;
-    const pct = total ? Math.round(t.good / total * 100) : 0;
-    return { rank: rankFor(pct), pct };
+    return runResultPct({
+      mode: runState.mode,
+      status: runState.status,
+      hitsCleared: runState.hitsCleared,
+      totalRunBeats: runState.totalRunBeats,
+      tally: runState.tally,
+    });
   }
 
   // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent),
-  // and compute any newly-unlocked trophies for the run-end popup.
-  function saveRunRecord() {
-    if (typeof window === 'undefined' || !window.Cloud || !window.Cloud.saveRun) return;
+  // and compute any newly-unlocked trophies for the run-end popup when valid.
+  async function saveRunRecord() {
+    const submit = window.Cloud && (window.Cloud.submitRun || window.Cloud.saveRun);
+    if (typeof window === 'undefined' || !submit) return;
     const { rank, pct } = runResultRankPct();
     const isGauntlet = runState.mode === 'gauntlet';
+    const played_sec = runState.gatingStartPerf
+      ? Math.round((performance.now() - runState.gatingStartPerf) / 1000)
+      : 0;
     const rec = {
+      run_id: runState.runId,
+      started_at: runState.startedAt,
+      played_sec,
       instrument: runState.instrument || 'kick',
       mode: runState.mode,
       bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
@@ -1381,10 +1444,15 @@ const RogueliteMode = (() => {
       duration_sec: isGauntlet ? null : runState.gameMins * 60,
       survival_sec: (runState.mode === 'suddendeath') ? Math.round(runState.survivalSec) : null,
       cleared: runState.status === 'complete',
-      created_at: new Date().toISOString(),
     };
-    evaluateTrophies(rec);                       // local diff → pendingTrophies (for the popup)
-    try { window.Cloud.saveRun(rec); } catch (e) { /* never let a save error break the game */ }
+    try {
+      const result = await submit(rec);
+      if (result && result.valid !== false && !result.error && !result.skipped) {
+        evaluateTrophies({ ...rec, valid: true });
+      } else if (result && result.reject_reason) {
+        console.warn('[roguelite] run not submitted:', result.reject_reason);
+      }
+    } catch (e) { /* never let a save error break the game */ }
   }
 
   // ── Trophy notifications ─────────────────────────────────────────────────────
@@ -1399,8 +1467,9 @@ const RogueliteMode = (() => {
     if (!window.Achievements) return;
     if (!user || !window.Cloud) { trophyRuns = null; trophyBaseline = null; return; }
     window.Cloud.myRuns().then(runs => {
-      trophyRuns = runs.slice();
-      trophyBaseline = window.Achievements.reachedMap(runs);
+      const valid = runs.filter(r => r.valid !== false);
+      trophyRuns = valid.slice();
+      trophyBaseline = window.Achievements.reachedMap(valid);
     }).catch(() => {});
   }
 
@@ -1487,8 +1556,6 @@ const RogueliteMode = (() => {
   // green percentage. Neutral row also shows the rush/drag split.
   function resultTable() {
     const t = runState.tally;
-    const total = t.good + t.neutral + t.bad;
-    const pct = total ? Math.round(t.good / total * 100) : 0;
     const split = t.neutral ? ' <span class="rl-split">(' + t.rush + ' rush · ' + t.drag + ' drag)</span>' : '';
     const row = (cls, label, n, extra) =>
       '<div class="rogue-result-row">' +
@@ -1496,7 +1563,7 @@ const RogueliteMode = (() => {
         '<span class="rl-lbl">' + label + (extra || '') + '</span>' +
         '<span class="rl-n">' + n + '</span>' +
       '</div>';
-    const { rank } = runResultRankPct();
+    const { rank, pct } = runResultRankPct();
     // Every rank E..SS has a hero emblem PNG (assets/img/rank/<x>.png). If the art is ever
     // missing, onerror swaps the <img> back to the plain glowing letter.
     const rankCell =
@@ -1653,26 +1720,18 @@ const RogueliteMode = (() => {
     return 'GOOD';
   }
 
-  // Rank bands by green % (forgiving — SS no longer needs a flawless run, just 99%+):
-  //   SS ≥99 · S 91–98 · A 81–90 · B 66–80 · C 50–65 · D 26–49 · E 0–25
-  function rankFor(pct) {
-    if (pct >= 99)  return 'SS';
-    if (pct >= 91)  return 'S';
-    if (pct >= 81)  return 'A';
-    if (pct >= 66)  return 'B';
-    if (pct >= 50)  return 'C';
-    if (pct >= 26)  return 'D';
-    return 'E';
-  }
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
   const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#b06fff', D: '#8ab0c8', E: '#ff3838' };
 
-  // Style gauge = GOOD beats ÷ total beats in the run, as a %. It only ever FILLS
-  // (good beats add; neutral/bad just don't), so it climbs from E and never drops.
-  // Rank comes straight from the gauge via rankFor (SS at 99%+).
+  // Live gauge: endurance modes = slots cleared ÷ full-run slots; time trial = good
+  // quarter-beats ÷ full-run target. Only ever fills (never drops).
   function scoreRank() {
-    const t = runState.tally;
-    const g = Math.max(0, Math.min(100, Math.round(t.good / (runState.totalRunBeats || 1) * 100)));
+    const g = liveGaugePct({
+      mode: runState.mode,
+      hitsCleared: runState.hitsCleared,
+      totalRunBeats: runState.totalRunBeats,
+      tally: runState.tally,
+    });
     return { gauge: g, rank: rankFor(g) };
   }
 
@@ -1835,7 +1894,7 @@ const RogueliteMode = (() => {
     let res = 'error';
     try { res = await C.claimBetaSpot(); } catch (e) {}
     if (res === 'ok') { betaOk = true; hideBetaGate(); return true; }
-    showBetaGate(res === 'full' ? 'full' : 'error');
+    showBetaGate(res === 'full' ? 'full' : res === 'not-allowed' ? 'notallowed' : 'error');
     return false;
   }
 
@@ -1880,6 +1939,9 @@ const RogueliteMode = (() => {
       betaWaitForm: document.getElementById('betaWaitForm'),
       betaWaitEmail:document.getElementById('betaWaitEmail'),
       betaWaitMsg:  document.getElementById('betaWaitMsg'),
+      betaInviteForm: document.getElementById('betaInviteForm'),
+      betaInviteEmail:document.getElementById('betaInviteEmail'),
+      betaInviteMsg:  document.getElementById('betaInviteMsg'),
       betaRetry:    document.getElementById('betaRetry'),
       instrBtns:    Array.from(document.querySelectorAll('.rogue-instr-btn')),
       instrStatus:  document.getElementById('rogueInstrStatus'),
@@ -1985,6 +2047,16 @@ const RogueliteMode = (() => {
       try { const r = await (window.Cloud && window.Cloud.joinWaitlist(email)); err = r && r.error; } catch (x) { err = x; }
       if (el.betaWaitMsg) el.betaWaitMsg.textContent = err ? 'Could not save — check the email and retry.' : "You're on the list! We'll be in touch.";
       if (!err && el.betaWaitForm) el.betaWaitForm.reset();
+    });
+    // Invite-only (not-allowlisted) waitlist form — same wiring as the "full" form.
+    if (el.betaInviteForm) el.betaInviteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = el.betaInviteEmail ? el.betaInviteEmail.value : '';
+      if (el.betaInviteMsg) el.betaInviteMsg.textContent = 'Adding you…';
+      let err = null;
+      try { const r = await (window.Cloud && window.Cloud.joinWaitlist(email)); err = r && r.error; } catch (x) { err = x; }
+      if (el.betaInviteMsg) el.betaInviteMsg.textContent = err ? 'Could not save — check the email and retry.' : "You're on the list! We'll be in touch.";
+      if (!err && el.betaInviteForm) el.betaInviteForm.reset();
     });
     // Android-Chrome label fallback, matching the existing toggles.
     const lbl = el.toggle.closest('.toggle-switch');

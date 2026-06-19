@@ -99,12 +99,32 @@ const CloudSupabaseBackend = (() => {
     return {};
   }
 
-  async function saveRun(record) {
+  async function submitRun(record) {
     if (!init()) return { skipped: 'no-client' };
     if (!user) return { skipped: 'signed-out' };
-    const { error } = await client.from('runs').insert({ ...record, user_id: user.id });
-    if (error) console.warn('[cloud] saveRun', error.message);
-    return { error };
+    const { data, error } = await client.rpc('submit_run', {
+      p_run_id: record.run_id,
+      p_started_at: record.started_at,
+      p_played_sec: record.played_sec,
+      p_mode: record.mode,
+      p_instrument: record.instrument || 'kick',
+      p_bpm: record.bpm == null ? null : record.bpm,
+      p_level: record.level == null ? null : record.level,
+      p_rank: record.rank,
+      p_green_pct: record.green_pct,
+      p_duration_sec: record.duration_sec == null ? null : record.duration_sec,
+      p_survival_sec: record.survival_sec == null ? null : record.survival_sec,
+      p_cleared: !!record.cleared,
+    });
+    if (error) {
+      console.warn('[cloud] submitRun', error.message);
+      return { error, valid: false };
+    }
+    return data || { valid: false, reject_reason: 'error' };
+  }
+
+  async function saveRun(record) {
+    return submitRun(record);
   }
 
   async function myRuns() {
@@ -128,7 +148,7 @@ const CloudSupabaseBackend = (() => {
 
   return {
     init, isReady, signIn, signOut, currentUser, getSessionUser,
-    claimBetaSpot, joinWaitlist, saveRun, myRuns, leaderboard,
+    claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
   };
 })();
 

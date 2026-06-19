@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 const CloudMockBackend = (() => {
   // Bump this when seed users / runs change — invalidates stale localStorage mock data.
-  const STORAGE_KEY = 'cloud:mock:v2';
+  const STORAGE_KEY = 'cloud:mock:v3';
 
   const DEV_USERS = [
     {
@@ -168,13 +168,35 @@ const CloudMockBackend = (() => {
     return {};
   }
 
-  async function saveRun(record) {
+  async function submitRun(record) {
     if (!init()) return { skipped: 'no-client' };
     if (!user) return { skipped: 'signed-out' };
+
+    if (!record.run_id) return { valid: false, reject_reason: 'missing_run_id' };
+
+    const V = typeof window !== 'undefined' ? window.RunSubmitValidation : null;
+    if (V && V.isDuplicateRun(db.runs, user.id, record.run_id)) {
+      return { valid: false, reject_reason: 'duplicate_run' };
+    }
+
+    const prev = db.runs
+      .filter(r => r.user_id === user.id)
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0] || null;
+
+    const nowMs = Date.now();
+    const check = V
+      ? V.validateRunSubmit(prev, record, nowMs)
+      : { valid: true, reject_reason: null };
+
     const row = {
       id: uid(),
       user_id: user.id,
-      created_at: record.created_at || new Date().toISOString(),
+      created_at: new Date(nowMs).toISOString(),
+      run_id: record.run_id,
+      started_at: record.started_at,
+      played_sec: record.played_sec == null ? null : record.played_sec,
+      valid: check.valid,
+      reject_reason: check.reject_reason,
       mode: record.mode,
       instrument: record.instrument || 'kick',
       bpm: record.bpm == null ? null : record.bpm,
@@ -187,7 +209,11 @@ const CloudMockBackend = (() => {
     };
     db.runs.push(row);
     persistDb(db);
-    return {};
+    return { valid: check.valid, reject_reason: check.reject_reason };
+  }
+
+  async function saveRun(record) {
+    return submitRun(record);
   }
 
   async function myRuns() {
@@ -226,6 +252,7 @@ const CloudMockBackend = (() => {
         };
       })
       .filter(r =>
+        r.valid !== false &&
         r.mode === mode &&
         (bpm == null || r.bpm === bpm) &&
         (level == null || r.level === level) &&
@@ -264,7 +291,7 @@ const CloudMockBackend = (() => {
 
   return {
     init, isReady, signIn, signInAs, signOut, currentUser, getSessionUser,
-    claimBetaSpot, joinWaitlist, saveRun, myRuns, leaderboard,
+    claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     getDevUsers, resetMockData,
   };
 })();
