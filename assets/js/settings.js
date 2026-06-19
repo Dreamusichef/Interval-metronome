@@ -13,7 +13,10 @@
   const wakeNote = document.getElementById('wakeLockNote');
   if (!gear || !overlay) return;
 
-  const open = () => { overlay.hidden = false; };
+  const open = () => {
+    overlay.hidden = false;
+    if (window.ProfileSettings) ProfileSettings.loadAll();
+  };
   const close = () => { overlay.hidden = true; };
   gear.addEventListener('click', open);
   closeBtn && closeBtn.addEventListener('click', close);
@@ -42,6 +45,20 @@
       scTable.hidden = !show;
       scRow.setAttribute('aria-expanded', show ? 'true' : 'false');
       if (scCaret) scCaret.style.transform = show ? 'rotate(180deg)' : '';
+    });
+  }
+
+  // ── Public profile collapsible ──
+  const profileRow = document.getElementById('profileToggleRow');
+  const profileBody = document.getElementById('profileSettings');
+  const profileCaret = document.getElementById('profileCaret');
+  if (profileRow && profileBody) {
+    profileRow.addEventListener('click', () => {
+      const show = profileBody.hidden;
+      profileBody.hidden = !show;
+      profileRow.setAttribute('aria-expanded', show ? 'true' : 'false');
+      if (profileCaret) profileCaret.style.transform = show ? 'rotate(180deg)' : '';
+      if (show && window.ProfileSettings) ProfileSettings.loadAll();
     });
   }
 

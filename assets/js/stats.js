@@ -242,3 +242,7 @@ function instrLabel(i) { return i === 'snare' ? 'Snare' : 'Kick'; }
 // ── boot ─────────────────────────────────────────────────────────────────────
 wireControls();
 initAuthBars();
+
+document.addEventListener('cloud:profileUpdated', () => {
+  if (state.view === 'global') render();
+});
