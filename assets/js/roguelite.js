@@ -1876,12 +1876,32 @@ const RogueliteMode = (() => {
   }
   function hideBetaGate() { if (el.betaGate) el.betaGate.hidden = true; }
 
+  // Wait for the Cloud facade to finish loading. Cloud scripts load async (Supabase
+  // CDN → cloud-supabase.js → cloud.js) while this file runs on `defer`, so after a
+  // sign-in reload `window.Cloud` may not exist yet when the gate first runs. Poll
+  // briefly and resolve once it's ready (or null on timeout). Same pattern as
+  // wireTrophies / index.html mountAuth.
+  function waitForCloud(timeoutMs) {
+    const cap = timeoutMs || 5000;
+    const start = Date.now();
+    return new Promise(resolve => {
+      (function poll() {
+        if (window.Cloud && window.Cloud.claimBetaSpot) return resolve(window.Cloud);
+        if (Date.now() - start >= cap) return resolve(null);
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+
   // Resolve whether the user may enter Game Mode. Shows the gate as needed.
   // Returns true only if a beta spot is confirmed.
   async function ensureBetaAccess() {
     if (!BETA_GATE || betaOk) return true;
-    const C = window.Cloud;
-    if (!C || !C.claimBetaSpot) return true;   // cloud not available → don't lock out
+    // Fail CLOSED: if Cloud never loads we can't verify the beta spot, so deny
+    // access rather than letting everyone in (the free metronome is unaffected —
+    // this only runs when toggling Game Mode on).
+    const C = await waitForCloud();
+    if (!C) { showBetaGate('error'); return false; }
     const u = C.getSessionUser ? await C.getSessionUser() : (C.currentUser && C.currentUser());
     if (!u) {
       try { sessionStorage.setItem('cloud:reopenGameMode', '1'); } catch (e) {}
