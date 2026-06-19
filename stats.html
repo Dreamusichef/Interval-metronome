@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260615a">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260619a">
 </head>
 <body>
   <div class="app-container">
@@ -70,8 +70,8 @@
       var h = location.hostname;
       window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260618b', 'assets/js/cloud.js?v=20260618b']
-        : ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260618b', 'assets/js/cloud.js?v=20260618b'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619a', 'assets/js/cloud.js?v=20260619a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619a', 'assets/js/cloud.js?v=20260619a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
@@ -84,6 +84,6 @@
     })();
   </script>
   <script defer src="assets/js/achievements.js?v=6"></script>
-  <script defer src="assets/js/stats.js?v=20260619a"></script>
+  <script defer src="assets/js/stats.js?v=20260619b"></script>
 </body>
 </html>

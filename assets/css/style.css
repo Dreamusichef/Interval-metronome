@@ -1712,6 +1712,7 @@ body.rogue-run .rogue-section { display: none !important; }
 .settings-close:hover { color: var(--danger); }
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 0; }
 .settings-row-label { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 0.92rem; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
+.settings-row-label-left { align-items: flex-start; text-align: left; }
 .settings-row-label small { font-weight: 600; font-size: 0.72rem; color: var(--text-dim); }
 /* Keep the toggle at its full size even when the label text is long (it would
    otherwise get flex-shrunk and look different from the others). */
@@ -1728,6 +1729,53 @@ body.rogue-run .rogue-section { display: none !important; }
 .sc-table td:first-child { width: 104px; white-space: nowrap; }
 .sc-table kbd { display: inline-block; min-width: 14px; text-align: center; padding: 1px 5px; font-family: 'Rajdhani', sans-serif; font-size: 0.72rem; font-weight: 700; color: var(--text); background: var(--inset); border: 1px solid var(--border); }
 .sc-hint { font-size: 0.7rem; color: var(--text-dim); opacity: 0.8; margin-top: 8px; }
+
+/* ── Public profile editor ── */
+.profile-settings {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  padding-bottom: 4px;
+}
+.profile-settings[hidden] { display: none; }
+#profileToggleRow[hidden] { display: none; }
+.profile-field { display: block; margin-bottom: 12px; border: 0; padding: 0; min-width: 0; }
+.profile-avatar-field { margin-left: 0; padding-left: 0; }
+.profile-field-label {
+  display: block;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.profile-field .config-input,
+.profile-field .rogue-select { width: 100%; box-sizing: border-box; }
+.profile-avatar-modes { display: flex; flex-direction: column; gap: 6px; }
+.profile-avatar-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.profile-custom-url-row { margin-top: 8px; }
+.profile-custom-url-row[hidden] { display: none; }
+.profile-avatar-preview { margin-top: 10px; width: 40px; height: 40px; }
+.profile-avatar-preview[hidden] { display: none; }
+.profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.profile-save-btn { flex: 1 1 auto; min-width: 120px; }
+.profile-status {
+  min-height: 1.2em;
+  margin: 8px 0 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cyan);
+}
+.profile-status.is-error { color: var(--danger); }
 
 /* ── Beta access gate (Game Mode) ── */
 .beta-gate { position: fixed; inset: 0; z-index: 350; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(2, 6, 12, 0.82); }

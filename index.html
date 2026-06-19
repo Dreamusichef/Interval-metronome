@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260617a">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260619d">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -68,6 +68,36 @@
             <input type="checkbox" id="latencyCompToggle"><span class="toggle-slider"></span>
           </span>
         </label>
+
+        <button class="settings-row settings-row-btn" id="profileToggleRow" type="button" aria-expanded="false" hidden>
+          <span class="settings-row-label settings-row-label-left">Public profile
+            <small>Alias and avatar on global leaderboards.</small>
+          </span>
+          <span class="settings-disclosure" id="profileCaret">&#9662;</span>
+        </button>
+        <div class="profile-settings" id="profileSettings" hidden>
+          <label class="profile-field">
+            <span class="profile-field-label">Alias</span>
+            <input class="profile-alias-input config-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Your display name">
+          </label>
+          <fieldset class="profile-field profile-avatar-field">
+            <legend class="profile-field-label">Avatar</legend>
+            <div class="profile-avatar-modes">
+              <label class="profile-avatar-option"><input type="radio" class="profile-avatar-mode" name="profileAvatarMode" value="google"> Google photo</label>
+              <label class="profile-avatar-option"><input type="radio" class="profile-avatar-mode" name="profileAvatarMode" value="hidden" checked> Hidden</label>
+              <label class="profile-avatar-option"><input type="radio" class="profile-avatar-mode" name="profileAvatarMode" value="custom"> Custom URL</label>
+            </div>
+            <div class="profile-custom-url-row" hidden>
+              <input class="profile-avatar-url config-input" type="url" inputmode="url" placeholder="https://…">
+            </div>
+            <img class="profile-avatar-preview cloud-avatar" alt="" referrerpolicy="no-referrer" hidden>
+          </fieldset>
+          <div class="profile-actions">
+            <button type="button" class="rogue-btn profile-save-btn">Save profile</button>
+            <button type="button" class="cloud-btn profile-reset-btn">Reset to Google</button>
+          </div>
+          <p class="profile-status" aria-live="polite"></p>
+        </div>
 
         <button class="settings-row settings-row-btn" id="shortcutsToggleRow" type="button" aria-expanded="false">
           <span class="settings-row-label">Keyboard shortcuts</span>
@@ -518,7 +548,8 @@
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
-  <script defer src="assets/js/settings.js?v=20260616b"></script>
+  <script defer src="assets/js/settings.js?v=20260619c"></script>
+  <script defer src="assets/js/profile-settings.js?v=20260619c"></script>
   <script defer src="assets/js/roguelite.js?v=20260619a"></script>
   <!-- Cloud: localhost → mock DB; deployed → Supabase. Optional — game works without it. -->
   <script>
@@ -528,8 +559,8 @@
       var h = location.hostname;
       window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260618b', 'assets/js/cloud.js?v=20260618b']
-        : ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260618b', 'assets/js/cloud.js?v=20260618b'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619a', 'assets/js/cloud.js?v=20260619a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619a', 'assets/js/cloud.js?v=20260619a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
