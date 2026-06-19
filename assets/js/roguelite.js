@@ -385,6 +385,8 @@ const RogueliteMode = (() => {
     totalRunBeats: 0,           // estimated total gated beats this run (gauge denominator)
     tally: { good: 0, neutral: 0, bad: 0, rush: 0, drag: 0 },   // per-beat verdict counts
     hitLog: [],                 // per-16th timeline: { off, rank } (for the result-card chart)
+    runId: null,                // UUID for cloud dedup (generated at run start)
+    startedAt: null,            // ISO wall-clock when gated play began
     calibration: null,          // { meanOffset, sd, sampleCount }
     // NOTE: dual-note / per-foot detection is explicitly out of scope for v1.
     // kickNote is a single number today; widening it to a Set later is the only
@@ -1030,6 +1032,9 @@ const RogueliteMode = (() => {
     runState.diedAtBpm = null;
     runState.survivalSec = 0;
     runState.gatingStartPerf = 0;
+    runState.runId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID() : ('run-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    runState.startedAt = null;
     runState.status = 'running';
     window.__rogueSuppressDoneOverlay = false;
     window.__rogueSuppressCompleteCue = true;   // GameSfx owns completion audio for game runs
@@ -1157,7 +1162,10 @@ const RogueliteMode = (() => {
           pendingFirstGated = true;   // first scored 16th of this set gets early grace
           // Start the survival clock on the first gated beat of the run (used by
           // Sudden Death). Only the first set arms it; later sets don't reset it.
-          if (!runState.gatingStartPerf) runState.gatingStartPerf = performance.now();
+          if (!runState.gatingStartPerf) {
+            runState.gatingStartPerf = performance.now();
+            runState.startedAt = new Date().toISOString();
+          }
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
           setRunBanner('Keep the 16ths going', 'live');
@@ -1313,9 +1321,10 @@ const RogueliteMode = (() => {
     // app owns (there is no dedicated game-over asset in this build).
     try { MetronomeEngine.playSetEndCue(); } catch (e) {}
 
-    saveRunRecord();          // saves + computes any newly-unlocked trophies first
-    showGameOver(classification);
-    updateGates();
+    saveRunRecord().finally(() => {
+      showGameOver(classification);
+      updateGates();
+    });
   }
 
   // The ramp finished cleanly on its own (ran out of sets) before reaching the
@@ -1365,9 +1374,10 @@ const RogueliteMode = (() => {
       if (window.AppRamp && window.AppRamp.isRunning()) window.AppRamp.stop();
     }
 
-    saveRunRecord();          // saves + computes any newly-unlocked trophies first
-    showComplete();
-    updateGates();
+    saveRunRecord().finally(() => {
+      showComplete();
+      updateGates();
+    });
   }
 
   function currentRunBpm() {
@@ -1412,12 +1422,19 @@ const RogueliteMode = (() => {
   }
 
   // Persist the just-finished run to the cloud (no-op if signed out / Cloud absent),
-  // and compute any newly-unlocked trophies for the run-end popup.
-  function saveRunRecord() {
-    if (typeof window === 'undefined' || !window.Cloud || !window.Cloud.saveRun) return;
+  // and compute any newly-unlocked trophies for the run-end popup when valid.
+  async function saveRunRecord() {
+    const submit = window.Cloud && (window.Cloud.submitRun || window.Cloud.saveRun);
+    if (typeof window === 'undefined' || !submit) return;
     const { rank, pct } = runResultRankPct();
     const isGauntlet = runState.mode === 'gauntlet';
+    const played_sec = runState.gatingStartPerf
+      ? Math.round((performance.now() - runState.gatingStartPerf) / 1000)
+      : 0;
     const rec = {
+      run_id: runState.runId,
+      started_at: runState.startedAt,
+      played_sec,
       instrument: runState.instrument || 'kick',
       mode: runState.mode,
       bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
@@ -1427,10 +1444,15 @@ const RogueliteMode = (() => {
       duration_sec: isGauntlet ? null : runState.gameMins * 60,
       survival_sec: (runState.mode === 'suddendeath') ? Math.round(runState.survivalSec) : null,
       cleared: runState.status === 'complete',
-      created_at: new Date().toISOString(),
     };
-    evaluateTrophies(rec);                       // local diff → pendingTrophies (for the popup)
-    try { window.Cloud.saveRun(rec); } catch (e) { /* never let a save error break the game */ }
+    try {
+      const result = await submit(rec);
+      if (result && result.valid !== false && !result.error && !result.skipped) {
+        evaluateTrophies({ ...rec, valid: true });
+      } else if (result && result.reject_reason) {
+        console.warn('[roguelite] run not submitted:', result.reject_reason);
+      }
+    } catch (e) { /* never let a save error break the game */ }
   }
 
   // ── Trophy notifications ─────────────────────────────────────────────────────
@@ -1445,8 +1467,9 @@ const RogueliteMode = (() => {
     if (!window.Achievements) return;
     if (!user || !window.Cloud) { trophyRuns = null; trophyBaseline = null; return; }
     window.Cloud.myRuns().then(runs => {
-      trophyRuns = runs.slice();
-      trophyBaseline = window.Achievements.reachedMap(runs);
+      const valid = runs.filter(r => r.valid !== false);
+      trophyRuns = valid.slice();
+      trophyBaseline = window.Achievements.reachedMap(valid);
     }).catch(() => {});
   }
 

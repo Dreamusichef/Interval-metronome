@@ -9,7 +9,8 @@
      signIn() / signOut()
      currentUser()                  — user object or null
      getSessionUser()               — fresh session read
-     saveRun(record)                — insert a run (no-op if signed out)
+     submitRun(record)              — validated insert via submit_run RPC / mock checks
+     saveRun(record)                — alias for submitRun
      myRuns()                       — this user's runs (for personal stats)
      leaderboard(mode, bpm, level, instrument) — global top-100 for a slice
      claimBetaSpot() / joinWaitlist(email)
@@ -120,9 +121,14 @@ const Cloud = (() => {
     return backend.joinWaitlist(e);
   }
 
-  async function saveRun(record) {
+  async function submitRun(record) {
     if (!init()) return { skipped: 'no-client' };
+    if (backend.submitRun) return backend.submitRun(record);
     return backend.saveRun(record);
+  }
+
+  async function saveRun(record) {
+    return submitRun(record);
   }
 
   async function myRuns() {
@@ -227,7 +233,7 @@ const Cloud = (() => {
 
   return {
     init, onAuth, signIn, signOut, currentUser, getSessionUser,
-    claimBetaSpot, joinWaitlist, saveRun, myRuns, leaderboard,
+    claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     mountAuthBar, resetMockData,
   };
 })();
