@@ -30,6 +30,8 @@ const CloudMockBackend = (() => {
   let user = null;
   let ready = false;
   let onAuthChange = null;
+  let profileCache = null;
+  let profileCacheUserId = null;
 
   function uid() {
     return 'run-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -93,11 +95,42 @@ const CloudMockBackend = (() => {
     return 'Drummer';
   }
 
+  function profileFromOAuth(u) {
+    const m = (u && u.user_metadata) || {};
+    return {
+      display_name: m.full_name || m.name || ((u && u.email) || 'Drummer').split('@')[0],
+      avatar_url: m.avatar_url || m.picture || null,
+    };
+  }
+
+  function clearProfileCache() {
+    profileCache = null;
+    profileCacheUserId = null;
+  }
+
+  function refreshProfileCache() {
+    if (!user || !db) {
+      clearProfileCache();
+      return null;
+    }
+    const row = db.profiles.find(p => p.id === user.id);
+    profileCache = row
+      ? { display_name: row.display_name, avatar_url: row.avatar_url }
+      : profileFromOAuth(user);
+    profileCacheUserId = user.id;
+    return profileCache;
+  }
+
   function setUser(u) {
     user = u || null;
     if (db) {
       db.sessionUserId = user ? user.id : null;
       persistDb(db);
+    }
+    if (user) {
+      upsertProfile().then(() => refreshProfileCache());
+    } else {
+      clearProfileCache();
     }
     if (onAuthChange) onAuthChange(user);
   }
@@ -109,6 +142,7 @@ const CloudMockBackend = (() => {
     const sessionUser = db.sessionUserId ? devUserById(db.sessionUserId) : null;
     user = sessionUser;
     ready = true;   // before onAuthChange — same contract as cloud-supabase getSession
+    if (user) refreshProfileCache();
     if (onAuthChange) onAuthChange(user);
     return true;
   }
@@ -136,16 +170,49 @@ const CloudMockBackend = (() => {
 
   async function upsertProfile() {
     if (!user || !db) return;
-    const m = user.user_metadata || {};
+    const row = Object.assign({ id: user.id }, profileFromOAuth(user));
+    const idx = db.profiles.findIndex(p => p.id === row.id);
+    if (idx < 0) {
+      db.profiles.push(row);
+      persistDb(db);
+    }
+  }
+
+  async function getProfile() {
+    if (!init() || !user) return null;
+    if (profileCache && profileCacheUserId === user.id) {
+      return { display_name: profileCache.display_name, avatar_url: profileCache.avatar_url };
+    }
+    const p = refreshProfileCache();
+    return p ? { display_name: p.display_name, avatar_url: p.avatar_url } : null;
+  }
+
+  async function updateProfile(fields) {
+    if (!init() || !user || !db) return { error: 'signed-out' };
+    const idx = db.profiles.findIndex(p => p.id === user.id);
     const row = {
       id: user.id,
-      display_name: m.full_name || m.name || (user.email || 'Drummer').split('@')[0],
-      avatar_url: m.avatar_url || m.picture || null,
+      display_name: fields.display_name,
+      avatar_url: fields.avatar_url == null ? null : fields.avatar_url,
     };
+    if (idx >= 0) db.profiles[idx] = row;
+    else db.profiles.push(row);
+    persistDb(db);
+    profileCache = { display_name: row.display_name, avatar_url: row.avatar_url };
+    profileCacheUserId = user.id;
+    return { ok: true };
+  }
+
+  async function resetProfileFromGoogle() {
+    if (!init() || !user || !db) return { error: 'signed-out' };
+    const row = Object.assign({ id: user.id }, profileFromOAuth(user));
     const idx = db.profiles.findIndex(p => p.id === row.id);
     if (idx >= 0) db.profiles[idx] = row;
     else db.profiles.push(row);
     persistDb(db);
+    profileCache = { display_name: row.display_name, avatar_url: row.avatar_url };
+    profileCacheUserId = user.id;
+    return { ok: true };
   }
 
   async function getSessionUser() {
@@ -291,6 +358,7 @@ const CloudMockBackend = (() => {
 
   return {
     init, isReady, signIn, signInAs, signOut, currentUser, getSessionUser,
+    getProfile, updateProfile, resetProfileFromGoogle,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     getDevUsers, resetMockData,
   };

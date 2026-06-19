@@ -3,10 +3,10 @@
 /* ════════════════════════════════════════════════════════════════════════════
    CLOUD — Facade over Supabase (prod) or localStorage mock (localhost).
 
-   Script load order (index.html / stats.html): backend script(s) load async via
-   loadCloudScripts(), then cloud.js; page scripts (stats.js, roguelite.js) may run
-   before getSession() finishes. Consumers MUST use Cloud.onAuth(fn) — never assume
-   auth is resolved on first tick. See onAuth / onBackendAuth below.
+   Script load order (index.html / stats.html): profile-validation.js, backend
+   script(s) load async via loadCloudScripts(), then cloud.js; page scripts
+   (stats.js, roguelite.js) may run before getSession() finishes. Consumers
+   MUST use Cloud.onAuth(fn) — never assume auth is resolved on first tick.
 
    Public API (window.Cloud):
      init()                         — create the backend (auto-runs on load)
@@ -14,6 +14,9 @@
      signIn() / signOut()
      currentUser()                  — user object or null
      getSessionUser()               — fresh session read
+     getProfile()                   — public alias + avatar for signed-in user
+     updateProfile({ display_name, avatar_url })
+     resetProfileFromGoogle()       — restore alias + avatar from OAuth metadata
      submitRun(record)              — validated insert via submit_run RPC / mock checks
      saveRun(record)                — alias for submitRun
      myRuns()                       — this user's runs (for personal stats)
@@ -61,6 +64,12 @@ const Cloud = (() => {
     listeners.forEach(fn => { try { fn(user); } catch (e) {} });
   }
 
+  function dispatchProfileUpdated() {
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(new CustomEvent('cloud:profileUpdated'));
+    }
+  }
+
   function init() {
     if (inited) return backend;
     backend = pickBackend();
@@ -89,6 +98,15 @@ const Cloud = (() => {
     return backend && backend.currentUser ? backend.currentUser() : null;
   }
 
+  function oauthDisplayName(u) {
+    const m = (u && u.user_metadata) || {};
+    return m.full_name || m.name || ((u && u.email) || 'Drummer').split('@')[0];
+  }
+
+  function safeAvatarUrl(url) {
+    return (url && String(url).startsWith('https://')) ? url : '';
+  }
+
   async function signIn() {
     if (!init()) return;
     try { sessionStorage.setItem('cloud:reopenGameMode', '1'); } catch (e) {}
@@ -115,6 +133,34 @@ const Cloud = (() => {
   async function getSessionUser() {
     if (!init()) return null;
     return backend.getSessionUser();
+  }
+
+  async function getProfile() {
+    if (!init()) return null;
+    if (!backend.getProfile) return null;
+    return backend.getProfile();
+  }
+
+  async function updateProfile(input) {
+    if (!init()) return { error: 'no-client' };
+    if (!currentUser()) return { error: 'signed-out' };
+    const V = typeof window !== 'undefined' ? window.ProfileValidation : null;
+    if (!V) return { error: 'validation-unavailable' };
+    const validated = V.validateProfileFields(input || {});
+    if (validated.error) return { error: validated.error };
+    if (!backend.updateProfile) return { error: 'no-client' };
+    const result = await backend.updateProfile(validated.value);
+    if (result && result.ok) dispatchProfileUpdated();
+    return result;
+  }
+
+  async function resetProfileFromGoogle() {
+    if (!init()) return { error: 'no-client' };
+    if (!currentUser()) return { error: 'signed-out' };
+    if (!backend.resetProfileFromGoogle) return { error: 'no-client' };
+    const result = await backend.resetProfileFromGoogle();
+    if (result && result.ok) dispatchProfileUpdated();
+    return result;
   }
 
   async function claimBetaSpot() {
@@ -210,11 +256,17 @@ const Cloud = (() => {
 
   function mountAuthBar(el) {
     if (!el) return;
-    const render = (u) => {
+    const render = async (u) => {
       if (u) {
-        const m = u.user_metadata || {};
-        const name = m.full_name || m.name || (u.email || 'Drummer').split('@')[0];
-        const av = m.avatar_url || m.picture;
+        let name = oauthDisplayName(u);
+        let av = safeAvatarUrl((u.user_metadata || {}).avatar_url || (u.user_metadata || {}).picture);
+        try {
+          const p = await getProfile();
+          if (p) {
+            if (p.display_name) name = p.display_name;
+            av = safeAvatarUrl(p.avatar_url);
+          }
+        } catch (e) {}
         el.innerHTML =
           (isMock ? '<span class="cloud-local-badge">LOCAL</span>' : '') +
           (av ? '<img class="cloud-avatar" src="' + escAttr(av) + '" alt="" referrerpolicy="no-referrer">' : '') +
@@ -236,6 +288,12 @@ const Cloud = (() => {
       }
     };
     onAuth(render);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('cloud:profileUpdated', () => {
+        const u = currentUser();
+        if (u) render(u);
+      });
+    }
   }
 
   if (typeof document !== 'undefined') {
@@ -245,6 +303,7 @@ const Cloud = (() => {
 
   return {
     init, onAuth, signIn, signOut, currentUser, getSessionUser,
+    getProfile, updateProfile, resetProfileFromGoogle,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     mountAuthBar, resetMockData,
   };
