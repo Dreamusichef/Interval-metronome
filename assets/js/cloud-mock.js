@@ -108,7 +108,7 @@ const CloudMockBackend = (() => {
     db = loadDb();
     const sessionUser = db.sessionUserId ? devUserById(db.sessionUserId) : null;
     user = sessionUser;
-    ready = true;
+    ready = true;   // before onAuthChange — same contract as cloud-supabase getSession
     if (onAuthChange) onAuthChange(user);
     return true;
   }

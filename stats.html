@@ -64,6 +64,8 @@
   </div>
 
   <script>
+    // Cloud loader: scripts are injected async (not defer), so page JS may run
+    // before auth is ready. Keep backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
       var h = location.hostname;
       window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';

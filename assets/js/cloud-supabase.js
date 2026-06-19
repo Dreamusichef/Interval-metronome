@@ -3,6 +3,10 @@
 /* ════════════════════════════════════════════════════════════════════════════
    CLOUD SUPABASE BACKEND — production data layer (Google OAuth + Supabase DB).
    Loaded only on non-localhost hosts; wired by cloud.js facade.
+
+   Auth init contract: isReady() must be true BEFORE the first onAuthChange call
+   (cloud.js reads isReady() inside onBackendAuth). getSession() is async — set
+   ready=true then setUser(), matching the sync order in cloud-mock.js init().
    ════════════════════════════════════════════════════════════════════════════ */
 const CloudSupabaseBackend = (() => {
   const SUPABASE_URL  = 'https://mmdmibimpipxckgfmhmz.supabase.co';
@@ -24,8 +28,9 @@ const CloudSupabaseBackend = (() => {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
     client.auth.getSession().then(({ data }) => {
-      setUser(data && data.session ? data.session.user : null);
+      // Order matters: ready before setUser → onAuthChange → facade onBackendAuth.
       ready = true;
+      setUser(data && data.session ? data.session.user : null);
     });
     client.auth.onAuthStateChange((_evt, session) => {
       setUser(session ? session.user : null);

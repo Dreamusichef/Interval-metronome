@@ -3,6 +3,11 @@
 /* ════════════════════════════════════════════════════════════════════════════
    CLOUD — Facade over Supabase (prod) or localStorage mock (localhost).
 
+   Script load order (index.html / stats.html): backend script(s) load async via
+   loadCloudScripts(), then cloud.js; page scripts (stats.js, roguelite.js) may run
+   before getSession() finishes. Consumers MUST use Cloud.onAuth(fn) — never assume
+   auth is resolved on first tick. See onAuth / onBackendAuth below.
+
    Public API (window.Cloud):
      init()                         — create the backend (auto-runs on load)
      onAuth(fn)                     — fn(user|null) now + on every auth change
@@ -20,6 +25,8 @@
 const Cloud = (() => {
   const listeners = [];
   let backend = null;
+  // Facade-level "auth bootstrap done". Distinct from backend.isReady() during the
+  // brief window while Supabase getSession() is in flight — see onBackendAuth/onAuth.
   let ready = false;
   let inited = false;
   let isMock = false;
@@ -64,12 +71,17 @@ const Cloud = (() => {
   }
 
   function onBackendAuth(user) {
+    // Sync ready from backend BEFORE notify. Supabase backend must set ready=true
+    // before calling setUser/onAuthChange (see cloud-supabase.js getSession).
     ready = backend && backend.isReady ? backend.isReady() : true;
     notify(user);
   }
 
   function onAuth(fn) {
     listeners.push(fn);
+    // Late registrants: stats.js / mountAuthBar may subscribe after getSession()
+    // already fired. Re-check backend.isReady() so they still get currentUser().
+    if (backend && backend.isReady && backend.isReady()) ready = true;
     if (ready) fn(backend && backend.currentUser ? backend.currentUser() : null);
   }
 
@@ -113,8 +125,8 @@ const Cloud = (() => {
   async function joinWaitlist(email) {
     if (!init()) return { error: 'no-client' };
     // Basic format guard before hitting the DB. The real abuse protection is the
-    // server-side rate-limit RLS policy on beta_waitlist (issue #49); this just
-    // rejects obviously malformed input (incl. programmatic callers bypassing the
+    // server-side rate-limit RLS policy on beta_waitlist; this just rejects
+    // obviously malformed input (incl. programmatic callers bypassing the
     // form's required+type=email validation).
     const e = (email || '').trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return { error: 'invalid-email' };
