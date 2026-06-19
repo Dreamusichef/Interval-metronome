@@ -187,12 +187,12 @@ async function renderGlobal() {
       (safeAvatar ? '<img class="cloud-avatar sm" src="' + safeAvatar + '" referrerpolicy="no-referrer">' : '') +
       esc(r.display_name || 'Drummer') + '</span>';
     const pos = '<span class="stats-pos' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span>';
-    if (state.mode === 'suddendeath') return tr([ pos, who, fmtMMSS(r.survival_sec) ]);
+    if (state.mode === 'suddendeath') return tr([ pos, who, rankPill(r.rank), fmtMMSS(r.survival_sec) ]);
     if (state.mode === 'gauntlet')    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', r.cleared ? '✓' : '—' ]);
     return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', fmtMMSS(r.duration_sec) ]); // time trial
   });
 
-  const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Survived']
+  const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Best Rank', 'Survived']
     : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Progress', 'Cleared']
     : ['#', 'Player', 'Grade', 'Green', 'Duration'];
   $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + where + '</div>' +

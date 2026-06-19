@@ -1,7 +1,7 @@
 'use strict';
 
 /** Single source for release version (BETA badge tooltip + feedback metadata). */
-window.APP_VERSION = '0.9.1';
+window.APP_VERSION = '0.9.2';
 
 (function applyBrandVersion() {
   function set() {
