@@ -16,6 +16,8 @@ const CloudSupabaseBackend = (() => {
   let user = null;
   let ready = false;
   let onAuthChange = null;
+  let profileCache = null;
+  let profileCacheUserId = null;
 
   function init(opts) {
     if (opts && opts.onAuthChange) onAuthChange = opts.onAuthChange;
@@ -38,10 +40,50 @@ const CloudSupabaseBackend = (() => {
     return client;
   }
 
+  function profileFromOAuth(u) {
+    const m = (u && u.user_metadata) || {};
+    return {
+      display_name: m.full_name || m.name || m.preferred_username || ((u && u.email) || 'Drummer').split('@')[0],
+      avatar_url: m.avatar_url || m.picture || null,
+    };
+  }
+
+  function clearProfileCache() {
+    profileCache = null;
+    profileCacheUserId = null;
+  }
+
+  async function refreshProfileCache() {
+    if (!client || !user) {
+      clearProfileCache();
+      return null;
+    }
+    const { data, error } = await client.from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (error) {
+      console.warn('[cloud] refreshProfileCache', error.message);
+      profileCache = profileFromOAuth(user);
+    } else if (data) {
+      profileCache = { display_name: data.display_name, avatar_url: data.avatar_url };
+    } else {
+      profileCache = profileFromOAuth(user);
+    }
+    profileCacheUserId = user.id;
+    return profileCache;
+  }
+
   function setUser(u) {
     const was = user && user.id;
     user = u || null;
-    if (user && user.id !== was) upsertProfile();
+    if (user && user.id !== was) {
+      upsertProfile().then(() => refreshProfileCache());
+    } else if (user) {
+      refreshProfileCache();
+    } else {
+      clearProfileCache();
+    }
     if (onAuthChange) onAuthChange(user);
   }
 
@@ -65,13 +107,8 @@ const CloudSupabaseBackend = (() => {
 
   async function upsertProfile() {
     if (!client || !user) return;
-    const m = user.user_metadata || {};
-    const row = {
-      id: user.id,
-      display_name: m.full_name || m.name || m.preferred_username || (user.email || 'Drummer').split('@')[0],
-      avatar_url: m.avatar_url || m.picture || null,
-    };
-    const { error } = await client.from('profiles').upsert(row);
+    const row = Object.assign({ id: user.id }, profileFromOAuth(user));
+    const { error } = await client.from('profiles').upsert(row, { onConflict: 'id', ignoreDuplicates: true });
     if (error) console.warn('[cloud] upsertProfile', error.message);
   }
 
@@ -81,6 +118,61 @@ const CloudSupabaseBackend = (() => {
     const u = data && data.session ? data.session.user : null;
     setUser(u);
     return u;
+  }
+
+  async function getProfile() {
+    if (!init() || !user) return null;
+    if (profileCache && profileCacheUserId === user.id) {
+      return { display_name: profileCache.display_name, avatar_url: profileCache.avatar_url };
+    }
+    const p = await refreshProfileCache();
+    return p ? { display_name: p.display_name, avatar_url: p.avatar_url } : null;
+  }
+
+  async function updateProfile(fields) {
+    if (!init() || !user) return { error: 'signed-out' };
+    const row = {
+      display_name: fields.display_name,
+      avatar_url: fields.avatar_url == null ? null : fields.avatar_url,
+    };
+    const { data, error } = await client.from('profiles')
+      .update(row)
+      .eq('id', user.id)
+      .select('display_name, avatar_url')
+      .maybeSingle();
+    if (error) {
+      console.warn('[cloud] updateProfile', error.message);
+      return { error: 'save-failed' };
+    }
+    if (!data) {
+      const insertRow = Object.assign({ id: user.id }, row);
+      const ins = await client.from('profiles').insert(insertRow).select('display_name, avatar_url').single();
+      if (ins.error) {
+        console.warn('[cloud] updateProfile insert', ins.error.message);
+        return { error: 'save-failed' };
+      }
+      profileCache = { display_name: ins.data.display_name, avatar_url: ins.data.avatar_url };
+    } else {
+      profileCache = { display_name: data.display_name, avatar_url: data.avatar_url };
+    }
+    profileCacheUserId = user.id;
+    return { ok: true };
+  }
+
+  async function resetProfileFromGoogle() {
+    if (!init() || !user) return { error: 'signed-out' };
+    const row = Object.assign({ id: user.id }, profileFromOAuth(user));
+    const { data, error } = await client.from('profiles')
+      .upsert(row)
+      .select('display_name, avatar_url')
+      .single();
+    if (error) {
+      console.warn('[cloud] resetProfileFromGoogle', error.message);
+      return { error: 'save-failed' };
+    }
+    profileCache = { display_name: data.display_name, avatar_url: data.avatar_url };
+    profileCacheUserId = user.id;
+    return { ok: true };
   }
 
   async function claimBetaSpot() {
@@ -148,6 +240,7 @@ const CloudSupabaseBackend = (() => {
 
   return {
     init, isReady, signIn, signOut, currentUser, getSessionUser,
+    getProfile, updateProfile, resetProfileFromGoogle,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
   };
 })();
