@@ -15,7 +15,8 @@
 
   const open = () => {
     overlay.hidden = false;
-    if (window.ProfileSettings) ProfileSettings.loadAll();
+    if (window.ProfileSettings && ProfileSettings.syncVisibility) ProfileSettings.syncVisibility();
+    else if (window.ProfileSettings) ProfileSettings.loadAll();
   };
   const close = () => { overlay.hidden = true; };
   gear.addEventListener('click', open);
@@ -48,7 +49,7 @@
     });
   }
 
-  // ── Public profile collapsible ──
+  // ── Profile management collapsible ──
   const profileRow = document.getElementById('profileToggleRow');
   const profileBody = document.getElementById('profileSettings');
   const profileCaret = document.getElementById('profileCaret');

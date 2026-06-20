@@ -238,9 +238,44 @@ const CloudSupabaseBackend = (() => {
     return data || [];
   }
 
+  async function requestAccountDeletion(opts) {
+    if (!init() || !user) return { error: 'signed-out' };
+    const immediate = !!(opts && opts.immediate);
+    const { data, error } = await client.rpc('request_account_deletion', { p_immediate: immediate });
+    if (error) {
+      console.warn('[cloud] requestAccountDeletion', error.message);
+      return { error: 'delete-failed' };
+    }
+    if (!data || !data.ok) return { error: (data && data.error) || 'delete-failed' };
+    clearProfileCache();
+    return data;
+  }
+
+  async function cancelAccountDeletion() {
+    if (!init() || !user) return { error: 'signed-out' };
+    const { data, error } = await client.rpc('cancel_account_deletion');
+    if (error) {
+      console.warn('[cloud] cancelAccountDeletion', error.message);
+      return { error: 'cancel-failed' };
+    }
+    if (!data || !data.ok) return { error: (data && data.error) || 'cancel-failed' };
+    return data;
+  }
+
+  async function getAccountDeletionStatus() {
+    if (!init() || !user) return { pending: false };
+    const { data, error } = await client.rpc('get_account_deletion_status');
+    if (error) {
+      console.warn('[cloud] getAccountDeletionStatus', error.message);
+      return { pending: false };
+    }
+    return data || { pending: false };
+  }
+
   return {
     init, isReady, signIn, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
+    requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
   };
 })();

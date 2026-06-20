@@ -203,8 +203,8 @@ function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, early
   Run scoring (pure — unit-tested in tests/roguelite.test.cjs).
 
   Time Trial: accuracy — green % of all quarter-beats played.
-  Sudden Death / Gauntlet: ENDURANCE — 16th slots cleared ÷ 16th slots in the
-  full run (not accuracy among beats played so far).
+  Sudden Death / Gauntlet: weighted endurance — 70% duration completed
+  (16th slots cleared ÷ full-run slots) + 30% hit accuracy (green % of beats played).
 */
 function rankFor(pct) {
   if (pct >= 99) return 'SS';
@@ -227,10 +227,19 @@ function accuracyPct(tally) {
   return total ? Math.round(tally.good / total * 100) : 0;
 }
 
+const ENDURANCE_DURATION_WEIGHT = 0.70;
+const ENDURANCE_ACCURACY_WEIGHT = 0.30;
+
+function enduranceScorePct(hitsCleared, totalRunBeats, tally) {
+  const duration = endurancePct(hitsCleared, totalRunBeats);
+  const accuracy = accuracyPct(tally);
+  return Math.round(Math.min(100,
+    ENDURANCE_DURATION_WEIGHT * duration + ENDURANCE_ACCURACY_WEIGHT * accuracy));
+}
+
 function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally }) {
   if (mode === 'suddendeath' || mode === 'gauntlet') {
-    if (status === 'complete') return { rank: 'SS', pct: 100 };
-    const pct = endurancePct(hitsCleared, totalRunBeats);
+    const pct = enduranceScorePct(hitsCleared, totalRunBeats, tally);
     return { rank: rankFor(pct), pct };
   }
   const pct = accuracyPct(tally);
@@ -239,7 +248,7 @@ function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally }) {
 
 function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally }) {
   if (mode === 'suddendeath' || mode === 'gauntlet') {
-    return endurancePct(hitsCleared, totalRunBeats);
+    return enduranceScorePct(hitsCleared, totalRunBeats, tally);
   }
   const good = (tally && tally.good) || 0;
   return Math.max(0, Math.min(100, Math.round(good / (totalRunBeats || 1) * 100)));
@@ -247,7 +256,7 @@ function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally }) {
 
 const RL_TimingMath = {
   audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
-  rankFor, endurancePct, accuracyPct, runResultPct, liveGaugePct,
+  rankFor, endurancePct, accuracyPct, enduranceScorePct, runResultPct, liveGaugePct,
 };
 
 // node export for unit tests; harmless/ignored in the browser.
@@ -362,6 +371,8 @@ const RogueliteMode = (() => {
   // Default GM note per drum (kick 36, acoustic snare 38). Overridable via "learn".
   const DEFAULT_KICK_NOTE = 36;
   const DEFAULT_NOTE = { kick: 36, snare: 38 };
+  // Kick learn rejects snare/rim/etc. — only GM bass-drum notes (35 acoustic, 36 kick).
+  const KICK_LEARN_NOTES = [35, 36];
   const INSTR_LABEL = { kick: 'Kick', snare: 'Snare' };
 
   // ── Run / session state ──────────────────────────────────────────────────
@@ -598,6 +609,10 @@ const RogueliteMode = (() => {
     if (!(typeof ts === 'number') || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
 
     if (learning) {
+      if (runState.instrument === 'kick' && !KICK_LEARN_NOTES.includes(note)) {
+        setMidiStatus('Kick learn only accepts MIDI notes 35 or 36. Hit your kick pad.', true);
+        return;
+      }
       learning = false;
       runState.kickNote = note;
       el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + note);
@@ -620,7 +635,9 @@ const RogueliteMode = (() => {
     if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return; }
     if (!midiAccess) { setMidiStatus('Connect MIDI first.', true); return; }
     learning = true;
-    el.kickNote && (el.kickNote.textContent = 'Hit your ' + instrLabel().toLowerCase() + '…');
+    el.kickNote && (el.kickNote.textContent = runState.instrument === 'kick'
+      ? 'Hit your kick (MIDI notes 35 or 36 only)…'
+      : 'Hit your ' + instrLabel().toLowerCase() + '…');
   }
 
   // Current drum label ('Kick' | 'Snare'); falls back to 'Note' before a choice.
@@ -1407,10 +1424,9 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // Single source of truth for a run's final grade.
   //  • Time Trial: accuracy — green % of all beats played (it never fails).
-  //  • Sudden Death / Gauntlet: ENDURANCE — how far you got, not accuracy. One bad
-  //    beat ends the run, so accuracy is ~100% right up until death; grading on that
-  //    would hand an A to someone who died 10 beats into a 5-minute run. Instead we
-  //    score beats survived ÷ beats in the full run (clearing it = 100% = SS).
+  //  • Sudden Death / Gauntlet: weighted endurance — 70% how far you got (16th slots
+  //    cleared ÷ full-run slots) + 30% hit accuracy (green % of beats played).
+  //    Clearing the run gives 100% on the duration side; accuracy still matters.
   function runResultRankPct() {
     return runResultPct({
       mode: runState.mode,
@@ -1723,7 +1739,7 @@ const RogueliteMode = (() => {
   function rankClass(rank) { return 'rank-' + rank.toLowerCase(); }   // rank-ss … rank-e
   const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#b06fff', D: '#8ab0c8', E: '#ff3838' };
 
-  // Live gauge: endurance modes = slots cleared ÷ full-run slots; time trial = good
+  // Live gauge: endurance modes = weighted duration + accuracy; time trial = good
   // quarter-beats ÷ full-run target. Only ever fills (never drops).
   function scoreRank() {
     const g = liveGaugePct({
@@ -1862,7 +1878,7 @@ const RogueliteMode = (() => {
     if (el.gauntletParams) el.gauntletParams.style.display = isGauntlet ? '' : 'none';
     if (el.gameModeHint) {
       el.gameModeHint.textContent = (runState.mode === 'suddendeath')
-        ? 'Sudden Death: one dropped 16th ends it — score is how long you survive (target caps it).'
+        ? 'Sudden Death: one dropped 16th ends it — rank blends survival (70%) and accuracy (30%).'
         : 'Time Trial: play the full duration; graded E–SS.';
     }
     updateGates();
