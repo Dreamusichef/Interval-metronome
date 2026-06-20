@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260619f">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260619h">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -70,12 +70,17 @@
         </label>
 
         <button class="settings-row settings-row-btn" id="profileToggleRow" type="button" aria-expanded="false" hidden>
-          <span class="settings-row-label settings-row-label-left">Public profile
-            <small>Alias and avatar on global leaderboards.</small>
+          <span class="settings-row-label settings-row-label-left">Profile management
+            <small>Alias, avatar, and account options.</small>
           </span>
           <span class="settings-disclosure" id="profileCaret">&#9662;</span>
         </button>
         <div class="profile-settings" id="profileSettings" hidden>
+          <div class="profile-signin-prompt" hidden>
+            <p class="profile-signin-msg">Sign in to edit your profile, manage leaderboard display, or delete your account.</p>
+            <button type="button" class="cloud-btn profile-signin-btn">Sign in</button>
+          </div>
+          <div class="profile-signed-in">
           <label class="profile-field">
             <span class="profile-field-label">Alias</span>
             <input class="profile-alias-input config-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Your display name">
@@ -95,6 +100,14 @@
           <div class="profile-actions">
             <button type="button" class="rogue-btn profile-save-btn">Save profile</button>
             <button type="button" class="cloud-btn profile-reset-btn">Reset to Google</button>
+          </div>
+          <div class="profile-deletion-pending" hidden>
+            <p class="profile-deletion-pending-msg"></p>
+            <button type="button" class="cloud-btn profile-cancel-deletion-btn">Cancel account deletion</button>
+          </div>
+          <div class="profile-danger-zone">
+            <button type="button" class="rogue-btn profile-delete-account-btn">Delete account and data</button>
+          </div>
           </div>
           <p class="profile-status" aria-live="polite"></p>
         </div>
@@ -558,8 +571,8 @@
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
-  <script defer src="assets/js/settings.js?v=20260619c"></script>
-  <script defer src="assets/js/profile-settings.js?v=20260619c"></script>
+  <script defer src="assets/js/settings.js?v=20260619f"></script>
+  <script defer src="assets/js/profile-settings.js?v=20260619g"></script>
   <script defer src="assets/js/roguelite.js?v=20260619a"></script>
   <!-- Cloud: localhost → mock DB; deployed → Supabase. Optional — game works without it. -->
   <script>
@@ -569,8 +582,8 @@
       var h = location.hostname;
       window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619a', 'assets/js/cloud.js?v=20260619a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619a', 'assets/js/cloud.js?v=20260619a'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619e', 'assets/js/cloud.js?v=20260619g']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619d', 'assets/js/cloud.js?v=20260619g'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');

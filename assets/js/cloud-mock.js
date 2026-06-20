@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 const CloudMockBackend = (() => {
   // Bump this when seed users / runs change — invalidates stale localStorage mock data.
-  const STORAGE_KEY = 'cloud:mock:v3';
+  const STORAGE_KEY = 'cloud:mock:v4';
 
   const DEV_USERS = [
     {
@@ -62,13 +62,26 @@ const CloudMockBackend = (() => {
       { id: uid(), user_id: 'dev-user-sam', mode: 'gauntlet', instrument: 'kick', bpm: null, level: 1, rank: 'S', green_pct: 91, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(1) },
       { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'snare', bpm: 120, level: null, rank: 'C', green_pct: 68, duration_sec: 60, survival_sec: null, cleared: false, created_at: isoDaysAgo(6) },
     ];
-    return { profiles, runs, beta_waitlist: [], sessionUserId: null };
+    return { profiles, runs, beta_waitlist: [], account_deletion_requests: [], sessionUserId: null };
+  }
+
+  function purgeUserData(userId) {
+    if (!db || !userId) return;
+    db.profiles = db.profiles.filter(p => p.id !== userId);
+    db.runs = db.runs.filter(r => r.user_id !== userId);
+    db.account_deletion_requests = (db.account_deletion_requests || [])
+      .filter(r => r.user_id !== userId);
+    persistDb(db);
   }
 
   function loadDb() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (!parsed.account_deletion_requests) parsed.account_deletion_requests = [];
+        return parsed;
+      }
     } catch (e) {}
     const seeded = seedDb();
     persistDb(seeded);
@@ -141,8 +154,23 @@ const CloudMockBackend = (() => {
     db = loadDb();
     const sessionUser = db.sessionUserId ? devUserById(db.sessionUserId) : null;
     user = sessionUser;
+    if (user) {
+      const requests = db.account_deletion_requests || [];
+      const due = requests.find(r => {
+        if (r.user_id !== user.id) return false;
+        const t = Date.parse(r.scheduled_for);
+        return !Number.isNaN(t) && t <= Date.now();
+      });
+      if (due) {
+        purgeUserData(user.id);
+        db.sessionUserId = null;
+        persistDb(db);
+        user = null;
+      } else {
+        refreshProfileCache();
+      }
+    }
     ready = true;   // before onAuthChange — same contract as cloud-supabase getSession
-    if (user) refreshProfileCache();
     if (onAuthChange) onAuthChange(user);
     return true;
   }
@@ -349,6 +377,42 @@ const CloudMockBackend = (() => {
     return rows;
   }
 
+  async function requestAccountDeletion(opts) {
+    if (!init() || !user || !db) return { error: 'signed-out' };
+    const immediate = !!(opts && opts.immediate);
+    if (!db.account_deletion_requests) db.account_deletion_requests = [];
+    if (immediate) {
+      purgeUserData(user.id);
+      clearProfileCache();
+      return { ok: true, immediate: true };
+    }
+    const scheduled = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const idx = db.account_deletion_requests.findIndex(r => r.user_id === user.id);
+    const row = { user_id: user.id, requested_at: new Date().toISOString(), scheduled_for: scheduled };
+    if (idx >= 0) db.account_deletion_requests[idx] = row;
+    else db.account_deletion_requests.push(row);
+    persistDb(db);
+    return { ok: true, immediate: false, scheduled_for: scheduled };
+  }
+
+  async function cancelAccountDeletion() {
+    if (!init() || !user || !db) return { error: 'signed-out' };
+    if (!db.account_deletion_requests) return { ok: true };
+    const before = db.account_deletion_requests.length;
+    db.account_deletion_requests = db.account_deletion_requests.filter(r => r.user_id !== user.id);
+    if (db.account_deletion_requests.length !== before) persistDb(db);
+    return { ok: true };
+  }
+
+  async function getAccountDeletionStatus() {
+    if (!init() || !user || !db) return { pending: false };
+    const row = (db.account_deletion_requests || []).find(r => r.user_id === user.id);
+    if (!row) return { pending: false };
+    const t = Date.parse(row.scheduled_for);
+    if (Number.isNaN(t) || t <= Date.now()) return { pending: false };
+    return { pending: true, scheduled_for: row.scheduled_for };
+  }
+
   function resetMockData() {
     db = seedDb();
     persistDb(db);
@@ -359,6 +423,7 @@ const CloudMockBackend = (() => {
   return {
     init, isReady, signIn, signInAs, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
+    requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     getDevUsers, resetMockData,
   };
