@@ -288,6 +288,20 @@ body {
   text-align: center;
   margin-top: 64px;
 }
+.faq-tutorial-link {
+  margin-bottom: 16px;
+}
+.faq-tutorial-link a {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--cyan);
+  transition: color 0.2s;
+}
+.faq-tutorial-link a:hover { color: var(--gold); }
 .faq-cta-line {
   color: var(--text-dim);
   font-weight: 500;

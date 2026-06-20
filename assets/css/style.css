@@ -1721,6 +1721,9 @@ body.rogue-run .rogue-section { display: none !important; }
 .settings-faq-btn { margin-top: 8px; text-decoration: none; color: inherit; }
 .settings-faq-btn:hover .settings-row-label { color: var(--cyan); }
 .settings-faq-btn:hover .settings-disclosure { color: var(--cyan); }
+.settings-tutorial-btn { text-decoration: none; color: inherit; }
+.settings-tutorial-btn:hover .settings-row-label { color: var(--cyan); }
+.settings-tutorial-btn:hover .settings-disclosure { color: var(--cyan); }
 .settings-feedback-btn { margin-top: 4px; }
 .settings-feedback-btn:hover .settings-row-label { color: var(--cyan); }
 .settings-feedback-btn:hover .settings-disclosure { color: var(--cyan); }

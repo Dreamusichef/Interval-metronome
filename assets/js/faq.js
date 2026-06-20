@@ -162,6 +162,7 @@
       '</section>' +
       sectionHtml +
       '<div class="faq-cta faq-rise d3">' +
+        '<p class="faq-tutorial-link"><a href="tutorial.html">Watch the tutorial video</a></p>' +
         '<p class="faq-cta-line">Still stuck? Send us a note from Settings.</p>' +
         '<a class="faq-btn-gold" href="index.html">Back to App</a>' +
       '</div>';
