@@ -371,6 +371,8 @@ const RogueliteMode = (() => {
   // Default GM note per drum (kick 36, acoustic snare 38). Overridable via "learn".
   const DEFAULT_KICK_NOTE = 36;
   const DEFAULT_NOTE = { kick: 36, snare: 38 };
+  // Kick learn rejects snare/rim/etc. — only GM bass-drum notes (35 acoustic, 36 kick).
+  const KICK_LEARN_NOTES = [35, 36];
   const INSTR_LABEL = { kick: 'Kick', snare: 'Snare' };
 
   // ── Run / session state ──────────────────────────────────────────────────
@@ -607,6 +609,10 @@ const RogueliteMode = (() => {
     if (!(typeof ts === 'number') || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
 
     if (learning) {
+      if (runState.instrument === 'kick' && !KICK_LEARN_NOTES.includes(note)) {
+        setMidiStatus('Kick learn only accepts MIDI notes 35 or 36. Hit your kick pad.', true);
+        return;
+      }
       learning = false;
       runState.kickNote = note;
       el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + note);
@@ -629,7 +635,9 @@ const RogueliteMode = (() => {
     if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return; }
     if (!midiAccess) { setMidiStatus('Connect MIDI first.', true); return; }
     learning = true;
-    el.kickNote && (el.kickNote.textContent = 'Hit your ' + instrLabel().toLowerCase() + '…');
+    el.kickNote && (el.kickNote.textContent = runState.instrument === 'kick'
+      ? 'Hit your kick (MIDI notes 35 or 36 only)…'
+      : 'Hit your ' + instrLabel().toLowerCase() + '…');
   }
 
   // Current drum label ('Kick' | 'Snare'); falls back to 'Note' before a choice.
