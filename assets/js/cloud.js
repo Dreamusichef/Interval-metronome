@@ -17,6 +17,9 @@
      getProfile()                   — public alias + avatar for signed-in user
      updateProfile({ display_name, avatar_url })
      resetProfileFromGoogle()       — restore alias + avatar from OAuth metadata
+     requestAccountDeletion({ immediate }) — delete now or schedule 30-day grace period
+     cancelAccountDeletion()        — cancel a pending scheduled deletion
+     getAccountDeletionStatus()     — { pending, scheduled_for } or { pending: false }
      submitRun(record)              — validated insert via submit_run RPC / mock checks
      saveRun(record)                — alias for submitRun
      myRuns()                       — this user's runs (for personal stats)
@@ -163,6 +166,32 @@ const Cloud = (() => {
     return result;
   }
 
+  async function requestAccountDeletion(opts) {
+    if (!init()) return { error: 'no-client' };
+    if (!currentUser()) return { error: 'signed-out' };
+    if (!backend.requestAccountDeletion) return { error: 'no-client' };
+    const immediate = !!(opts && opts.immediate);
+    const result = await backend.requestAccountDeletion({ immediate });
+    if (result && result.ok && immediate) {
+      if (backend.signOut) await backend.signOut();
+    }
+    return result;
+  }
+
+  async function cancelAccountDeletion() {
+    if (!init()) return { error: 'no-client' };
+    if (!currentUser()) return { error: 'signed-out' };
+    if (!backend.cancelAccountDeletion) return { error: 'no-client' };
+    return backend.cancelAccountDeletion();
+  }
+
+  async function getAccountDeletionStatus() {
+    if (!init()) return { pending: false };
+    if (!currentUser()) return { pending: false };
+    if (!backend.getAccountDeletionStatus) return { pending: false };
+    return backend.getAccountDeletionStatus();
+  }
+
   async function claimBetaSpot() {
     if (!init()) return 'error';
     return backend.claimBetaSpot();
@@ -304,6 +333,7 @@ const Cloud = (() => {
   return {
     init, onAuth, signIn, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
+    requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     mountAuthBar, resetMockData,
   };

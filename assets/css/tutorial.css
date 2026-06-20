@@ -1,0 +1,19 @@
+/* Tutorial page — vertical YouTube Short embed */
+
+.tutorial-video-section {
+  margin-bottom: 48px;
+}
+
+.tutorial-video-wrap {
+  max-width: 360px;
+  margin: 0 auto;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+}
+
+.tutorial-video-wrap iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
