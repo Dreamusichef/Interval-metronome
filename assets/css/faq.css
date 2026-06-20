@@ -277,6 +277,18 @@ body {
 .faq-answer li { margin-bottom: 6px; }
 .faq-answer li:last-child { margin-bottom: 0; }
 
+.faq-cache-notice {
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--gold-flash);
+  background: rgba(255, 184, 0, 0.08);
+  border: 1px solid rgba(255, 184, 0, 0.35);
+}
+
 .faq-error {
   text-align: center;
   padding: 32px 24px;

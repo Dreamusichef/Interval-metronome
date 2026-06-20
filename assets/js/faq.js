@@ -2,18 +2,15 @@
 
 /* ════════════════════════════════════════════════════════════════════════════
    FAQ — fetch markdown content and render styled accordion page.
+   Always requests the live file (no browser cache). On network failure only,
+   falls back to the last successfully loaded copy in localStorage.
    ════════════════════════════════════════════════════════════════════════════ */
 (function () {
-  // ── FAQ content URL ───────────────────────────────────────────────────────
-  // Paste your public markdown URL here (same URL for localhost and production).
-  // Supabase Storage example (public bucket "content", file "faq.md"):
-  //   https://mmdmibimpipxckgfmhmz.supabase.co/storage/v1/object/public/content/faq.md
-  // Until hosted, the local copy below works with `npx http-server`.
-  const FAQ_CONTENT_URL = 'content/faq.md';
+  const FAQ_CONTENT_URL = 'https://mmdmibimpipxckgfmhmz.supabase.co/storage/v1/object/public/User-Facing Data/FAQ.md';
+  const FAQ_CACHE_KEY = 'gm_faq_md:' + FAQ_CONTENT_URL;
 
   const root = document.getElementById('faqContent');
   if (!root) return;
-
   function normalizeMd(raw) {
     return raw
       .replace(/\r\n/g, '\n')
@@ -126,9 +123,9 @@
     return { title, lede, sections };
   }
 
-  function renderPage(data) {
-    const sectionHtml = data.sections.map((section, idx) => {
-      const tone = idx % 2 === 0 ? 'gold' : 'cyan';
+  function renderPage(data, opts) {
+    const fromCache = opts && opts.fromCache;
+    const sectionHtml = data.sections.map((section, idx) => {      const tone = idx % 2 === 0 ? 'gold' : 'cyan';
       const itemsHtml = section.items.map((item) =>
         '<details class="faq-item panel">' +
           '<summary>' + escapeHtml(item.q) + '</summary>' +
@@ -149,8 +146,10 @@
     }).join('');
 
     root.innerHTML =
-      '<section class="faq-hero">' +
-        '<div class="faq-beat-row live faq-rise d1" aria-hidden="true">' +
+      (fromCache
+        ? '<p class="faq-cache-notice faq-rise" role="status">Showing a saved copy — live FAQ is temporarily unavailable.</p>'
+        : '') +
+      '<section class="faq-hero">' +        '<div class="faq-beat-row live faq-rise d1" aria-hidden="true">' +
           '<div class="faq-hex accent"></div>' +
           '<div class="faq-hex"></div>' +
           '<div class="faq-hex"></div>' +
@@ -176,11 +175,46 @@
       '</div>';
   }
 
-  fetch(FAQ_CONTENT_URL)
-    .then((res) => {
+  function readCache() {
+    try {
+      return localStorage.getItem(FAQ_CACHE_KEY);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeCache(md) {
+    try {
+      localStorage.setItem(FAQ_CACHE_KEY, md);
+    } catch (e) { /* private mode / quota — skip */ }
+  }
+
+  function fetchLiveMd() {
+    const bust = (FAQ_CONTENT_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
+    return fetch(FAQ_CONTENT_URL + bust, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    }).then((res) => {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.text();
-    })
-    .then((md) => renderPage(parseFaqMd(md)))
-    .catch((err) => renderError(err.message || String(err)));
+    });
+  }
+
+  function loadFaq() {
+    fetchLiveMd()
+      .then((md) => {
+        writeCache(md);
+        renderPage(parseFaqMd(md));
+      })
+      .catch((err) => {
+        const cached = readCache();
+        if (cached) {
+          renderPage(parseFaqMd(cached), { fromCache: true });
+          return;
+        }
+        renderError(err.message || String(err));
+      });
+  }
+
+  loadFaq();
 })();
