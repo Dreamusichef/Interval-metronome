@@ -2,7 +2,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const { dojoPulse, firstStrokePulse, crossedMilestone } = require('../src/domain/funnel-analysis');
+const { dojoPulse, crossedMilestone } = require('../src/domain/funnel-analysis');
 
 describe('funnel-analysis — dojo', () => {
   test('baseline run writes a row but no signal', () => {
@@ -38,22 +38,6 @@ describe('funnel-analysis — dojo', () => {
       { ninjas: 102, activeNinjas: 40, totalClips: 8210 },
       { ninjas: 100, activeNinjas: 40, totalClips: 8200 }
     );
-    assert.equal(row.needs_attention, false);
-    assert.equal(signal, null);
-  });
-});
-
-describe('funnel-analysis — first stroke', () => {
-  test('preorder milestone crossing fires a signal', () => {
-    const { row, signal } = firstStrokePulse({ preorders: 102 }, { preorders: 96 });
-    assert.equal(row.needs_attention, true);
-    assert.ok(signal);
-    assert.match(signal.title, /crossed 100/);
-  });
-
-  test('unavailable source still produces a tolerant row', () => {
-    const { row, signal } = firstStrokePulse({ preorders: null }, null);
-    assert.equal(row.source, 'firststroke');
     assert.equal(row.needs_attention, false);
     assert.equal(signal, null);
   });

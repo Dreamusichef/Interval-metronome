@@ -15,17 +15,17 @@ const cockpit = require('../lib/cockpit');
 const { getWatermark, setWatermark } = require('../lib/watermark');
 const { detectMoneyAlerts } = require('../domain/money-analysis');
 
-const WM = 'money:preorders';
+const WM = 'money:launch';
 
 async function run(ctx = {}) {
   const bundle = ctx.bundle || (await cockpit.read());
   const snapshot = bundle.snapshot || {};
 
-  // Previous preorder count for idempotent milestone-crossing detection.
+  // Previous launch-counter value for idempotent milestone-crossing detection.
   const prev = getWatermark(WM);
-  const lastPreorders = prev != null && prev !== '' ? Number(prev) : null;
+  const lastValue = prev != null && prev !== '' ? Number(prev) : null;
 
-  const { rows, signals } = detectMoneyAlerts(snapshot, { lastPreorders });
+  const { rows, signals } = detectMoneyAlerts(snapshot, { lastValue });
 
   const capturedAt = new Date().toISOString();
   const stamped = rows.map((r) => ({ ...r, captured_at: capturedAt }));
@@ -34,9 +34,9 @@ async function run(ctx = {}) {
     await cockpit.ingest('money_alerts', stamped);
   }
 
-  // Advance the milestone watermark to the latest observed preorder count.
-  const cur = snapshot.firstStroke && typeof snapshot.firstStroke.preorders === 'number'
-    ? snapshot.firstStroke.preorders
+  // Advance the milestone watermark to the latest observed launch-counter value.
+  const cur = snapshot.launch && typeof snapshot.launch.value === 'number'
+    ? snapshot.launch.value
     : null;
   if (cur != null) setWatermark(WM, String(cur));
 

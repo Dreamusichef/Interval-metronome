@@ -14,13 +14,17 @@
       refunds:  { amount: number, trailingWeeklyAvgAmount: number, count?: number },
       payments: { failed: number, disputed: number },
       revenue:  { weekToDateAmount: number, trailingWeeklyAvgAmount: number },
-      firstStroke: { preorders: number }   // milestone source (also used by Funnel)
+      launch:   { label: string, value: number }   // product-agnostic milestone counter
     }
+
+  `launch` is a generic product-launch counter (e.g. Art of Double Bass 3.0 sales). When
+  the owner populates it in /daemon-read, milestone crossings fire automatically — no
+  daemon change needed. (First Stroke was the original example and has been removed.)
 
   Thresholds are tunable via opts (the owner tunes live — build step 7).
 */
 
-const PREORDER_MILESTONES = [100, 250, 500, 1000, 2500];
+const LAUNCH_MILESTONES = [50, 100, 250, 500, 1000, 2500];
 
 function num(v) {
   return typeof v === 'number' && isFinite(v) ? v : null;
@@ -33,7 +37,7 @@ function num(v) {
  * @param {number} [opts.revenueDipRatio=0.6]    week revenue below this * trailing avg → dip
  * @param {number} [opts.revenueSpikeRatio=1.8]  week revenue above this * trailing avg → spike
  * @param {number} [opts.failedThreshold=1]      failed/disputed count at/above → flag
- * @param {number|null} [opts.lastPreorders=null] previous preorder count (watermark) for milestone-crossing
+ * @param {number|null} [opts.lastValue=null]    previous launch counter (watermark) for milestone-crossing
  * @returns {{ rows: object[], signals: object[] }}  rows lack captured_at (module stamps it)
  */
 function detectMoneyAlerts(snapshot, opts = {}) {
@@ -42,7 +46,7 @@ function detectMoneyAlerts(snapshot, opts = {}) {
     revenueDipRatio = 0.6,
     revenueSpikeRatio = 1.8,
     failedThreshold = 1,
-    lastPreorders = null,
+    lastValue = null,
   } = opts;
 
   const rows = [];
@@ -102,19 +106,20 @@ function detectMoneyAlerts(snapshot, opts = {}) {
     }
   }
 
-  // --- First Stroke preorder milestone (idempotent via lastPreorders) ---
-  const preorders = num(s.firstStroke && s.firstStroke.preorders);
-  if (preorders != null) {
-    const crossed = PREORDER_MILESTONES.filter(
-      (m) => preorders >= m && (lastPreorders == null || lastPreorders < m)
+  // --- Product-launch milestone (idempotent via lastValue) ---
+  const launchVal = num(s.launch && s.launch.value);
+  if (launchVal != null) {
+    const label = (s.launch && s.launch.label) || 'launch';
+    const crossed = LAUNCH_MILESTONES.filter(
+      (m) => launchVal >= m && (lastValue == null || lastValue < m)
     );
-    // Only emit on a genuine crossing (lastPreorders known and below the milestone).
+    // Only emit on a genuine crossing (lastValue known and below the milestone).
     for (const m of crossed) {
-      if (lastPreorders != null && lastPreorders < m) {
+      if (lastValue != null && lastValue < m) {
         push(
           'milestone',
-          `First Stroke crossed ${m} preorders (now ${preorders})`,
-          preorders,
+          `${label} crossed ${m} (now ${launchVal})`,
+          launchVal,
           'notice',
           true
         );
@@ -125,4 +130,4 @@ function detectMoneyAlerts(snapshot, opts = {}) {
   return { rows, signals };
 }
 
-module.exports = { detectMoneyAlerts, PREORDER_MILESTONES };
+module.exports = { detectMoneyAlerts, LAUNCH_MILESTONES };

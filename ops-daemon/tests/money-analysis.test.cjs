@@ -37,21 +37,24 @@ describe('money-analysis — anomalies', () => {
   });
 });
 
-describe('money-analysis — milestones are idempotent', () => {
-  test('fires only on a genuine crossing', () => {
-    const crossing = detectMoneyAlerts({ firstStroke: { preorders: 101 } }, { lastPreorders: 98 });
+describe('money-analysis — launch milestones are idempotent', () => {
+  test('fires only on a genuine crossing, with the product label', () => {
+    const crossing = detectMoneyAlerts(
+      { launch: { label: 'Art of Double Bass 3.0', value: 101 } },
+      { lastValue: 98 }
+    );
     const m = crossing.rows.find((x) => x.type === 'milestone');
     assert.ok(m);
-    assert.match(m.detail, /crossed 100/);
+    assert.match(m.detail, /Art of Double Bass 3\.0 crossed 100/);
   });
 
   test('does not re-fire once already above', () => {
-    const noFire = detectMoneyAlerts({ firstStroke: { preorders: 120 } }, { lastPreorders: 110 });
+    const noFire = detectMoneyAlerts({ launch: { value: 120 } }, { lastValue: 110 });
     assert.equal(noFire.rows.find((x) => x.type === 'milestone'), undefined);
   });
 
-  test('does not fire on first observation (no prior count)', () => {
-    const first = detectMoneyAlerts({ firstStroke: { preorders: 500 } }, { lastPreorders: null });
+  test('does not fire on first observation (no prior value)', () => {
+    const first = detectMoneyAlerts({ launch: { value: 500 } }, { lastValue: null });
     assert.equal(first.rows.find((x) => x.type === 'milestone'), undefined);
   });
 });

@@ -106,11 +106,6 @@ const config = {
     ),
   },
 
-  firstStroke: {
-    supabaseUrl: str('FIRSTSTROKE_SUPABASE_URL'),
-    anonKey: str('FIRSTSTROKE_ANON_KEY'),
-  },
-
   discord: {
     briefWebhookUrl: str('DISCORD_BRIEF_WEBHOOK_URL'),
   },
@@ -143,11 +138,6 @@ function validate() {
   }
   if (config.modules.funnel) {
     need(config.dojo.publicJsonUrl, 'MODULE_FUNNEL_ENABLED but DOJO_PUBLIC_JSON_URL is not set.');
-    // First Stroke creds are optional-but-flagged: the module reports the source as
-    // unavailable rather than failing the whole run.
-    if (!config.firstStroke.supabaseUrl) {
-      warnings.push('FIRSTSTROKE_SUPABASE_URL is not set — First Stroke funnel source will be skipped (confirm read method with owner).');
-    }
   }
   // The Brief reaches Wei via the webhook; without it, briefs still persist to the cockpit.
   need(config.discord.briefWebhookUrl, 'DISCORD_BRIEF_WEBHOOK_URL is not set (brief will persist but not push to Discord).');

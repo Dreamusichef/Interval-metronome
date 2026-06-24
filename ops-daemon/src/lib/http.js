@@ -2,7 +2,7 @@
 
 /*
   Native fetch with bounded exponential-backoff retry. Used by every outbound
-  HTTP caller (cockpit, Kit, Dojo, First Stroke, Discord webhook). Node 20+ has
+  HTTP caller (cockpit, Kit, Dojo, Discord webhook). Node 20+ has
   global fetch, so no dependency.
 */
 

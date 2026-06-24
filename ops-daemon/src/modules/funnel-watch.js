@@ -1,18 +1,16 @@
 'use strict';
 
 /*
-  Funnel Watch — "Gates & Tides" → funnel_pulse (Dojo + First Stroke only).
+  Funnel Watch — "Gates & Tides" → funnel_pulse (Dojo only, for now).
 
   Weekly (self-gated via a watermark, so it participates in the day's Brief when it
-  runs). Built to accept a LIST of sources; Metronome is a future drop-in entry behind
-  the existing toggle — NOT wired in this build. No Haiku.
+  runs). Built to accept a LIST of sources so new funnels drop in with no rework —
+  Art of Double Bass 3.0 and the Game Metronome are future entries behind this same
+  toggle, NOT wired in this build. (First Stroke was removed — no longer in development.)
+  No Haiku.
 
-  Sources:
+  Source:
    - Dojo: fetch DOJO_PUBLIC_JSON_URL (published nightly, PII-free, zero setup).
-   - First Stroke: read the preorder counter. The read method is owner-confirmed —
-     set FIRSTSTROKE_PREORDER_PATH (a path under FIRSTSTROKE_SUPABASE_URL returning
-     JSON) and FIRSTSTROKE_PREORDER_KEY (dotted key to the number). If unset/unreadable,
-     the source is skipped (logged) rather than guessed.
 */
 
 const config = require('../config');
@@ -20,7 +18,7 @@ const logger = require('../lib/logger');
 const cockpit = require('../lib/cockpit');
 const { fetchJson } = require('../lib/http');
 const { getWatermark, setWatermark, getWatermarkUpdatedAt } = require('../lib/watermark');
-const { dojoPulse, firstStrokePulse } = require('../domain/funnel-analysis');
+const { dojoPulse } = require('../domain/funnel-analysis');
 
 const WM_LASTRUN = 'funnel:lastrun';
 const WEEKLY_MS = 7 * 86400000;
@@ -54,39 +52,12 @@ async function fetchDojo() {
   };
 }
 
-function dottedGet(obj, path) {
-  return String(path)
-    .split('.')
-    .reduce((acc, k) => (acc == null ? acc : acc[k]), obj);
-}
-
-async function fetchFirstStroke() {
-  const { supabaseUrl, anonKey } = config.firstStroke;
-  const path = process.env.FIRSTSTROKE_PREORDER_PATH;
-  const key = process.env.FIRSTSTROKE_PREORDER_KEY || 'preorders';
-  if (!supabaseUrl || !anonKey || !path) {
-    logger.warn('funnel: First Stroke read not configured — skipping source (confirm method with owner)');
-    return null;
-  }
-  const url = supabaseUrl.replace(/\/+$/, '') + (path.startsWith('/') ? path : '/' + path);
-  const data = await fetchJson(
-    url,
-    { method: 'GET', headers: { apikey: anonKey, authorization: `Bearer ${anonKey}` } },
-    { label: 'funnel:firststroke' }
-  );
-  const raw = dottedGet(data, key);
-  const preorders = typeof raw === 'number' ? raw : Number(raw);
-  if (!isFinite(preorders)) {
-    logger.warn('funnel: First Stroke value not numeric — skipping', { key });
-    return null;
-  }
-  return { preorders };
-}
-
 const SOURCES = [
   { key: 'dojo', wm: 'funnel:dojo', fetch: fetchDojo, pulse: dojoPulse },
-  { key: 'firststroke', wm: 'funnel:firststroke', fetch: fetchFirstStroke, pulse: firstStrokePulse },
-  // Future: { key: 'metronome', ... } — drop-in behind the existing toggle, no rework.
+  // Future drop-ins behind this same toggle — add a { key, wm, fetch, pulse } entry,
+  // no other rework needed:
+  //   { key: 'adb3', ... }        — Art of Double Bass 3.0
+  //   { key: 'metronome', ... }   — Game Metronome (deferred pending Azurek)
 ];
 
 async function run() {

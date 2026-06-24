@@ -51,8 +51,11 @@ Paste this prompt into Lovable for the **Arcane Sanctum** project:
 > The `snapshot` should reuse the Treasury's existing reconciled numbers (Shopify/PayPal,
 > including PayPal dedup) — do not recompute. A useful shape for the daemon's Money Watch
 > is: `{ refunds: { amount, trailingWeeklyAvgAmount }, payments: { failed, disputed },
-> revenue: { weekToDateAmount, trailingWeeklyAvgAmount }, firstStroke: { preorders } }`
-> (all optional — the daemon tolerates missing fields).
+> revenue: { weekToDateAmount, trailingWeeklyAvgAmount }, launch: { label, value } }`
+> (all optional — the daemon tolerates missing fields). `launch` is a generic
+> product-launch counter — populate it (e.g. `{ label: "Art of Double Bass 3.0",
+> value: <sales> }`) whenever you want milestone alerts (50/100/250/500/1000/2500);
+> leave it out and no milestone fires.
 
 After Lovable builds it, note the two endpoint URLs — they go in the daemon `.env` as
 `ARCANE_INGEST_URL` and `ARCANE_READ_URL`.
@@ -82,41 +85,28 @@ Webhook** → name it (e.g. "Dawn Auspex") → **Copy Webhook URL**. That URL is
 | `KIT_API_KEY` | Kit (ConvertKit) API key (read-only use). |
 | `DAEMON_HASH_SALT` | A long random string. Rotating it re-buckets student hashes — set once and keep. |
 | `DISCORD_BRIEF_WEBHOOK_URL` | The webhook URL from step 2. |
-| `FIRSTSTROKE_SUPABASE_URL` / `FIRSTSTROKE_ANON_KEY` | First Stroke project (see step 4). |
 
 Shopify/PayPal keys are **not** needed — money is read via the reconciled snapshot.
 
 Optional:
 - `KIT_COLD_TAG` — the name of your Kit "cold/non-responder" tag. Set it to enable the
   cull **proposal** (the daemon still never deletes). Without it, the cull is skipped.
-- `FIRSTSTROKE_PREORDER_PATH` / `FIRSTSTROKE_PREORDER_KEY` — see step 4.
+
+> **First Stroke is gone** — no longer in development, so there's nothing to configure for
+> it. Funnel Watch wires only Dojo today; **Art of Double Bass 3.0** and the Game Metronome
+> are future drop-in sources (add a source entry in `funnel-watch.js`). ADB 3.0 launch
+> milestones can fire today with zero new credentials by populating `launch` in the
+> `/daemon-read` snapshot (step 1).
 
 ---
 
-## 4. Confirm the First Stroke preorder-counter read method
-
-The daemon needs to read the First Stroke preorder count, but the read method is **not
-assumed** — tell it where the number is:
-
-- Set `FIRSTSTROKE_PREORDER_PATH` to a path under `FIRSTSTROKE_SUPABASE_URL` that returns
-  JSON when fetched with the anon key (e.g. a PostgREST view/RPC like
-  `/rest/v1/preorder_count?select=count` or `/rest/v1/rpc/preorder_total`).
-- Set `FIRSTSTROKE_PREORDER_KEY` to the dotted path to the number in that JSON
-  (e.g. `0.count` or `preorders`; default `preorders`).
-
-If you'd rather, tell the build agent the exact First Stroke table/column and it will wire
-`fetchFirstStroke()` directly. Until configured, Funnel Watch **skips** First Stroke (it
-won't guess a schema) and still reports Dojo.
-
----
-
-## 5. Deploy on the VPS
+## 4. Deploy on the VPS
 
 ```bash
 # one-time: clone the daemon repo to /opt/ops-daemon (lifted out of ops-daemon/)
 cd /opt/ops-daemon
 npm install
-# create .env per steps 1–4
+# create .env per steps 1–3
 node index.js --once            # smoke test: prints a cycle, writes run_log
 pm2 start ecosystem.config.js
 pm2 save
@@ -126,7 +116,7 @@ Updates later: `git pull && npm install && pm2 reload ops-daemon`.
 
 ---
 
-## 6. Pulse Bot intake addition
+## 5. Pulse Bot intake addition
 
 The daemon reads `discord_intake` from `ops.db`; **Pulse** fills it. See
 `pulse-integration/README.md` for the one isolated, flag-gated file to add to the Pulse
@@ -135,7 +125,7 @@ intake (it never touches Discord itself).
 
 ---
 
-## 7. Tune thresholds live
+## 6. Tune thresholds live
 
 After the first few briefs, tune the thresholds (refund spike ratio, revenue dip/spike,
 ninja-growth, low-click-rate, cull age, pain intensity) — they're plain options on the

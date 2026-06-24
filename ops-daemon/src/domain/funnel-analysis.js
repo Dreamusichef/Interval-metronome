@@ -1,18 +1,16 @@
 'use strict';
 
 /*
-  Funnel Watch analysis — PURE. Dojo (public JSON) + First Stroke (preorder counter).
-  Built to accept a LIST of sources; Metronome is a future entry behind the existing
-  toggle, not wired now. "Speak only on meaningful movement": every weekly run writes
-  one funnel_pulse row per source, but a brief signal fires only on real movement.
+  Funnel Watch analysis — PURE. Dojo (public JSON). Built so new sources drop in with
+  no rework (Art of Double Bass 3.0, Game Metronome are future entries, not wired here).
+  "Speak only on meaningful movement": every weekly run writes one funnel_pulse row per
+  source, but a brief signal fires only on real movement.
 
-  Each function returns { row, signal } where:
+  dojoPulse returns { row, signal } where:
     row    — funnel_pulse shape minus captured_at (module stamps it):
              { source, metrics, delta_note, needs_attention }
     signal — a brief signal, or null when movement is not meaningful.
 */
-
-const { PREORDER_MILESTONES } = require('./money-analysis');
 
 function n(v) {
   return typeof v === 'number' && isFinite(v) ? v : null;
@@ -82,40 +80,4 @@ function milestoneSeq(clips) {
   return out;
 }
 
-/**
- * First Stroke pulse from the preorder counter.
- * @param {object} current   { preorders }
- * @param {object|null} previous  { preorders }
- */
-function firstStrokePulse(current, previous) {
-  const cur = current || {};
-  const prev = previous || null;
-  const preorders = n(cur.preorders);
-
-  const metrics = { preorders };
-  let needsAttention = false;
-  const notes = [];
-
-  if (prev && n(prev.preorders) != null && preorders != null) {
-    const delta = preorders - prev.preorders;
-    notes.push(`${delta >= 0 ? '+' : ''}${delta} preorders`);
-    const ms = crossedMilestone(prev.preorders, preorders, PREORDER_MILESTONES);
-    if (ms != null) {
-      notes.push(`crossed ${ms} preorders`);
-      needsAttention = true;
-    }
-  } else if (preorders != null) {
-    notes.push('baseline (first reading)');
-  } else {
-    notes.push('unavailable');
-  }
-
-  const delta_note = notes.join('; ');
-  const row = { source: 'firststroke', metrics, delta_note, needs_attention: needsAttention };
-  const signal = needsAttention
-    ? { source: 'funnel', severity: 'notice', needsAttention: true, title: `First Stroke: ${delta_note}`, detail: delta_note }
-    : null;
-  return { row, signal };
-}
-
-module.exports = { dojoPulse, firstStrokePulse, crossedMilestone, milestoneSeq };
+module.exports = { dojoPulse, crossedMilestone, milestoneSeq };

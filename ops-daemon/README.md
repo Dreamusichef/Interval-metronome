@@ -24,8 +24,8 @@ SOURCES                          OPS DAEMON (/opt/ops-daemon, PM2, node-cron, Ha
 Pulse Bot ─► ops.db (local) ───► Pain-Point Miner ─┐
 Kit API ───────────────────────► Email Watch ──────┤
 Arcane /daemon-read (snapshot) ► Money Watch ───────┤  each writes a row  ──POST──►  /daemon-ingest ─► tables:
-Dojo public JSON + First Stroke ► Funnel Watch ─────┼─►                                pain_points, email_health,
-(Metronome: future, not wired) ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤                                   money_alerts, funnel_pulse,
+Dojo public JSON ──────────────► Funnel Watch ──────┼─►                                pain_points, email_health,
+(ADB 3.0 / Metronome: future) ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┤                                   money_alerts, funnel_pulse,
 Arcane /daemon-read (quests) ──► Stale-Quest ───────┤                                   review_alerts, daily_brief
                                  The Morning Brief ──┴──► Discord webhook ─► #clawdbot-notifications ─► Wei
 ```
@@ -55,7 +55,7 @@ and (mostly) its own cockpit table.
 |---|---|---|---|---|
 | **Email Watch** — *The Sendings* | daily | no | `email_health` | one row/run; proposes a non-responder cull, **never deletes** |
 | **Money Watch** — *Coffer Wards* | daily | no | `money_alerts` | reads reconciled snapshot; quiet when normal |
-| **Funnel Watch** — *Gates & Tides* | weekly | no | `funnel_pulse` | Dojo + First Stroke; Metronome is a future drop-in source |
+| **Funnel Watch** — *Gates & Tides* | weekly | no | `funnel_pulse` | Dojo; ADB 3.0 + Metronome are future drop-in sources |
 | **Pain-Point Miner** — *Forge Echoes* | daily | **yes (Batch)** | `pain_points` | classify → dedup; handles hashed; verbatim quotes |
 | **Review Watch** — *The Testaments* | — | no | `review_alerts` | **scaffold, shipped disabled** |
 | **Stale-Quest Resurfacing** | daily | no | — | surfaces cold quests in the Brief only |
@@ -162,7 +162,7 @@ src/lib/
 src/domain/                   PURE, unit-tested logic (no I/O):
   brief-compose.js            exception-based 3–5 item selection
   money-analysis.js           anomaly + milestone detection
-  funnel-analysis.js          Dojo + First Stroke pulse
+  funnel-analysis.js          Dojo pulse
   email-analysis.js           flags + proposed cull
   pain/taxonomy.js            taxonomy, Haiku prompts, result parsers
   pain/dedup.js               canonical accumulation (frequency, quotes, source hashes)
@@ -176,4 +176,4 @@ HUMAN-SETUP.md                the human-only setup steps (Lovable, Discord, keys
 ```
 
 See **HUMAN-SETUP.md** for the steps only Wei can do (Lovable endpoints, Discord webhook,
-keys, First Stroke read method, deploy).
+keys, deploy).
