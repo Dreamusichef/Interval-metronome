@@ -1,0 +1,21 @@
+# Secrets — never commit (provisioned by the owner on the VPS)
+.env
+.env.*
+!.env.example
+
+# Local operational state — VPS-local, same trust level as Pulse's dojo-data.json
+ops.db
+ops.db-wal
+ops.db-shm
+*.sqlite
+*.sqlite-*
+
+# Dependencies / runtime
+node_modules/
+npm-debug.log*
+pm2.log
+.pm2/
+
+# Editor / OS
+.DS_Store
+*.swp

@@ -1,0 +1,21 @@
+{
+  "name": "ops-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Ops Daemon — watches Wei Lung Wong's business on a schedule and emits one daily brief.",
+  "type": "commonjs",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "once": "node index.js --once",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "better-sqlite3": "^11.8.0",
+    "node-cron": "^3.0.3"
+  }
+}
