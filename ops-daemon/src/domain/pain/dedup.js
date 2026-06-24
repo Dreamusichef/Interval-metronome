@@ -4,11 +4,15 @@
   Canonical pain-point accumulation — PURE. The daemon keeps its own canonical
   mirror locally (it cannot read pain_points back from /daemon-read), so these
   functions own the merge math: increment frequency, append verbatim quotes (cap
-  ~10 distinct), refresh last_seen, track source hashes for idempotency, and keep a
+  ~10 distinct), refresh last_seen, track distinct author hashes, and keep a
   running intensity average.
 
-  Idempotency: a message's source_hash is the dedupe key. If a hash is already on a
-  canonical row, re-processing it is a no-op — reruns never double-count.
+  source_hashes is the set of distinct salted AUTHOR hashes (PII-free provenance —
+  "which students"), NOT a per-message dedupe key: frequency counts messages and
+  always increments. Rerun idempotency is owned by the CALLER (painpoint-miner.js):
+  intake rows are processed-once, the mirror-persist + mark-processed commit
+  atomically in one transaction, and the cockpit upsert sends ABSOLUTE computed
+  rows — so a crash-replay recomputes identical values and never double-counts.
 
   The local mirror row carries two internal-only fields (`key`, `intensity_sum`)
   used for bucketing and average math; `toCockpitRow()` strips them to the
