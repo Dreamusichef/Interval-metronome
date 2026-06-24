@@ -61,7 +61,18 @@ async function runDailyCycle() {
     results.push(await runModule('email-watch', config.modules.email, () => emailWatch.run()));
     results.push(await runModule('money-watch', config.modules.money, () => moneyWatch.run({ bundle })));
 
-    const funnelDue = config.modules.funnel && funnelWatch.isDue();
+    // Funnel self-gates to weekly; guard the gate check so a DB hiccup in isDue()
+    // can never abort the cycle (module isolation is a hard requirement).
+    let funnelDue = false;
+    if (config.modules.funnel) {
+      try {
+        funnelDue = funnelWatch.isDue();
+      } catch (err) {
+        logger.error('funnel isDue check failed — treating as not due', {
+          error: String((err && err.message) || err),
+        });
+      }
+    }
     results.push(await runModule('funnel-watch', funnelDue, () => funnelWatch.run()));
 
     results.push(await runModule('painpoint-miner', config.modules.painpoints, () => painMiner.run()));

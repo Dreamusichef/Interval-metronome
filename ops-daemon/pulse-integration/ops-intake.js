@@ -139,9 +139,12 @@ async function runOpsIntake(opts = {}) {
         const afterId = row ? row.cursor : null;
 
         const messages = (await fetchChannelMessages(ch.id, afterId)) || [];
-        let newest = afterId;
 
+        // The transaction returns its own counts; we only fold them into the totals
+        // AFTER a successful commit, so a rolled-back batch can't inflate the summary.
         const insertBatch = db.transaction((msgs) => {
+          let inserted = 0;
+          let newest = afterId;
           for (const m of msgs) {
             if (!m || m.id == null) continue;
             // Skip anything not strictly newer than the cursor (defensive against
@@ -160,12 +163,16 @@ async function runOpsIntake(opts = {}) {
               m.ts || null
             );
             newest = maxId(newest, m.id);
-            totalInserted += 1;
-            perChannel[ch.name || ch.id] = (perChannel[ch.name || ch.id] || 0) + 1;
+            inserted += 1;
           }
+          return { inserted, newest };
         });
-        insertBatch(messages);
 
+        const { inserted, newest } = insertBatch(messages);
+        if (inserted > 0) {
+          totalInserted += inserted;
+          perChannel[ch.name || ch.id] = (perChannel[ch.name || ch.id] || 0) + inserted;
+        }
         if (newest && newest !== afterId) {
           setCursor.run(wmKey, String(newest), new Date().toISOString());
         }
