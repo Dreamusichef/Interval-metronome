@@ -12,7 +12,7 @@
      - MetronomeEngine.onSchedule()  → precise per-tick times (audio clock)
      - MetronomeEngine.getAudioContext() → the shared audio clock
      - window.AppRamp.*               → start/stop/read the existing ramp
-     - document 'ramp:start|bpmchange|complete|stop' events → ramp lifecycle
+     - document 'ramp:start|bpmchange|setcomplete|complete|stop' events → ramp lifecycle
 
    ─────────────────────────────────────────────────────────────────────────
    THE CALIBRATION PRINCIPLE (read before touching detection math):
@@ -1220,6 +1220,7 @@ const RogueliteMode = (() => {
 
   function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, sixteenthIdx, offset) {
     if (runState.status !== 'running') return;
+    if (!runGating) return;
     if (offset == null) offset = runState.meanOffset;
 
     // The first scored 16th of each set is lenient on the early side (a rushed start
@@ -1353,6 +1354,16 @@ const RogueliteMode = (() => {
     if (runState.status !== 'running') return;
     window.__rogueSuppressDoneOverlay = true;   // stays true; reset on overlay close / next run
     completeRun(false);
+  }
+
+  // A BPM set finished (timer expired) but the ramp continues — rest, then next set.
+  // Stop scoring immediately so tail slots and stray hits after the set-end cue
+  // can't fail a run the player already survived.
+  function onRampSetComplete() {
+    if (runState.status !== 'running') return;
+    clearPendingEvals();
+    runGating = false;
+    events = [];
   }
 
   // Called on ramp:start and ramp:bpmchange. The fixed climb lands the final set
@@ -2149,6 +2160,7 @@ const RogueliteMode = (() => {
     // Ramp lifecycle from app.js.
     document.addEventListener('ramp:start',     e => maybeCompleteOnBpm(e.detail && e.detail.bpm));
     document.addEventListener('ramp:bpmchange', e => maybeCompleteOnBpm(e.detail && e.detail.bpm));
+    document.addEventListener('ramp:setcomplete', () => onRampSetComplete());
     document.addEventListener('ramp:complete', () => onRampComplete());
     document.addEventListener('ramp:stop', () => onRampStop());
 

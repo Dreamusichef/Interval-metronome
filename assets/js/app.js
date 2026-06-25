@@ -615,6 +615,9 @@ function countdownTick() {
 
 function onSetComplete() {
   if (session.currentSet >= session.totalSets) { finishSession(); return; }
+  // Roguelite hook: a BPM set survived — stop scoring tail slots / stray hits before
+  // the set-end cue and rest (or immediate advance when rest is 0).
+  document.dispatchEvent(new CustomEvent('ramp:setcomplete', { detail: { bpm: session.currentBpm, set: session.currentSet } }));
   ME?.playSetEndCue();
   if (session.restDurationSecs > 0) {
     ME?.stop();
@@ -702,7 +705,8 @@ function setConfigDisabled(disabled) {
 // ── Roguelite control surface ───────────────────────────────────────────────
 // Minimal, additive API so Roguelite Mode can reuse the existing ramp engine
 // instead of duplicating it. The roguelite layer (roguelite.js) drives the
-// climb through this surface and listens to the ramp:* CustomEvents above.
+// climb through this surface and listens to the ramp:* CustomEvents above
+// (start, bpmchange, setcomplete, complete, stop).
 window.AppRamp = {
   // Ensure Ramp Mode is on, then start the existing interval session unchanged.
   startRampSession() {
