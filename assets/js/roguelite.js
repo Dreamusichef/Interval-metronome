@@ -539,6 +539,43 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // MIDI
   // ───────────────────────────────────────────────────────────────────────────
+
+  function persistMidiCalibration() {
+    if (runState.inputSource !== 'midi' || !selectedInputId || !runState.calibration) return;
+    if (runState.calibration.manual) return;
+    if (!window.CalibrationStore) return;
+    const dev = midiInputs.find(i => i.id === selectedInputId);
+    CalibrationStore.save(selectedInputId, dev ? dev.name : selectedInputId, runState.calibration);
+  }
+
+  function tryLoadMidiCalibration() {
+    if (runState.inputSource !== 'midi') return;
+    if (!selectedInputId || runState.status === 'calibrating' || runState.status === 'running') return;
+    if (runState.calibration && runState.calibration.manual) return;
+    if (!midiInputs.some(i => i.id === selectedInputId)) {
+      runState.calibration = null;
+      runState.meanOffset = 0;
+      updateGates();
+      return;
+    }
+    if (!window.CalibrationStore) { updateGates(); return; }
+    const dev = midiInputs.find(i => i.id === selectedInputId);
+    const stored = CalibrationStore.get(selectedInputId, dev ? dev.name : '');
+    if (!stored || !stored.calibration) {
+      runState.calibration = null;
+      runState.meanOffset = 0;
+      updateGates();
+      return;
+    }
+    runState.calibration = { ...stored.calibration };
+    runState.meanOffset = stored.calibration.meanOffset;
+    captureLatencyCal();
+    setStatus(el.calStatus,
+      'Loaded saved calibration for ' + (dev ? dev.name : 'device') + ' — offset ' +
+      signed(runState.meanOffset) + 'ms.', false);
+    updateGates();
+  }
+
   async function enableMidi() {
     if (!navigator.requestMIDIAccess) {
       setMidiStatus('Web MIDI not supported in this browser.', true);
@@ -573,7 +610,7 @@ const RogueliteMode = (() => {
       const cur = midiInputs.find(i => i.id === selectedInputId);
       setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
     }
-    updateGates();
+    tryLoadMidiCalibration();
   }
 
   function attachToSelectedInput() {
@@ -588,6 +625,7 @@ const RogueliteMode = (() => {
     attachToSelectedInput();
     const cur = midiInputs.find(i => i.id === selectedInputId);
     setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
+    tryLoadMidiCalibration();
   }
 
   function handleMidiMessage(event) {
@@ -675,7 +713,8 @@ const RogueliteMode = (() => {
     runState.calibration = null;      // per-source latency → must recalibrate
     if (src === 'midi' && window.AudioInput) { try { AudioInput.stop(); } catch (e) {} runState.audioReady = false; }
     reflectInputSource();
-    updateGates();
+    if (src === 'midi') tryLoadMidiCalibration();
+    else updateGates();
   }
 
   function reflectInputSource() {
@@ -947,6 +986,7 @@ const RogueliteMode = (() => {
       runState.meanOffset = G;
       runState.calibration = { meanOffset: G, sd: gross.sd, sampleCount: gross.sampleCount, grossOffset: G, drift: 0, refined: false };
       captureLatencyCal();
+      persistMidiCalibration();
       setStatus(el.calStatus, 'Quarters calibrated @ ' + passBpm + ' BPM. Offset ' + signed(G) +
         'ms (subtracted). Optional: refine your 16th pocket.', false);
       updateGates();
@@ -989,6 +1029,7 @@ const RogueliteMode = (() => {
     runState.meanOffset = meanOffset;
     runState.calibration = { meanOffset, sd, sampleCount, grossOffset: G, drift, refined: true };
     captureLatencyCal();
+    persistMidiCalibration();
 
     const dir = drift < 0 ? 'rushing' : 'dragging';
     setStatus(el.calStatus,
