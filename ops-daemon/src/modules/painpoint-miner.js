@@ -26,7 +26,9 @@ const cockpit = require('../lib/cockpit');
 const { getDb } = require('../lib/db');
 const { getWatermark, setWatermark } = require('../lib/watermark');
 const { hashHandle } = require('../lib/hash');
-const { cachedSystem, runBatch } = require('../lib/haiku');
+// Namespace import (not destructured) so the Haiku calls are injectable in tests:
+// integration tests override haiku.runBatch with a canned classifier.
+const haiku = require('../lib/haiku');
 const {
   CLASSIFY_SYSTEM_PREFIX,
   DEDUP_SYSTEM_PREFIX,
@@ -80,11 +82,11 @@ async function run() {
     params: {
       model,
       max_tokens: 200,
-      system: cachedSystem(CLASSIFY_SYSTEM_PREFIX),
+      system: haiku.cachedSystem(CLASSIFY_SYSTEM_PREFIX),
       messages: [{ role: 'user', content: buildClassifyUserContent(r.content) }],
     },
   }));
-  const classifyResults = await runBatch(classifyReqs);
+  const classifyResults = await haiku.runBatch(classifyReqs);
 
   const consideredIds = [];
   const struggles = [];
@@ -119,12 +121,12 @@ async function run() {
       params: {
         model,
         max_tokens: 60,
-        system: cachedSystem(DEDUP_SYSTEM_PREFIX),
+        system: haiku.cachedSystem(DEDUP_SYSTEM_PREFIX),
         messages: [{ role: 'user', content: buildDedupUserContent(s.label, existing) }],
       },
     });
   }
-  const dedupResults = dedupReqs.length ? await runBatch(dedupReqs) : new Map();
+  const dedupResults = dedupReqs.length ? await haiku.runBatch(dedupReqs) : new Map();
 
   for (const s of struggles) {
     if (mirror[s.key]) continue;

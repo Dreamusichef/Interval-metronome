@@ -24,9 +24,13 @@ function sleep(ms) {
  * @returns {Promise<Response>}
  */
 async function fetchWithRetry(url, options = {}, retryOpts = {}) {
+  // Defaults are production values; tests can dial them down via env without touching
+  // call sites (OPS_HTTP_RETRIES / OPS_HTTP_BACKOFF_MS).
+  const envRetries = parseInt(process.env.OPS_HTTP_RETRIES, 10);
+  const envBackoff = parseInt(process.env.OPS_HTTP_BACKOFF_MS, 10);
   const {
-    retries = 3,
-    backoffMs = 1000,
+    retries = Number.isFinite(envRetries) ? envRetries : 3,
+    backoffMs = Number.isFinite(envBackoff) ? envBackoff : 1000,
     timeoutMs = 20000,
     label = 'http',
   } = retryOpts;

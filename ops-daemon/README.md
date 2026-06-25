@@ -134,20 +134,47 @@ boundary is 23:00 SGT / 15:00 UTC), so the day's messages are present in `ops.db
 
 ## Tests
 
-`npm test` runs `node --test` over `tests/*.test.cjs`. The timing/scoring-style logic
-(brief composition, money/funnel/email analysis, pain taxonomy + dedup, hashing) is kept
-**pure and rendering-agnostic** in `src/domain/` and `src/lib/hash.js`, so the suite runs
-with **no native dependencies** (`better-sqlite3` / the Anthropic SDK are not required to
-test). 41 tests across 7 files.
+`npm test` runs `node --test` over everything (unit + integration). Split runners:
+`npm run test:unit` (pure logic) and `npm run test:int` (end-to-end against the stub).
+
+- **Unit** (`tests/*.test.cjs`) — the timing/scoring-style logic (brief composition,
+  money/funnel/email analysis, pain taxonomy + dedup, hashing) is kept **pure and
+  rendering-agnostic** in `src/domain/` and `src/lib/hash.js`, so it runs with **no native
+  dependencies**.
+- **Integration** (`tests/integration/*.test.cjs`) — runs real cycles against an
+  in-process cockpit stub (`tools/stub-cockpit.js`, a faithful mirror of the
+  `/daemon-ingest` + `/daemon-read` contract): per-module round-trips, the full nightly
+  cycle (brief composed + posted once, idempotent rerun, weekly funnel gate), the
+  Pain-Point Miner (injected Haiku — classify/dedup, PII-free promotion, crash-replay
+  determinism), and the Pulse → `ops.db` handoff.
+
+## Local verification (no credentials)
+
+The build spec's verification gates say to exercise the daemon against a **local stub**
+before the real Lovable endpoints exist, then re-verify against the live ones. Two ways:
+
+```bash
+npm run demo     # start the stub in-process, run ONE real cycle against a seeded
+                 # anomaly snapshot, and print every row ingested + the webhook brief.
+                 # (Email + Pain-Point Miner are off — they need the Kit / Anthropic APIs.)
+
+npm run stub     # run the stub standalone; it prints ARCANE_INGEST_URL / ARCANE_READ_URL /
+                 # DISCORD_BRIEF_WEBHOOK_URL / DAEMON_API_KEY. Point a local .env at those
+                 # and `node index.js --once` to drive the daemon against it.
+```
+
+When the real endpoints are up, set the env to the live URLs and run `node index.js --once`
+— same flow, real cockpit. `sql/cockpit-schema.sql` is the reference DDL for the six tables.
 
 ---
 
 ## File map
 
 ```
-index.js                      entry: scheduler + daily-cycle orchestrator
+index.js                      entry: node-cron scheduler + --once (delegates to src/cycle.js)
 ecosystem.config.js           PM2 app definition
 .env.example                  env template (copy to gitignored .env on the VPS)
+src/cycle.js                  daily-cycle orchestrator (no side effects on require — testable)
 src/config.js                 env loader (no dotenv dep) + toggles + per-module validation
 src/lib/
   db.js                       ops.db accessor (better-sqlite3, WAL) + schema
@@ -171,7 +198,12 @@ src/modules/                  orchestration (source → domain → cockpit → s
   painpoint-miner.js  review-watch.js  stale-quest.js  brief.js
 pulse-integration/            ONE isolated addition for the Pulse Bot repo (§9):
   ops-intake.js  README.md
+tools/                        local verification (no credentials):
+  stub-cockpit.js             in-process mirror of the cockpit contract + Dojo feed
+  run-local.js                `npm run demo` — one real cycle against the stub
+sql/cockpit-schema.sql        reference DDL for the six cockpit tables
 tests/                        node:test unit tests (.test.cjs)
+tests/integration/            end-to-end tests against the stub (_harness.cjs)
 HUMAN-SETUP.md                the human-only setup steps (Lovable, Discord, keys, deploy)
 ```
 

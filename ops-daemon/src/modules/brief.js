@@ -50,7 +50,8 @@ function toDiscordContent(brief) {
   if (brief.items.length > 0) lines.push('');
   for (const it of brief.items) {
     lines.push(`• ${it.title}`);
-    if (it.detail) lines.push(`  ${String(it.detail).slice(0, 280)}`);
+    // Skip the detail line when it just repeats the title (some signals set them equal).
+    if (it.detail && it.detail !== it.title) lines.push(`  ${String(it.detail).slice(0, 280)}`);
   }
   return lines.join('\n').slice(0, 1900); // Discord content cap is 2000
 }
