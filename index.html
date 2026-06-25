@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260619h">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260625a">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -535,7 +535,10 @@
       <div class="done-message">
         <h2 class="rogue-overlay-title" id="rogueOverlayTitle">RUN OVER</h2>
         <div id="rogueOverlayBody"></div>
-        <button class="done-btn" id="rogueOverlayClose">OK</button>
+        <div class="rogue-overlay-actions">
+          <button class="done-btn" id="rogueOverlayReplay" type="button">Play Again</button>
+          <button class="done-btn done-btn-secondary" id="rogueOverlayClose" type="button">OK</button>
+        </div>
       </div>
     </div>
 
@@ -573,7 +576,7 @@
   <script defer src="assets/js/sfx.js?v=7"></script>
   <script defer src="assets/js/settings.js?v=20260619f"></script>
   <script defer src="assets/js/profile-settings.js?v=20260619g"></script>
-  <script defer src="assets/js/roguelite.js?v=20260625a"></script>
+  <script defer src="assets/js/roguelite.js?v=20260625b"></script>
   <!-- Cloud: localhost → mock DB; deployed → Supabase. Optional — game works without it. -->
   <script>
     // Cloud loader: scripts are injected async (not defer), so page JS may run

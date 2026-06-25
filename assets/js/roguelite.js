@@ -1579,6 +1579,16 @@ const RogueliteMode = (() => {
     if (el.overlay) el.overlay.classList.remove('blurred');
   }
 
+  function dismissResultsOverlay() {
+    clearTimeout(revealTimer);
+    clearTimeout(rankTimer);
+    endTrophySequence();
+    if (el.overlay) el.overlay.classList.remove('visible', 'blurred');
+    runState.status = 'idle';
+    window.__rogueSuppressDoneOverlay = false;
+    window.__rogueSuppressCompleteCue = false;
+  }
+
   // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
   // green percentage. Neutral row also shows the rush/drag split.
   function resultTable() {
@@ -2032,6 +2042,7 @@ const RogueliteMode = (() => {
       overlayTitle: document.getElementById('rogueOverlayTitle'),
       overlayBody:  document.getElementById('rogueOverlayBody'),
       overlayClose: document.getElementById('rogueOverlayClose'),
+      overlayReplay: document.getElementById('rogueOverlayReplay'),
       hudVerdict:   document.getElementById('rogueHudVerdict'),
       hudBanner:    document.getElementById('rogueHudBanner'),
       hudBpm:       document.getElementById('rogueHudBpm'),
@@ -2138,16 +2149,15 @@ const RogueliteMode = (() => {
     renderGameBpm();
     renderGameMins();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
-      clearTimeout(revealTimer);
-      clearTimeout(rankTimer);
-      endTrophySequence();
-      el.overlay.classList.remove('visible', 'blurred');
-      runState.status = 'idle';
-      window.__rogueSuppressDoneOverlay = false;
-      window.__rogueSuppressCompleteCue = false;   // restore the normal practice cue
+      dismissResultsOverlay();
       exitHud();   // leave the HUD and restore the normal (decluttered) setup view
       setRunStatus('Start another run.');
       updateGates();
+    });
+    el.overlayReplay && el.overlayReplay.addEventListener('click', async () => {
+      dismissResultsOverlay();
+      updateGates();
+      await startRun();
     });
 
     // Load the trophy baseline once Cloud is ready (it loads after this script);
