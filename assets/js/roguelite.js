@@ -1186,10 +1186,7 @@ const RogueliteMode = (() => {
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
           setRunBanner('Keep the 16ths going', 'live');
-          if (el.hudBpm) {
-            el.hudBpm.textContent = (runState.mode === 'gauntlet' ? 'L' + runState.level + ' · ' : '') +
-              currentRunBpm() + ' BPM';
-          }
+          refreshHudBpm();
         }
       }
     }
@@ -1375,6 +1372,7 @@ const RogueliteMode = (() => {
   function maybeCompleteOnBpm(bpm) {
     if (typeof bpm === 'number') runState.currentBpm = bpm;
     if (runState.status !== 'running') return;
+    refreshHudBpm();   // show the upcoming set BPM during its count-in
     // Every set begins here (ramp:start for set 1, ramp:bpmchange for later sets) —
     // and crucially this fires AFTER app.js has marked the set running and started its
     // countdown. Hold that countdown through the 2-bar count-in; it starts fresh at
@@ -1411,6 +1409,14 @@ const RogueliteMode = (() => {
   function currentRunBpm() {
     if (window.AppRamp) return window.AppRamp.getCurrentBpm() || runState.currentBpm;
     return runState.currentBpm;
+  }
+
+  function refreshHudBpm() {
+    if (!el.hudBpm) return;
+    const bpm = currentRunBpm();
+    if (!bpm) return;
+    el.hudBpm.textContent = (runState.mode === 'gauntlet' ? 'L' + runState.level + ' · ' : '') +
+      bpm + ' BPM';
   }
 
   function clearPendingEvals() {
