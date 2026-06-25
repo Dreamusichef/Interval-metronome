@@ -577,13 +577,18 @@ const RogueliteMode = (() => {
   }
 
   async function enableMidi() {
-    if (!navigator.requestMIDIAccess) {
-      setMidiStatus('Web MIDI not supported in this browser.', true);
+    const blocked = midiUnavailableReason();
+    if (blocked) {
+      setMidiStatus(blocked, true);
       return;
     }
     try {
       midiAccess = await navigator.requestMIDIAccess({ sysex: false });
     } catch (e) {
+      if (e && e.name === 'SecurityError') {
+        setMidiStatus(midiUnavailableReason() || 'MIDI blocked: serve this page over HTTPS.', true);
+        return;
+      }
       setMidiStatus('MIDI access denied: ' + (e && e.message ? e.message : e), true);
       return;
     }
@@ -722,6 +727,29 @@ const RogueliteMode = (() => {
     el.inputBtns && el.inputBtns.forEach(b => b.classList.toggle('active', b.dataset.src === runState.inputSource));
     if (el.midiSteps)  el.midiSteps.style.display  = audio ? 'none' : '';
     if (el.audioSteps) el.audioSteps.style.display = audio ? '' : 'none';
+    if (!audio) {
+      const blocked = midiUnavailableReason();
+      if (blocked) setMidiStatus(blocked, true);
+    }
+  }
+
+  // Web MIDI is only exposed in secure contexts (HTTPS, or http://localhost).
+  // Plain HTTP on a LAN IP hides the API — same browser works fine on prod HTTPS.
+  function midiUnavailableReason() {
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+      (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      return 'Web MIDI is not available on iPhone/iPad. Use Audio input instead.';
+    }
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      return 'Web MIDI needs HTTPS (browsers only allow it on https:// pages and localhost). ' +
+        'For LAN dev run: npm run dev:lan — then open https://<server-ip>:8127 and accept the certificate warning.';
+    }
+    if (!navigator.requestMIDIAccess) {
+      return 'Web MIDI not supported in this browser.';
+    }
+    return null;
   }
 
   // Open the audio interface/mic and start onset detection. Onsets feed the SAME
@@ -2137,7 +2165,7 @@ const RogueliteMode = (() => {
     if (window.__CLOUD_MODE__ === 'mock') {
       if (el.betaSignIn) el.betaSignIn.textContent = 'Dev sign in ▾';
       const signinMsg = el.betaGate && el.betaGate.querySelector('.beta-gate-state[data-state="signin"] .beta-gate-msg');
-      if (signinMsg) signinMsg.textContent = 'Game Mode uses a local mock database on localhost. Pick a dev user to continue.';
+      if (signinMsg) signinMsg.textContent = 'Game Mode uses a local mock database in dev. Pick a dev user to continue.';
     }
 
     // Beta gate controls.

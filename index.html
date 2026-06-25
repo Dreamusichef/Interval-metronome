@@ -577,17 +577,16 @@
   <script defer src="assets/js/settings.js?v=20260619f"></script>
   <script defer src="assets/js/profile-settings.js?v=20260619g"></script>
   <script defer src="assets/js/calibration-store.js?v=1"></script>
-  <script defer src="assets/js/roguelite.js?v=20260625d"></script>
-  <!-- Cloud: localhost → mock DB; deployed → Supabase. Optional — game works without it. -->
+  <script defer src="assets/js/roguelite.js?v=20260625f"></script>
+  <!-- Cloud: local dev (any host) → mock DB; deployed prod hosts → Supabase. -->
+  <script src="assets/js/cloud-mode.js?v=1"></script>
   <script>
     // Cloud loader: scripts are injected async (not defer), so page JS may run
-    // before auth is ready. Keep backend→cloud.js order; bump ?v= when those change.
+    // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
-      var h = location.hostname;
-      window.__CLOUD_MODE__ = (h === 'localhost' || h === '127.0.0.1') ? 'mock' : 'supabase';
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619e', 'assets/js/cloud.js?v=20260619g']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619d', 'assets/js/cloud.js?v=20260619g'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619e', 'assets/js/cloud.js?v=20260625a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619d', 'assets/js/cloud.js?v=20260625a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');

@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "-p", "8127", "-c-1"],
       "port": 8127
+    },
+    {
+      "name": "metronome-lan-https",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:lan"],
+      "port": 8127
     }
   ]
 }
