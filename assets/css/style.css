@@ -1274,7 +1274,27 @@ body {
   line-height: 1.5;
 }
 .rogue-overlay .done-message { margin-bottom: 0; max-width: 420px; padding: 36px 34px; }
-.rogue-overlay #rogueOverlayClose { margin-top: 22px; }
+.rogue-overlay-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.rogue-overlay-actions .done-btn {
+  flex: 1 1 auto;
+  min-width: 140px;
+}
+.done-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 184, 0, 0.45);
+  color: var(--text);
+  box-shadow: none;
+}
+.done-btn-secondary:hover {
+  background: rgba(255, 184, 0, 0.08);
+  box-shadow: 0 0 12px rgba(255, 184, 0, 0.15);
+}
 
 /* ── Number spinners — hide ────────────────────── */
 input[type="number"]::-webkit-inner-spin-button,

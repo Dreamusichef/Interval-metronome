@@ -3,6 +3,7 @@
 
 # Node
 node_modules/
+.dev-certs/
 
 # Source art originals + local image helpers (processed outputs are committed)
 /Rank *.png

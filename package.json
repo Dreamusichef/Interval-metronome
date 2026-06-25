@@ -2,6 +2,8 @@
   "name": "interval-metronome",
   "private": true,
   "scripts": {
-    "test": "node --test tests/roguelite.test.cjs tests/achievements.test.cjs tests/run-submit-validation.test.cjs tests/profile-validation.test.cjs"
+    "test": "node --test tests/roguelite.test.cjs tests/achievements.test.cjs tests/run-submit-validation.test.cjs tests/profile-validation.test.cjs tests/calibration-store.test.cjs",
+    "dev": "npx -y http-server -p 8127 -c-1",
+    "dev:lan": "node scripts/dev-https.mjs"
   }
 }

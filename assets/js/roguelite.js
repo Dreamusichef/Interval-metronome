@@ -539,14 +539,56 @@ const RogueliteMode = (() => {
   // ───────────────────────────────────────────────────────────────────────────
   // MIDI
   // ───────────────────────────────────────────────────────────────────────────
+
+  function persistMidiCalibration() {
+    if (runState.inputSource !== 'midi' || !selectedInputId || !runState.calibration) return;
+    if (runState.calibration.manual) return;
+    if (!window.CalibrationStore) return;
+    const dev = midiInputs.find(i => i.id === selectedInputId);
+    CalibrationStore.save(selectedInputId, dev ? dev.name : selectedInputId, runState.calibration);
+  }
+
+  function tryLoadMidiCalibration() {
+    if (runState.inputSource !== 'midi') return;
+    if (!selectedInputId || runState.status === 'calibrating' || runState.status === 'running') return;
+    if (runState.calibration && runState.calibration.manual) return;
+    if (!midiInputs.some(i => i.id === selectedInputId)) {
+      runState.calibration = null;
+      runState.meanOffset = 0;
+      updateGates();
+      return;
+    }
+    if (!window.CalibrationStore) { updateGates(); return; }
+    const dev = midiInputs.find(i => i.id === selectedInputId);
+    const stored = CalibrationStore.get(selectedInputId, dev ? dev.name : '');
+    if (!stored || !stored.calibration) {
+      runState.calibration = null;
+      runState.meanOffset = 0;
+      updateGates();
+      return;
+    }
+    runState.calibration = { ...stored.calibration };
+    runState.meanOffset = stored.calibration.meanOffset;
+    captureLatencyCal();
+    setStatus(el.calStatus,
+      'Loaded saved calibration for ' + (dev ? dev.name : 'device') + ' — offset ' +
+      signed(runState.meanOffset) + 'ms.', false);
+    updateGates();
+  }
+
   async function enableMidi() {
-    if (!navigator.requestMIDIAccess) {
-      setMidiStatus('Web MIDI not supported in this browser.', true);
+    const blocked = midiUnavailableReason();
+    if (blocked) {
+      setMidiStatus(blocked, true);
       return;
     }
     try {
       midiAccess = await navigator.requestMIDIAccess({ sysex: false });
     } catch (e) {
+      if (e && e.name === 'SecurityError') {
+        setMidiStatus(midiUnavailableReason() || 'MIDI blocked: serve this page over HTTPS.', true);
+        return;
+      }
       setMidiStatus('MIDI access denied: ' + (e && e.message ? e.message : e), true);
       return;
     }
@@ -573,7 +615,7 @@ const RogueliteMode = (() => {
       const cur = midiInputs.find(i => i.id === selectedInputId);
       setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
     }
-    updateGates();
+    tryLoadMidiCalibration();
   }
 
   function attachToSelectedInput() {
@@ -588,6 +630,7 @@ const RogueliteMode = (() => {
     attachToSelectedInput();
     const cur = midiInputs.find(i => i.id === selectedInputId);
     setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
+    tryLoadMidiCalibration();
   }
 
   function handleMidiMessage(event) {
@@ -675,7 +718,8 @@ const RogueliteMode = (() => {
     runState.calibration = null;      // per-source latency → must recalibrate
     if (src === 'midi' && window.AudioInput) { try { AudioInput.stop(); } catch (e) {} runState.audioReady = false; }
     reflectInputSource();
-    updateGates();
+    if (src === 'midi') tryLoadMidiCalibration();
+    else updateGates();
   }
 
   function reflectInputSource() {
@@ -683,6 +727,29 @@ const RogueliteMode = (() => {
     el.inputBtns && el.inputBtns.forEach(b => b.classList.toggle('active', b.dataset.src === runState.inputSource));
     if (el.midiSteps)  el.midiSteps.style.display  = audio ? 'none' : '';
     if (el.audioSteps) el.audioSteps.style.display = audio ? '' : 'none';
+    if (!audio) {
+      const blocked = midiUnavailableReason();
+      if (blocked) setMidiStatus(blocked, true);
+    }
+  }
+
+  // Web MIDI is only exposed in secure contexts (HTTPS, or http://localhost).
+  // Plain HTTP on a LAN IP hides the API — same browser works fine on prod HTTPS.
+  function midiUnavailableReason() {
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+      (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      return 'Web MIDI is not available on iPhone/iPad. Use Audio input instead.';
+    }
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      return 'Web MIDI needs HTTPS (browsers only allow it on https:// pages and localhost). ' +
+        'For LAN dev run: npm run dev:lan — then open https://<server-ip>:8127 and accept the certificate warning.';
+    }
+    if (!navigator.requestMIDIAccess) {
+      return 'Web MIDI not supported in this browser.';
+    }
+    return null;
   }
 
   // Open the audio interface/mic and start onset detection. Onsets feed the SAME
@@ -947,6 +1014,7 @@ const RogueliteMode = (() => {
       runState.meanOffset = G;
       runState.calibration = { meanOffset: G, sd: gross.sd, sampleCount: gross.sampleCount, grossOffset: G, drift: 0, refined: false };
       captureLatencyCal();
+      persistMidiCalibration();
       setStatus(el.calStatus, 'Quarters calibrated @ ' + passBpm + ' BPM. Offset ' + signed(G) +
         'ms (subtracted). Optional: refine your 16th pocket.', false);
       updateGates();
@@ -989,6 +1057,7 @@ const RogueliteMode = (() => {
     runState.meanOffset = meanOffset;
     runState.calibration = { meanOffset, sd, sampleCount, grossOffset: G, drift, refined: true };
     captureLatencyCal();
+    persistMidiCalibration();
 
     const dir = drift < 0 ? 'rushing' : 'dragging';
     setStatus(el.calStatus,
@@ -1186,10 +1255,7 @@ const RogueliteMode = (() => {
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
           setRunBanner('Keep the 16ths going', 'live');
-          if (el.hudBpm) {
-            el.hudBpm.textContent = (runState.mode === 'gauntlet' ? 'L' + runState.level + ' · ' : '') +
-              currentRunBpm() + ' BPM';
-          }
+          refreshHudBpm();
         }
       }
     }
@@ -1375,6 +1441,7 @@ const RogueliteMode = (() => {
   function maybeCompleteOnBpm(bpm) {
     if (typeof bpm === 'number') runState.currentBpm = bpm;
     if (runState.status !== 'running') return;
+    refreshHudBpm();   // show the upcoming set BPM during its count-in
     // Every set begins here (ramp:start for set 1, ramp:bpmchange for later sets) —
     // and crucially this fires AFTER app.js has marked the set running and started its
     // countdown. Hold that countdown through the 2-bar count-in; it starts fresh at
@@ -1411,6 +1478,14 @@ const RogueliteMode = (() => {
   function currentRunBpm() {
     if (window.AppRamp) return window.AppRamp.getCurrentBpm() || runState.currentBpm;
     return runState.currentBpm;
+  }
+
+  function refreshHudBpm() {
+    if (!el.hudBpm) return;
+    const bpm = currentRunBpm();
+    if (!bpm) return;
+    el.hudBpm.textContent = (runState.mode === 'gauntlet' ? 'L' + runState.level + ' · ' : '') +
+      bpm + ' BPM';
   }
 
   function clearPendingEvals() {
@@ -1577,6 +1652,16 @@ const RogueliteMode = (() => {
     trophyQueue = [];
     if (el.trophyPop) el.trophyPop.classList.remove('visible', 'out');
     if (el.overlay) el.overlay.classList.remove('blurred');
+  }
+
+  function dismissResultsOverlay() {
+    clearTimeout(revealTimer);
+    clearTimeout(rankTimer);
+    endTrophySequence();
+    if (el.overlay) el.overlay.classList.remove('visible', 'blurred');
+    runState.status = 'idle';
+    window.__rogueSuppressDoneOverlay = false;
+    window.__rogueSuppressCompleteCue = false;
   }
 
   // Result table: Good / Neutral / Bad rows (hexagon + label + count), then the
@@ -2032,6 +2117,7 @@ const RogueliteMode = (() => {
       overlayTitle: document.getElementById('rogueOverlayTitle'),
       overlayBody:  document.getElementById('rogueOverlayBody'),
       overlayClose: document.getElementById('rogueOverlayClose'),
+      overlayReplay: document.getElementById('rogueOverlayReplay'),
       hudVerdict:   document.getElementById('rogueHudVerdict'),
       hudBanner:    document.getElementById('rogueHudBanner'),
       hudBpm:       document.getElementById('rogueHudBpm'),
@@ -2079,7 +2165,7 @@ const RogueliteMode = (() => {
     if (window.__CLOUD_MODE__ === 'mock') {
       if (el.betaSignIn) el.betaSignIn.textContent = 'Dev sign in ▾';
       const signinMsg = el.betaGate && el.betaGate.querySelector('.beta-gate-state[data-state="signin"] .beta-gate-msg');
-      if (signinMsg) signinMsg.textContent = 'Game Mode uses a local mock database on localhost. Pick a dev user to continue.';
+      if (signinMsg) signinMsg.textContent = 'Game Mode uses a local mock database in dev. Pick a dev user to continue.';
     }
 
     // Beta gate controls.
@@ -2138,16 +2224,15 @@ const RogueliteMode = (() => {
     renderGameBpm();
     renderGameMins();
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
-      clearTimeout(revealTimer);
-      clearTimeout(rankTimer);
-      endTrophySequence();
-      el.overlay.classList.remove('visible', 'blurred');
-      runState.status = 'idle';
-      window.__rogueSuppressDoneOverlay = false;
-      window.__rogueSuppressCompleteCue = false;   // restore the normal practice cue
+      dismissResultsOverlay();
       exitHud();   // leave the HUD and restore the normal (decluttered) setup view
       setRunStatus('Start another run.');
       updateGates();
+    });
+    el.overlayReplay && el.overlayReplay.addEventListener('click', async () => {
+      dismissResultsOverlay();
+      updateGates();
+      await startRun();
     });
 
     // Load the trophy baseline once Cloud is ready (it loads after this script);
