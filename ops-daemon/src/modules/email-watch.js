@@ -108,8 +108,9 @@ async function fetchKitAggregate() {
   return { totalSubscribers, sequences, broadcasts, nonResponders, expectedTagFirings: [] };
 }
 
-async function run() {
-  const aggregate = await fetchKitAggregate();
+async function run(ctx = {}) {
+  // ctx.aggregate lets tests inject the Kit aggregate (no network); production fetches it.
+  const aggregate = ctx.aggregate || (await fetchKitAggregate());
   const analysis = analyzeEmail(aggregate);
 
   const row = {
