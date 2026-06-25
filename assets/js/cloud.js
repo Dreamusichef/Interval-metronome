@@ -40,9 +40,11 @@ const Cloud = (() => {
   function useMockCloud() {
     if (typeof window !== 'undefined' && window.__CLOUD_MODE__ === 'mock') return true;
     if (typeof window !== 'undefined' && window.__CLOUD_MODE__ === 'supabase') return false;
+    if (typeof window !== 'undefined' && window.CloudMode) {
+      return window.CloudMode.isMock(typeof location !== 'undefined' ? location.hostname : '');
+    }
     if (typeof location === 'undefined') return false;
-    const h = location.hostname;
-    return h === 'localhost' || h === '127.0.0.1';
+    return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   }
 
   function pickBackend() {
