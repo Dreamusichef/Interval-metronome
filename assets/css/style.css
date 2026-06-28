@@ -1302,6 +1302,33 @@ body {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Dark-only scrollbars on overlay modals (nested scroll areas ignore OS theme). */
+.done-overlay,
+.done-message,
+#rogueOverlayBody {
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 176, 200, 0.38) var(--inset);
+}
+.done-overlay::-webkit-scrollbar,
+.done-message::-webkit-scrollbar,
+#rogueOverlayBody::-webkit-scrollbar { width: 8px; }
+.done-overlay::-webkit-scrollbar-track,
+.done-message::-webkit-scrollbar-track,
+#rogueOverlayBody::-webkit-scrollbar-track { background: var(--inset); }
+.done-overlay::-webkit-scrollbar-thumb,
+.done-message::-webkit-scrollbar-thumb,
+#rogueOverlayBody::-webkit-scrollbar-thumb {
+  background: rgba(138, 176, 200, 0.38);
+  border-radius: 4px;
+}
+.done-overlay::-webkit-scrollbar-thumb:hover,
+.done-message::-webkit-scrollbar-thumb:hover,
+#rogueOverlayBody::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 176, 200, 0.58);
+}
+
 .rogue-overlay-actions {
   display: flex;
   gap: 12px;
