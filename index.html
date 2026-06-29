@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260628b">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260628d">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -43,6 +43,12 @@
       <span class="brand-beta" id="brandBeta" title="">BETA</span>
       <button class="settings-gear" id="settingsGear" aria-label="Settings" title="Settings">&#9881;</button>
     </header>
+
+    <div class="whats-new-banner" id="whatsNewBanner" hidden role="region" aria-label="What's new">
+      <span class="whats-new-text">What's new in <strong class="whats-new-version">v0.9.3</strong></span>
+      <a class="whats-new-link" href="patch-notes.html">View patch notes</a>
+      <button class="whats-new-dismiss" id="whatsNewDismiss" type="button" aria-label="Dismiss">&#10005;</button>
+    </div>
 
     <!-- Settings panel -->
     <div class="settings-overlay" id="settingsOverlay" hidden>
@@ -134,6 +140,11 @@
           </table>
           <div class="sc-hint">Shortcuts ignore typing in input fields. <kbd>Enter</kbd> confirms a number field.</div>
         </div>
+
+        <a class="settings-row settings-row-btn settings-patch-notes-btn" id="patchNotesSettingsLink" href="patch-notes.html">
+          <span class="settings-row-label">Patch Notes</span>
+          <span class="settings-disclosure" aria-hidden="true">&#8250;</span>
+        </a>
 
         <a class="settings-row settings-row-btn settings-faq-btn" href="faq.html">
           <span class="settings-row-label">FAQ</span>
@@ -569,6 +580,9 @@
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
   <script defer src="assets/js/version.js?v=20260616a"></script>
+  <script defer src="assets/js/faq-markdown.js?v=20260628a"></script>
+  <script defer src="assets/js/patch-notes-storage.js?v=20260628f"></script>
+  <script defer src="assets/js/patch-notes-check.js?v=20260628f"></script>
   <script defer src="assets/js/metronome.js?v=20260612c"></script>
   <script defer src="assets/js/app.js?v=20260625a"></script>
   <script defer src="assets/js/audio-input.js?v=5"></script>

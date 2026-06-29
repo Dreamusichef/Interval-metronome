@@ -1,0 +1,113 @@
+/* ═══════════════════════════════════════════════════
+   PATCH NOTES — flat entries + version history (requires content-page.css)
+═══════════════════════════════════════════════════ */
+
+.pn-section-body { padding: 18px 22px; }
+.pn-entry {
+  margin: 0 0 14px;
+  font-size: 16.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.pn-entry:last-child { margin-bottom: 0; }
+.pn-entry-title {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 0.35em;
+}
+.faq-section.gold .pn-entry-title { color: var(--gold-flash); }
+.faq-section.cyan .pn-entry-title { color: var(--cyan); }
+.pn-section-body .pn-entry-desc strong { color: var(--text); }
+
+.patch-release-date {
+  margin: -6px 0 16px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+.patch-release-date time { font-style: normal; }
+
+.patch-history {
+  margin-top: 48px;
+}
+.patch-history-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+.patch-version {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  background: rgba(8, 14, 22, 0.6);
+}
+.patch-version-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+.patch-version-summary::-webkit-details-marker { display: none; }
+.patch-version-summary::after {
+  content: "\25BE";
+  margin-left: auto;
+  color: var(--text-dim);
+  transition: transform 0.2s, color 0.2s;
+}
+.patch-version[open] .patch-version-summary::after {
+  transform: rotate(180deg);
+  color: var(--cyan);
+}
+.patch-version-summary:hover { color: var(--cyan); }
+.patch-version-heading { flex: none; }
+.patch-version-date {
+  flex: none;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cyan);
+}
+.patch-version-date::before,
+.patch-version-lede::before {
+  content: "·";
+  margin: 0 0.45em;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.patch-version-lede {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-dim);
+}
+.patch-version-body {
+  padding: 0 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.patch-version-body .faq-section:first-child { margin-top: 12px; }
+.patch-version-loading {
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+@media (max-width: 540px) {
+  .pn-entry { font-size: 16px; }
+  .pn-section-body { padding: 16px; }
+}
