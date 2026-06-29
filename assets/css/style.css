@@ -1794,7 +1794,54 @@ body.rogue-run .rogue-section { display: none !important; }
    otherwise get flex-shrunk and look different from the others). */
 .settings-row .toggle-switch { flex: none; }
 .settings-row-btn { width: 100%; background: none; border: 0; border-top: 1px solid var(--border); margin-top: 4px; cursor: pointer; }
-.settings-faq-btn { margin-top: 8px; text-decoration: none; color: inherit; }
+/* What's New banner (below brand header) */
+.whats-new-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: linear-gradient(90deg, rgba(255, 184, 0, 0.12), rgba(0, 200, 255, 0.08));
+  border: 1px solid rgba(255, 184, 0, 0.35);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+.whats-new-banner[hidden] { display: none; }
+.whats-new-text strong { color: var(--gold-flash); font-weight: 700; }
+.whats-new-link {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--cyan);
+  transition: color 0.15s;
+}
+.whats-new-link:hover { color: var(--gold); }
+.whats-new-dismiss {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.whats-new-dismiss:hover { color: var(--danger); }
+
+.settings-patch-notes-btn { margin-top: 8px; text-decoration: none; color: inherit; }
+.settings-patch-notes-btn:hover .settings-row-label { color: var(--cyan); }
+.settings-patch-notes-btn:hover .settings-disclosure { color: var(--cyan); }
+
+.settings-faq-btn { margin-top: 4px; text-decoration: none; color: inherit; }
 .settings-faq-btn:hover .settings-row-label { color: var(--cyan); }
 .settings-faq-btn:hover .settings-disclosure { color: var(--cyan); }
 .settings-tutorial-btn { text-decoration: none; color: inherit; }
