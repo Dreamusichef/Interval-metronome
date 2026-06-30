@@ -1679,6 +1679,53 @@ body.rogue-run .rogue-section { display: none !important; }
 
 /* Stats page */
 .stats-section { gap: 14px; }
+.stats-footer {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 200, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8ab0c8;
+}
+.stats-footer a {
+  color: #00c8ff;
+  text-decoration: none;
+}
+.stats-footer a:hover { color: #FFB800; }
+
+.app-footer {
+  margin-top: 20px;
+  padding: 20px 4px 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+.app-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: flex-end;
+}
+.app-footer a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+.app-footer a:hover { color: var(--accent); }
+body.rogue-run .app-footer { display: none; }
+
 .stats-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stats-title {
   font-family: 'Orbitron', monospace;
