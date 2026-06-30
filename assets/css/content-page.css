@@ -292,6 +292,12 @@ a:focus-visible {
 }
 .faq-footer a { color: var(--cyan); text-decoration: none; }
 .faq-footer a:hover { color: var(--gold); }
+.faq-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  justify-content: flex-end;
+}
 
 @keyframes faqRiseIn {
   from { opacity: 0; transform: translateY(16px); }
