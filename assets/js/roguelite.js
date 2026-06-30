@@ -371,8 +371,10 @@ const RogueliteMode = (() => {
   // Default GM note per drum (kick 36, acoustic snare 38). Overridable via "learn".
   const DEFAULT_KICK_NOTE = 36;
   const DEFAULT_NOTE = { kick: 36, snare: 38 };
-  // Kick learn rejects snare/rim/etc. — only GM bass-drum notes (35 acoustic, 36 kick).
-  const KICK_LEARN_NOTES = [35, 36];
+  // Accepted without learn: GM + Alesis Strata Prime (non-standard mapping).
+  const PLAYABLE_NOTES = { kick: [24, 35, 36], snare: [26, 38] };
+  const KICK_LEARN_NOTES = PLAYABLE_NOTES.kick;
+  const SNARE_LEARN_NOTES = PLAYABLE_NOTES.snare;
   const INSTR_LABEL = { kick: 'Kick', snare: 'Snare' };
 
   // ── Run / session state ──────────────────────────────────────────────────
@@ -652,8 +654,9 @@ const RogueliteMode = (() => {
     if (!(typeof ts === 'number') || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
 
     if (learning) {
-      if (runState.instrument === 'kick' && !KICK_LEARN_NOTES.includes(note)) {
-        setMidiStatus('Kick learn only accepts MIDI notes 35 or 36. Hit your kick pad.', true);
+      const learnNotes = runState.instrument === 'kick' ? KICK_LEARN_NOTES : SNARE_LEARN_NOTES;
+      if (!learnNotes.includes(note)) {
+        setMidiStatus(instrLabel() + ' learn only accepts MIDI notes ' + learnNotes.join(', ') + '. Hit your pad.', true);
         return;
       }
       learning = false;
@@ -664,7 +667,7 @@ const RogueliteMode = (() => {
       return;
     }
 
-    if (note === runState.kickNote) {
+    if (isPlayableMidiNote(note)) {
       // Debounce hardware double-triggers (one physical hit → two note-ons within a
       // few ms) so they don't count as a 'cram'. Genuine strokes are far enough
       // apart to pass. (No effect on calibration matching — it just drops dupes.)
@@ -678,13 +681,18 @@ const RogueliteMode = (() => {
     if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return; }
     if (!midiAccess) { setMidiStatus('Connect MIDI first.', true); return; }
     learning = true;
-    el.kickNote && (el.kickNote.textContent = runState.instrument === 'kick'
-      ? 'Hit your kick (MIDI notes 35 or 36 only)…'
-      : 'Hit your ' + instrLabel().toLowerCase() + '…');
+    el.kickNote && (el.kickNote.textContent = 'Hit your ' + instrLabel().toLowerCase()
+      + ' (MIDI notes ' + (runState.instrument === 'kick' ? KICK_LEARN_NOTES : SNARE_LEARN_NOTES).join(', ') + ')…');
   }
 
   // Current drum label ('Kick' | 'Snare'); falls back to 'Note' before a choice.
   function instrLabel() { return INSTR_LABEL[runState.instrument] || 'Note'; }
+
+  function isPlayableMidiNote(note) {
+    if (note === runState.kickNote) return true;
+    const notes = PLAYABLE_NOTES[runState.instrument];
+    return notes ? notes.includes(note) : false;
+  }
 
   // Compulsory drum choice. Sets the GM default note for that drum (until learned),
   // updates labels/gates. Switching drum resets the listened note to the default.
