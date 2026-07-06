@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260629b">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260705a">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -504,6 +504,7 @@
                 </div>
               </label>
             </div>
+            <div class="rogue-subdiv-field" id="rogueGameSubdivRow"></div>
             <div class="rogue-field-hint" id="rogueGameModeHint">Time Trial: play the full duration; graded E–SS.</div>
           </div>
 
@@ -529,6 +530,7 @@
                 <span class="rogue-level-n">LVL 6</span><span class="rogue-level-d">180–200 BPM</span>
               </button>
             </div>
+            <div class="rogue-subdiv-field" id="rogueGauntletSubdivRow"></div>
           </div>
         </div>
 
@@ -593,14 +595,15 @@
   <script defer src="assets/js/patch-notes-storage.js?v=20260628f"></script>
   <script defer src="assets/js/patch-notes-check.js?v=20260628f"></script>
   <script defer src="assets/js/metronome.js?v=20260612c"></script>
-  <script defer src="assets/js/app.js?v=20260625a"></script>
+  <script defer src="assets/js/game-subdivisions.js?v=20260706b"></script>
+  <script defer src="assets/js/app.js?v=20260705b"></script>
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
   <script defer src="assets/js/settings.js?v=20260619f"></script>
   <script defer src="assets/js/profile-settings.js?v=20260619g"></script>
   <script defer src="assets/js/calibration-store.js?v=1"></script>
-  <script defer src="assets/js/roguelite.js?v=20260630a"></script>
+  <script defer src="assets/js/roguelite.js?v=20260705a"></script>
   <!-- Cloud: local dev (any host) → mock DB; deployed prod hosts → Supabase. -->
   <script src="assets/js/cloud-mode.js?v=1"></script>
   <script>
@@ -608,8 +611,8 @@
     // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619e', 'assets/js/cloud.js?v=20260625a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619d', 'assets/js/cloud.js?v=20260625a'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260706a', 'assets/js/cloud.js?v=20260705a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260705a', 'assets/js/cloud.js?v=20260705a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
