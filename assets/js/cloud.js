@@ -225,9 +225,9 @@ const Cloud = (() => {
     return backend.myRuns();
   }
 
-  async function leaderboard(mode, bpm, level, instrument) {
+  async function leaderboard(mode, bpm, level, instrument, subdivision) {
     if (!init()) return [];
-    return backend.leaderboard(mode, bpm, level, instrument);
+    return backend.leaderboard(mode, bpm, level, instrument, subdivision);
   }
 
   function resetMockData() {

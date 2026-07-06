@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 const CloudMockBackend = (() => {
   // Bump this when seed users / runs change — invalidates stale localStorage mock data.
-  const STORAGE_KEY = 'cloud:mock:v4';
+  const STORAGE_KEY = 'cloud:mock:v6';
 
   const DEV_USERS = [
     {
@@ -50,17 +50,22 @@ const CloudMockBackend = (() => {
       avatar_url: null,
     }));
     const runs = [
-      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'kick', bpm: 120, level: null, rank: 'A', green_pct: 88, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(3) },
-      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'kick', bpm: 120, level: null, rank: 'S', green_pct: 94, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(1) },
-      { id: uid(), user_id: 'dev-user-wei', mode: 'timetrial', instrument: 'kick', bpm: 120, level: null, rank: 'B', green_pct: 82, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(2) },
-      { id: uid(), user_id: 'dev-user-sam', mode: 'timetrial', instrument: 'kick', bpm: 120, level: null, rank: 'SS', green_pct: 97, duration_sec: 180, survival_sec: null, cleared: false, created_at: isoDaysAgo(0) },
-      { id: uid(), user_id: 'dev-user-alex', mode: 'suddendeath', instrument: 'kick', bpm: 100, level: null, rank: 'A', green_pct: 75, duration_sec: 180, survival_sec: 142, cleared: false, created_at: isoDaysAgo(4) },
-      { id: uid(), user_id: 'dev-user-wei', mode: 'suddendeath', instrument: 'kick', bpm: 100, level: null, rank: 'S', green_pct: 80, duration_sec: 180, survival_sec: 165, cleared: false, created_at: isoDaysAgo(2) },
-      { id: uid(), user_id: 'dev-user-sam', mode: 'suddendeath', instrument: 'kick', bpm: 100, level: null, rank: 'B', green_pct: 70, duration_sec: 180, survival_sec: 98, cleared: false, created_at: isoDaysAgo(1) },
-      { id: uid(), user_id: 'dev-user-alex', mode: 'gauntlet', instrument: 'kick', bpm: null, level: 1, rank: 'B', green_pct: 78, duration_sec: null, survival_sec: null, cleared: false, created_at: isoDaysAgo(5) },
-      { id: uid(), user_id: 'dev-user-wei', mode: 'gauntlet', instrument: 'kick', bpm: null, level: 1, rank: 'A', green_pct: 85, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(3) },
-      { id: uid(), user_id: 'dev-user-sam', mode: 'gauntlet', instrument: 'kick', bpm: null, level: 1, rank: 'S', green_pct: 91, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(1) },
-      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'snare', bpm: 120, level: null, rank: 'C', green_pct: 68, duration_sec: 60, survival_sec: null, cleared: false, created_at: isoDaysAgo(6) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'kick', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'A', green_pct: 88, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(3) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'kick', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'S', green_pct: 94, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(1) },
+      { id: uid(), user_id: 'dev-user-wei', mode: 'timetrial', instrument: 'kick', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'B', green_pct: 82, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(2) },
+      { id: uid(), user_id: 'dev-user-sam', mode: 'timetrial', instrument: 'kick', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'SS', green_pct: 97, duration_sec: 180, survival_sec: null, cleared: false, created_at: isoDaysAgo(0) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'kick', subdivision: 'eighth', bpm: 120, level: null, rank: 'B', green_pct: 79, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(2) },
+      { id: uid(), user_id: 'dev-user-wei', mode: 'timetrial', instrument: 'kick', subdivision: 'eighth', bpm: 120, level: null, rank: 'A', green_pct: 86, duration_sec: 120, survival_sec: null, cleared: false, created_at: isoDaysAgo(1) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'suddendeath', instrument: 'kick', subdivision: 'sixteenth', bpm: 100, level: null, rank: 'A', green_pct: 75, duration_sec: 180, survival_sec: 142, cleared: false, created_at: isoDaysAgo(4) },
+      { id: uid(), user_id: 'dev-user-wei', mode: 'suddendeath', instrument: 'kick', subdivision: 'sixteenth', bpm: 100, level: null, rank: 'S', green_pct: 80, duration_sec: 180, survival_sec: 165, cleared: false, created_at: isoDaysAgo(2) },
+      { id: uid(), user_id: 'dev-user-sam', mode: 'suddendeath', instrument: 'kick', subdivision: 'sixteenth', bpm: 100, level: null, rank: 'B', green_pct: 70, duration_sec: 180, survival_sec: 98, cleared: false, created_at: isoDaysAgo(1) },
+      { id: uid(), user_id: 'dev-user-sam', mode: 'suddendeath', instrument: 'kick', subdivision: 'triplet', bpm: 100, level: null, rank: 'A', green_pct: 72, duration_sec: 180, survival_sec: 120, cleared: false, created_at: isoDaysAgo(1) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'gauntlet', instrument: 'kick', subdivision: 'sixteenth', bpm: null, level: 1, rank: 'B', green_pct: 78, duration_sec: null, survival_sec: null, cleared: false, created_at: isoDaysAgo(5) },
+      { id: uid(), user_id: 'dev-user-wei', mode: 'gauntlet', instrument: 'kick', subdivision: 'sixteenth', bpm: null, level: 1, rank: 'A', green_pct: 85, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(3) },
+      { id: uid(), user_id: 'dev-user-sam', mode: 'gauntlet', instrument: 'kick', subdivision: 'sixteenth', bpm: null, level: 1, rank: 'S', green_pct: 91, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(1) },
+      { id: uid(), user_id: 'dev-user-wei', mode: 'gauntlet', instrument: 'kick', subdivision: 'triplet', bpm: null, level: 1, rank: 'B', green_pct: 80, duration_sec: null, survival_sec: null, cleared: false, created_at: isoDaysAgo(4) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'gauntlet', instrument: 'kick', subdivision: 'sextuplet', bpm: null, level: 1, rank: 'A', green_pct: 82, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(2) },
+      { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'snare', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'C', green_pct: 68, duration_sec: 60, survival_sec: null, cleared: false, created_at: isoDaysAgo(6) },
     ];
     return { profiles, runs, beta_waitlist: [], account_deletion_requests: [], sessionUserId: null };
   }
@@ -80,6 +85,7 @@ const CloudMockBackend = (() => {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (!parsed.account_deletion_requests) parsed.account_deletion_requests = [];
+        if (parsed.runs) parsed.runs.forEach(r => { if (!r.subdivision) r.subdivision = 'sixteenth'; });
         return parsed;
       }
     } catch (e) {}
@@ -294,6 +300,7 @@ const CloudMockBackend = (() => {
       reject_reason: check.reject_reason,
       mode: record.mode,
       instrument: record.instrument || 'kick',
+      subdivision: record.subdivision || 'sixteenth',
       bpm: record.bpm == null ? null : record.bpm,
       level: record.level == null ? null : record.level,
       rank: record.rank,
@@ -335,7 +342,7 @@ const CloudMockBackend = (() => {
     return 0;
   }
 
-  async function leaderboard(mode, bpm, level, instrument) {
+  async function leaderboard(mode, bpm, level, instrument, subdivision) {
     if (!init()) return [];
     const slice = db.runs
       .map(r => {
@@ -351,7 +358,8 @@ const CloudMockBackend = (() => {
         r.mode === mode &&
         (bpm == null || r.bpm === bpm) &&
         (level == null || r.level === level) &&
-        (instrument == null || r.instrument === instrument)
+        (instrument == null || r.instrument === instrument) &&
+        (subdivision == null || (r.subdivision || 'sixteenth') === subdivision)
       );
 
     const bestByUser = new Map();

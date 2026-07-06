@@ -322,6 +322,9 @@ bpmValue.addEventListener('change', () => setDisplayBpm(parseInt(bpmValue.value,
 bpmValue.addEventListener('focus',  () => bpmValue.select());
 
 subBtns.forEach(btn => {
+  if (typeof GameSubdivisions !== 'undefined') {
+    btn.title = GameSubdivisions.labelFor(btn.dataset.mode);
+  }
   btn.addEventListener('click', () => {
     subBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');

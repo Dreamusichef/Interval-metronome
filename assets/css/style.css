@@ -1091,6 +1091,44 @@ body {
 }
 .rogue-mode-btn:disabled { opacity: 0.5; cursor: default; }
 
+.rogue-subdiv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.rogue-subdiv-field .rogue-field-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.rogue-subdivision-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rogue-subdiv-btn {
+  flex: 1;
+  min-width: 36px;
+  padding: 6px 4px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.rogue-subdiv-btn:hover { color: var(--text); }
+.rogue-subdiv-btn.active {
+  color: var(--cyan);
+  box-shadow: inset 0 0 0 1px rgba(0, 200, 255, 0.3), 0 0 10px rgba(0, 200, 255, 0.15);
+}
+.rogue-subdiv-btn:disabled { opacity: 0.5; cursor: default; }
+.rogue-subdiv-btn .sub-icon { font-size: 1.1rem; line-height: 1; }
+
 .rogue-field-row { display: flex; gap: 10px; margin-bottom: 6px; }
 .rogue-field { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 
@@ -1740,6 +1778,36 @@ body.rogue-run .app-footer { display: none; }
 }
 
 .stats-viewtoggle, .stats-modes { display: flex; gap: 6px; }
+.stats-subdivisions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.stats-subdiv-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 4px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 36px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.stats-subdiv-btn:hover { color: var(--text); }
+.stats-subdiv-btn.active {
+  background: linear-gradient(180deg, #0d1e32 0%, #071220 100%);
+  color: var(--cyan);
+  box-shadow: inset 0 0 0 1px rgba(0, 200, 255, 0.3), 0 0 14px rgba(0, 200, 255, 0.18);
+}
 .stats-view-btn, .stats-mode-btn {
   flex: 1;
   padding: 9px 6px;

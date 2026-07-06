@@ -216,10 +216,10 @@ function rankFor(pct) {
   return 'E';
 }
 
-function endurancePct(hitsCleared, totalRunBeats) {
-  const totalSixteenths = (totalRunBeats || 0) * 4;
-  if (!totalSixteenths) return 0;
-  return Math.round(Math.min(100, hitsCleared / totalSixteenths * 100));
+function endurancePct(hitsCleared, totalRunBeats, ticksPerBeat = 4) {
+  const totalSlots = (totalRunBeats || 0) * ticksPerBeat;
+  if (!totalSlots) return 0;
+  return Math.round(Math.min(100, hitsCleared / totalSlots * 100));
 }
 
 function accuracyPct(tally) {
@@ -230,25 +230,25 @@ function accuracyPct(tally) {
 const ENDURANCE_DURATION_WEIGHT = 0.70;
 const ENDURANCE_ACCURACY_WEIGHT = 0.30;
 
-function enduranceScorePct(hitsCleared, totalRunBeats, tally) {
-  const duration = endurancePct(hitsCleared, totalRunBeats);
+function enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat = 4) {
+  const duration = endurancePct(hitsCleared, totalRunBeats, ticksPerBeat);
   const accuracy = accuracyPct(tally);
   return Math.round(Math.min(100,
     ENDURANCE_DURATION_WEIGHT * duration + ENDURANCE_ACCURACY_WEIGHT * accuracy));
 }
 
-function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally }) {
+function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally, ticksPerBeat = 4 }) {
   if (mode === 'suddendeath' || mode === 'gauntlet') {
-    const pct = enduranceScorePct(hitsCleared, totalRunBeats, tally);
+    const pct = enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat);
     return { rank: rankFor(pct), pct };
   }
   const pct = accuracyPct(tally);
   return { rank: rankFor(pct), pct };
 }
 
-function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally }) {
+function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally, ticksPerBeat = 4 }) {
   if (mode === 'suddendeath' || mode === 'gauntlet') {
-    return enduranceScorePct(hitsCleared, totalRunBeats, tally);
+    return enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat);
   }
   const good = (tally && tally.good) || 0;
   return Math.max(0, Math.min(100, Math.round(good / (totalRunBeats || 1) * 100)));
@@ -384,6 +384,7 @@ const RogueliteMode = (() => {
     audioReady: false,          // audio input started + sensitivity usable
     mode: 'timetrial',          // 'timetrial' | 'suddendeath' (both free BPM+duration) | 'gauntlet'
     level: null,                // 1..6 (gauntlet only)
+    subdivision: 'sixteenth',   // gated slot density (see game-subdivisions.js)
     gameBpm: 120,               // game mode: chosen BPM
     gameMins: 3,                // game mode: chosen duration (minutes)
     currentBpm: 0,              // mirrors the existing ramp engine
@@ -1205,12 +1206,15 @@ const RogueliteMode = (() => {
     let where;
     if (runState.mode === 'gauntlet') {
       where = 'Gauntlet L' + runState.level + ' · ' + LEVELS[runState.level].bpmStart + '–' +
-        LEVELS[runState.level].bpmCeiling + ' BPM';
+        LEVELS[runState.level].bpmCeiling + ' BPM · ' +
+        (typeof GameSubdivisions !== 'undefined' ? GameSubdivisions.labelFor(runState.subdivision) : '16th notes');
     } else {
       where = (runState.mode === 'suddendeath' ? 'Sudden Death' : 'Time Trial') +
-        ' · ' + runState.gameBpm + ' BPM · ' + runState.gameMins + ' min';
+        ' · ' + runState.gameBpm + ' BPM · ' + runState.gameMins + ' min · ' +
+        (typeof GameSubdivisions !== 'undefined' ? GameSubdivisions.labelFor(runState.subdivision) : '16th notes');
     }
-    setRunStatus(where + ' — ' + RUN_LEAD_IN_BARS + '-bar count-in, then play continuous 16ths.');
+    setRunStatus(where + ' — ' + RUN_LEAD_IN_BARS + '-bar count-in, then ' +
+      (typeof GameSubdivisions !== 'undefined' ? GameSubdivisions.playBanner(runState.subdivision) : 'Play 16ths') + '.');
     updateGates();
   }
 
@@ -1262,7 +1266,8 @@ const RogueliteMode = (() => {
           }
           // Count-in over — NOW start the set's 1-minute clock (see AppRamp hooks).
           if (window.AppRamp && window.AppRamp.beginSetCountdown) window.AppRamp.beginSetCountdown();
-          setRunBanner('Keep the 16ths going', 'live');
+          setRunBanner(typeof GameSubdivisions !== 'undefined'
+            ? GameSubdivisions.playBanner(runState.subdivision) : 'Play 16ths', 'live');
           refreshHudBpm();
         }
       }
@@ -1275,24 +1280,25 @@ const RogueliteMode = (() => {
     // 16th spacing, so the 16ths TILE the timeline — timing wobble inside the slot
     // is fine; only a DROPPED 16th (empty slot = a skip / frozen foot) ends the run.
     const bpm = currentRunBpm();
-    const sixteenthMs = 60000 / bpm / 4;
-    const presenceMs = sixteenthMs * RUN_PRESENCE_FACTOR;
+    const ticks = runTicksPerBeat();
+    const slotMs = 60000 / bpm / ticks;
+    const presenceMs = slotMs * RUN_PRESENCE_FACTOR;
     const goodMs = presenceMs * goodFraction(bpm);   // GOOD vs RUSH/DRAG threshold (tempo-aware)
-    const sixteenthSec = sixteenthMs / 1000;
+    const slotSec = slotMs / 1000;
     // Offset for this whole tick (calibration + any latency compensation). Captured
     // once and passed through so the eval timer and the classify centre always agree.
     const runOffset = effectiveOffset();
-    for (let k = 0; k < 4; k++) {
-      const subPerf = audioToPerfMs(tickTimeSec + k * sixteenthSec, sync);
+    for (let k = 0; k < ticks; k++) {
+      const subPerf = audioToPerfMs(tickTimeSec + k * slotSec, sync);
       // Evaluate after the (offset-shifted) slot closes — classifySlot centres it at
       // subPerf + runOffset, so the eval timer must wait out runOffset too.
       const evalAt = subPerf + runOffset + presenceMs + EVAL_MARGIN_MS;
       const delay = Math.max(0, evalAt - performance.now());
-      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, goodMs, beatIndex, k, runOffset), delay));
+      pendingEvalTimers.push(setTimeout(() => evaluateHit(subPerf, presenceMs, goodMs, beatIndex, k, ticks - 1, runOffset), delay));
     }
   }
 
-  function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, sixteenthIdx, offset) {
+  function evaluateHit(expectedPerf, presenceMs, goodMs, beatIndex, subslotIdx, lastSubslotIdx, offset) {
     if (runState.status !== 'running') return;
     if (!runGating) return;
     if (offset == null) offset = runState.meanOffset;
@@ -1324,7 +1330,7 @@ const RogueliteMode = (() => {
     } else {
       rank = 2;
     }
-    if (sixteenthIdx === 0) { hudBeatRank[beatIndex] = rank; hudBeatOff[beatIndex] = off; }
+    if (subslotIdx === 0) { hudBeatRank[beatIndex] = rank; hudBeatOff[beatIndex] = off; }
     else if (rank > hudBeatRank[beatIndex]) { hudBeatRank[beatIndex] = rank; hudBeatOff[beatIndex] = off; }
     else if (rank === 1 && hudBeatRank[beatIndex] === 1 && Math.abs(off) > Math.abs(hudBeatOff[beatIndex])) {
       hudBeatOff[beatIndex] = off;   // keep the most extreme neutral direction this beat
@@ -1369,13 +1375,13 @@ const RogueliteMode = (() => {
 
     // Otherwise the run continues. At beat completion, append the lane cell and
     // tally the beat by its worst 16th (rush/drag split for neutral).
-    if (sixteenthIdx === 3) {
+    if (subslotIdx === lastSubslotIdx) {
       tallyBeat(hudBeatRank[beatIndex], hudBeatOff[beatIndex]);
       addLaneCell(verdictClass(hudBeatRank[beatIndex], hudBeatOff[beatIndex]));
     }
     updateScoreHud();
     // Purge consumed/stale events a few slots behind the current expected time.
-    pruneEvents(expectedPerf - presenceMs * 4);
+    pruneEvents(expectedPerf - presenceMs * (lastSubslotIdx + 1));
   }
 
   function tallyBeat(rank, off) {
@@ -1521,13 +1527,21 @@ const RogueliteMode = (() => {
   //  • Sudden Death / Gauntlet: weighted endurance — 70% how far you got (16th slots
   //    cleared ÷ full-run slots) + 30% hit accuracy (green % of beats played).
   //    Clearing the run gives 100% on the duration side; accuracy still matters.
+  function runTicksPerBeat() {
+    return (typeof GameSubdivisions !== 'undefined')
+      ? GameSubdivisions.ticksFor(runState.subdivision)
+      : 4;
+  }
+
   function runResultRankPct() {
+    const ticksPerBeat = runTicksPerBeat();
     return runResultPct({
       mode: runState.mode,
       status: runState.status,
       hitsCleared: runState.hitsCleared,
       totalRunBeats: runState.totalRunBeats,
       tally: runState.tally,
+      ticksPerBeat,
     });
   }
 
@@ -1549,6 +1563,7 @@ const RogueliteMode = (() => {
       mode: runState.mode,
       bpm: isGauntlet ? null : snapGameBpm(runState.gameBpm),
       level: isGauntlet ? runState.level : null,
+      subdivision: runState.subdivision || 'sixteenth',
       rank: rank,
       green_pct: pct,
       duration_sec: isGauntlet ? null : runState.gameMins * 60,
@@ -1851,6 +1866,7 @@ const RogueliteMode = (() => {
       hitsCleared: runState.hitsCleared,
       totalRunBeats: runState.totalRunBeats,
       tally: runState.tally,
+      ticksPerBeat: runTicksPerBeat(),
     });
     return { gauge: g, rank: rankFor(g) };
   }
@@ -1965,6 +1981,7 @@ const RogueliteMode = (() => {
     el.modeBtns   && el.modeBtns.forEach(b => { b.disabled = busy; });
     el.instrBtns  && el.instrBtns.forEach(b => { b.disabled = busy; });
     el.inputBtns  && el.inputBtns.forEach(b => { b.disabled = busy; });
+    document.querySelectorAll('.rogue-subdiv-btn').forEach(b => { b.disabled = busy; });
   }
 
   function selectLevel(n) {
@@ -1982,10 +1999,50 @@ const RogueliteMode = (() => {
     if (el.gauntletParams) el.gauntletParams.style.display = isGauntlet ? '' : 'none';
     if (el.gameModeHint) {
       el.gameModeHint.textContent = (runState.mode === 'suddendeath')
-        ? 'Sudden Death: one dropped 16th ends it — rank blends survival (70%) and accuracy (30%).'
+        ? 'Sudden Death: one dropped note ends it — rank blends survival (70%) and accuracy (30%).'
         : 'Time Trial: play the full duration; graded E–SS.';
     }
+    renderSubdivisions();
     updateGates();
+  }
+
+  function selectSubdivision(id) {
+    runState.subdivision = (typeof GameSubdivisions !== 'undefined')
+      ? GameSubdivisions.clampForMode(id, runState.mode)
+      : 'sixteenth';
+    renderSubdivisions();
+    updateGates();
+  }
+
+  function renderSubdivisions() {
+    const GS = typeof GameSubdivisions !== 'undefined' ? GameSubdivisions : null;
+    if (!GS) return;
+    runState.subdivision = GS.clampForMode(runState.subdivision, runState.mode);
+    const allowed = GS.allowedForMode(runState.mode);
+    const isGauntlet = runState.mode === 'gauntlet';
+    const container = isGauntlet ? el.gauntletSubdivRow : el.gameSubdivRow;
+    const other = isGauntlet ? el.gameSubdivRow : el.gauntletSubdivRow;
+    if (other) other.style.display = 'none';
+    if (!container) return;
+    container.style.display = '';
+    container.innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'rogue-field-label';
+    label.textContent = 'Subdivision';
+    container.appendChild(label);
+    const btns = document.createElement('div');
+    btns.className = 'rogue-subdivision-buttons';
+    allowed.forEach(id => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rogue-subdiv-btn' + (runState.subdivision === id ? ' active' : '');
+      btn.dataset.subdiv = id;
+      btn.title = GS.labelFor(id);
+      btn.innerHTML = '<span class="sub-icon">' + GS.iconFor(id) + '</span>';
+      btn.addEventListener('click', () => selectSubdivision(id));
+      btns.appendChild(btn);
+    });
+    container.appendChild(btns);
   }
 
   // ── Beta access gate (Game Mode only) ───────────────────────────────────────
@@ -2103,6 +2160,8 @@ const RogueliteMode = (() => {
       gameBpmDec:     document.getElementById('rogueGameBpmDec'),
       gameBpmInc:     document.getElementById('rogueGameBpmInc'),
       gameModeHint:   document.getElementById('rogueGameModeHint'),
+      gameSubdivRow:  document.getElementById('rogueGameSubdivRow'),
+      gauntletSubdivRow: document.getElementById('rogueGauntletSubdivRow'),
       gameMinsVal:    document.getElementById('rogueGameMinsVal'),
       gameMinsDec:    document.getElementById('rogueGameMinsDec'),
       gameMinsInc:    document.getElementById('rogueGameMinsInc'),
@@ -2231,6 +2290,7 @@ const RogueliteMode = (() => {
     el.gameMinsInc && el.gameMinsInc.addEventListener('click', () => stepGameMins(+1));
     renderGameBpm();
     renderGameMins();
+    selectMode(runState.mode);
     el.overlayClose && el.overlayClose.addEventListener('click', () => {
       dismissResultsOverlay();
       exitHud();   // leave the HUD and restore the normal (decluttered) setup view

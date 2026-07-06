@@ -207,6 +207,7 @@ const CloudSupabaseBackend = (() => {
       p_duration_sec: record.duration_sec == null ? null : record.duration_sec,
       p_survival_sec: record.survival_sec == null ? null : record.survival_sec,
       p_cleared: !!record.cleared,
+      p_subdivision: record.subdivision || 'sixteenth',
     });
     if (error) {
       console.warn('[cloud] submitRun', error.message);
@@ -226,13 +227,14 @@ const CloudSupabaseBackend = (() => {
     return data || [];
   }
 
-  async function leaderboard(mode, bpm, level, instrument) {
+  async function leaderboard(mode, bpm, level, instrument, subdivision) {
     if (!init()) return [];
     const { data, error } = await client.rpc('get_leaderboard', {
       p_mode: mode,
       p_bpm: (bpm == null ? null : bpm),
       p_level: (level == null ? null : level),
       p_instrument: (instrument == null ? null : instrument),
+      p_subdivision: (subdivision == null ? null : subdivision),
     });
     if (error) { console.warn('[cloud] leaderboard', error.message); return []; }
     return data || [];
