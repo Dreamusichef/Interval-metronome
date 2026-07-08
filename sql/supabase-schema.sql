@@ -33,6 +33,8 @@ create table if not exists public.runs (
   created_at   timestamptz not null default now(),
   mode         text not null check (mode in ('timetrial','suddendeath','gauntlet')),
   instrument   text not null default 'kick' check (instrument in ('kick','snare')),
+  subdivision  text not null default 'sixteenth'
+    check (subdivision in ('quarter','eighth','triplet','sixteenth','sextuplet')),
   bpm          int,            -- free modes (60–240); null for gauntlet
   level        int,            -- gauntlet (1–6); null for free modes
   rank         text not null,  -- 'E','D','C','B','A','S','SS'
@@ -56,7 +58,7 @@ drop policy if exists "users read own runs" on public.runs;
 create policy "users read own runs"
   on public.runs for select using (auth.uid() = user_id);
 
-create index if not exists runs_user_mode_idx on public.runs (user_id, mode, bpm, level);
+create index if not exists runs_mode_instr_subdiv_idx on public.runs (mode, instrument, subdivision, bpm, level);
 create index if not exists runs_mode_bpm_idx  on public.runs (mode, bpm);
 create index if not exists runs_mode_level_idx on public.runs (mode, level);
 create unique index if not exists runs_user_run_id_idx
@@ -66,6 +68,9 @@ create index if not exists runs_user_created_idx on public.runs (user_id, create
 -- ── submit_run: validated insert (dedup + temporal checks) ───────────────────
 drop function if exists public.submit_run(
   uuid, timestamptz, int, text, text, int, int, text, int, int, int, boolean
+);
+drop function if exists public.submit_run(
+  uuid, timestamptz, int, text, text, int, int, text, int, int, int, boolean, text
 );
 create function public.submit_run(
   p_run_id         uuid,
@@ -79,7 +84,8 @@ create function public.submit_run(
   p_green_pct      int,
   p_duration_sec   int,
   p_survival_sec   int,
-  p_cleared        boolean
+  p_cleared        boolean,
+  p_subdivision    text default 'sixteenth'
 )
 returns jsonb
 language plpgsql
@@ -95,6 +101,7 @@ declare
   v_prev         record;
   v_elapsed_sec  numeric;
   v_max_played   int;
+  v_subdivision  text := coalesce(p_subdivision, 'sixteenth');
 begin
   if v_uid is null then
     return jsonb_build_object('valid', false, 'reject_reason', 'unauthenticated');
@@ -104,6 +111,9 @@ begin
   end if;
   if exists (select 1 from public.runs where user_id = v_uid and run_id = p_run_id) then
     return jsonb_build_object('valid', false, 'reject_reason', 'duplicate_run');
+  end if;
+  if v_subdivision not in ('quarter', 'eighth', 'triplet', 'sixteenth', 'sextuplet') then
+    v_subdivision := 'sixteenth';
   end if;
   if p_started_at is null
      or p_started_at > v_now + interval '30 seconds'
@@ -147,10 +157,10 @@ begin
   end if;
   insert into public.runs (
     user_id, created_at, run_id, started_at, played_sec, valid, reject_reason,
-    mode, instrument, bpm, level, rank, green_pct, duration_sec, survival_sec, cleared
+    mode, instrument, subdivision, bpm, level, rank, green_pct, duration_sec, survival_sec, cleared
   ) values (
     v_uid, v_now, p_run_id, p_started_at, p_played_sec, v_valid, v_reason,
-    p_mode, coalesce(p_instrument, 'kick'), p_bpm, p_level, p_rank, p_green_pct,
+    p_mode, coalesce(p_instrument, 'kick'), v_subdivision, p_bpm, p_level, p_rank, p_green_pct,
     p_duration_sec, p_survival_sec, coalesce(p_cleared, false)
   );
   return jsonb_build_object('valid', v_valid, 'reject_reason', v_reason);
@@ -158,7 +168,7 @@ end;
 $$;
 
 grant execute on function public.submit_run(
-  uuid, timestamptz, int, text, text, int, int, text, int, int, int, boolean
+  uuid, timestamptz, int, text, text, int, int, text, int, int, int, boolean, text
 ) to authenticated;
 
 -- ── leaderboard: cross-user, best-per-user, ranked ──────────────────────────
@@ -168,11 +178,13 @@ grant execute on function public.submit_run(
 -- longer duration; Sudden Death ranks by survival time.
 drop function if exists public.get_leaderboard(text, int, int);
 drop function if exists public.get_leaderboard(text, int, int, text);
+drop function if exists public.get_leaderboard(text, int, int, text, text);
 create function public.get_leaderboard(
   p_mode text,
   p_bpm int default null,
   p_level int default null,
-  p_instrument text default null
+  p_instrument text default null,
+  p_subdivision text default null
 )
 returns table (
   display_name text,
@@ -197,6 +209,7 @@ as $$
       and (p_bpm        is null or r.bpm        = p_bpm)
       and (p_level      is null or r.level      = p_level)
       and (p_instrument is null or r.instrument = p_instrument)
+      and (p_subdivision is null or r.subdivision = p_subdivision)
   ),
   best_per_user as (
     select *,
@@ -222,7 +235,33 @@ as $$
   limit 100;
 $$;
 
-grant execute on function public.get_leaderboard(text, int, int, text) to anon, authenticated;
+grant execute on function public.get_leaderboard(text, int, int, text, text) to anon, authenticated;
+
+-- ── ramp_presets: private saved ramp configs (signed-in sync) ────────────────
+-- Incremental deploy: sql/supabase-migration-ramp-presets.sql
+create table if not exists public.ramp_presets (
+  user_id    uuid primary key references auth.users on delete cascade,
+  presets    jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.ramp_presets enable row level security;
+
+drop policy if exists "users read own ramp presets" on public.ramp_presets;
+create policy "users read own ramp presets"
+  on public.ramp_presets for select using (auth.uid() = user_id);
+
+drop policy if exists "users insert own ramp presets" on public.ramp_presets;
+create policy "users insert own ramp presets"
+  on public.ramp_presets for insert with check (auth.uid() = user_id);
+
+drop policy if exists "users update own ramp presets" on public.ramp_presets;
+create policy "users update own ramp presets"
+  on public.ramp_presets for update using (auth.uid() = user_id);
+
+drop policy if exists "users delete own ramp presets" on public.ramp_presets;
+create policy "users delete own ramp presets"
+  on public.ramp_presets for delete using (auth.uid() = user_id);
 
 -- ── account deletion: user-initiated self-service (30-day grace or immediate) ─
 -- Incremental deploy: sql/supabase-migration-account-deletion.sql

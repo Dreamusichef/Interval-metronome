@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260629a">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260705a">
 </head>
 <body>
   <div class="app-container">
@@ -51,6 +51,9 @@
           <button class="stats-mode-btn" data-mode="gauntlet">Gauntlet</button>
         </div>
 
+        <!-- Subdivision: scopes Personal + Global to one board at a time -->
+        <div class="stats-subdivisions" id="statsSubdivRow"></div>
+
         <!-- Secondary selector (Global only): pick BPM (free modes) or Level (gauntlet) -->
         <div class="stats-subselect" id="statsSubSelect" hidden>
           <label class="stats-sub-label" id="statsSubLabel">BPM</label>
@@ -75,8 +78,8 @@
     // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260619a', 'assets/js/cloud.js?v=20260625a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260619a', 'assets/js/cloud.js?v=20260625a'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260708a', 'assets/js/cloud.js?v=20260708a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260708a', 'assets/js/cloud.js?v=20260708a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
@@ -88,7 +91,8 @@
       load(0);
     })();
   </script>
+  <script defer src="assets/js/game-subdivisions.js?v=20260706b"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
-  <script defer src="assets/js/stats.js?v=20260619b"></script>
+  <script defer src="assets/js/stats.js?v=20260705a"></script>
 </body>
 </html>

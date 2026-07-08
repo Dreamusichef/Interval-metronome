@@ -4,18 +4,14 @@
    STATS PAGE — personal records + global leaderboard.
 
    Toggle: Personal | Global. Mode buttons: Time Trial / Sudden Death / Gauntlet.
-   - Personal aggregates the signed-in user's own runs (read directly; RLS allows
-     reading your own rows): per-BPM (free modes) or per-level (gauntlet) best
-     rank, best green%, longest survival, run counts, total runs.
-   - Global calls the get_leaderboard RPC for a chosen BPM (free) or level
-     (gauntlet) and lists the top players.
+   Subdivision buttons scope each board (same mode/instrument/BPM or level).
    ════════════════════════════════════════════════════════════════════════════ */
 
 const RANK_ORDER = { E: 0, D: 1, C: 2, B: 3, A: 4, S: 5, SS: 6 };
 const RANK_COLOR = { SS: '#ffe066', S: '#00c8ff', A: '#00e87a', B: '#4aa8ff', C: '#e8f0f5', D: '#8ab0c8', E: '#ff3838' };
 const GAME_BPM_MIN = 50, GAME_BPM_MAX = 250, GAME_BPM_STEP = 5;
 
-const state = { view: 'personal', mode: 'timetrial', instrument: 'kick', bpm: 120, level: 1 };
+const state = { view: 'personal', mode: 'timetrial', instrument: 'kick', subdivision: 'sixteenth', bpm: 120, level: 1 };
 let myRunsCache = null;
 
 const $ = (id) => document.getElementById(id);
@@ -26,9 +22,6 @@ function fmtMMSS(sec) {
 }
 function rankBetter(a, b) { return (RANK_ORDER[a] ?? -1) > (RANK_ORDER[b] ?? -1) ? a : b; }
 function rankPill(rank) {
-  // Whitelist to the 7 real ranks. `rank` comes from the DB; a spoofed row could
-  // carry arbitrary text, so anything not in RANK_ORDER renders as the neutral '–'
-  // and never reaches the DOM (stored-XSS guard, issue #48).
   const r = (rank in RANK_ORDER) ? rank : '';
   return '<span class="stats-rank" style="color:' + (RANK_COLOR[r] || '#fff') + '">' + (r || '–') + '</span>';
 }
@@ -37,9 +30,16 @@ function esc(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ── Auth wiring ──────────────────────────────────────────────────────────────
-// Cloud scripts load async (see stats.html loadCloudScripts); poll until Cloud
-// exists, then subscribe via onAuth — do not read currentUser() synchronously.
+function runSubdiv(r) {
+  return r.subdivision || 'sixteenth';
+}
+
+function subdivLabel(id) {
+  return (typeof GameSubdivisions !== 'undefined')
+    ? GameSubdivisions.labelFor(id)
+    : (id === 'sixteenth' ? '16th notes' : id);
+}
+
 function initAuthBars() {
   if (!window.Cloud) { setTimeout(initAuthBars, 100); return; }
   window.Cloud.mountAuthBar($('cloudAuthBar'));
@@ -53,7 +53,27 @@ function initAuthBars() {
   });
 }
 
-// ── Controls ─────────────────────────────────────────────────────────────────
+function renderSubdivButtons() {
+  const row = $('statsSubdivRow');
+  if (!row || typeof GameSubdivisions === 'undefined') return;
+  state.subdivision = GameSubdivisions.clampForMode(state.subdivision, state.mode);
+  row.innerHTML = '';
+  GameSubdivisions.allowedForMode(state.mode).forEach(id => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'stats-subdiv-btn' + (state.subdivision === id ? ' active' : '');
+    btn.dataset.subdiv = id;
+    btn.textContent = GameSubdivisions.labelFor(id);
+    btn.addEventListener('click', () => {
+      state.subdivision = id;
+      document.querySelectorAll('.stats-subdiv-btn').forEach(x =>
+        x.classList.toggle('active', x.dataset.subdiv === id));
+      render();
+    });
+    row.appendChild(btn);
+  });
+}
+
 function wireControls() {
   document.querySelectorAll('.stats-view-btn').forEach(b =>
     b.addEventListener('click', () => {
@@ -65,6 +85,7 @@ function wireControls() {
     b.addEventListener('click', () => {
       state.mode = b.dataset.mode;
       document.querySelectorAll('.stats-mode-btn').forEach(x => x.classList.toggle('active', x === b));
+      renderSubdivButtons();
       render();
     }));
   document.querySelectorAll('.stats-instr-btn').forEach(b =>
@@ -80,7 +101,6 @@ function wireControls() {
   });
 }
 
-// Populate the Global secondary selector for the current mode.
 function populateSubSelect() {
   const sel = $('statsSubSelectEl');
   sel.innerHTML = '';
@@ -96,17 +116,15 @@ function populateSubSelect() {
 }
 function opt(val, label) { const o = document.createElement('option'); o.value = String(val); o.textContent = label; return o; }
 
-// ── Render ───────────────────────────────────────────────────────────────────
 async function render() {
   const isTrophies = state.view === 'trophies';
-  // The mode / instrument / BPM controls only apply to Personal & Global.
   if ($('statsInstrRow')) $('statsInstrRow').style.display = isTrophies ? 'none' : '';
   if ($('statsModesRow')) $('statsModesRow').style.display = isTrophies ? 'none' : '';
-  // .stats-subselect has an author display:flex rule, so toggle display directly
-  // (the `hidden` attribute would be overridden by it).
+  if ($('statsSubdivRow')) $('statsSubdivRow').style.display = isTrophies ? 'none' : '';
   $('statsSubSelect').style.display = (isTrophies || state.view !== 'global') ? 'none' : 'flex';
 
   if (isTrophies) { await renderTrophies(); return; }
+  renderSubdivButtons();
   if (state.view === 'global') populateSubSelect();
   if (state.view === 'personal') await renderPersonal();
   else await renderGlobal();
@@ -122,16 +140,19 @@ async function renderPersonal() {
   const runs = myRunsCache;
   const totalRuns = runs.length;
   const instr = state.instrument;
+  const subLabel = subdivLabel(state.subdivision);
   const instrRuns = runs.filter(r => (r.instrument || 'kick') === instr);
-  const modeRuns = instrRuns.filter(r => r.mode === state.mode);
+  const modeRuns = instrRuns.filter(r =>
+    r.mode === state.mode && runSubdiv(r) === state.subdivision);
 
   $('statsSummary').innerHTML =
     '<span class="stats-stat"><b>' + totalRuns + '</b> total runs</span>' +
     '<span class="stats-stat"><b>' + instrRuns.length + '</b> on ' + instrLabel(instr) + '</span>' +
-    '<span class="stats-stat"><b>' + modeRuns.length + '</b> in ' + modeLabel(state.mode) + '</span>';
+    '<span class="stats-stat"><b>' + modeRuns.length + '</b> in ' + modeLabel(state.mode) + ' · ' + esc(subLabel) + '</span>';
 
   if (!modeRuns.length) {
-    $('statsContent').innerHTML = '<div class="stats-empty">No ' + instrLabel(instr) + ' ' + modeLabel(state.mode) + ' runs yet — go set a record.</div>';
+    $('statsContent').innerHTML = '<div class="stats-empty">No ' + instrLabel(instr) + ' ' +
+      modeLabel(state.mode) + ' · ' + esc(subLabel) + ' runs yet — go set a record.</div>';
     return;
   }
 
@@ -166,22 +187,23 @@ async function renderGlobal() {
   $('statsSummary').innerHTML = '';
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
   const isGauntlet = state.mode === 'gauntlet';
+  const subLabel = subdivLabel(state.subdivision);
   const rows = await window.Cloud.leaderboard(
     state.mode,
     isGauntlet ? null : state.bpm,
     isGauntlet ? state.level : null,
-    state.instrument
+    state.instrument,
+    state.subdivision
   );
-  const where = instrLabel(state.instrument) + ' · ' + (isGauntlet ? ('Level ' + state.level) : (state.bpm + ' BPM'));
+  const where = instrLabel(state.instrument) + ' · ' + subLabel + ' · ' +
+    (isGauntlet ? ('Level ' + state.level) : (state.bpm + ' BPM'));
 
   if (!rows.length) {
-    $('statsContent').innerHTML = '<div class="stats-empty">No scores yet for ' + modeLabel(state.mode) + ' · ' + where + '. Be the first.</div>';
+    $('statsContent').innerHTML = '<div class="stats-empty">No scores yet for ' + modeLabel(state.mode) + ' · ' + esc(where) + '. Be the first.</div>';
     return;
   }
 
   const body = rows.map((r, i) => {
-    // Only render https:// avatars — esc() blocks attribute breakout but not a
-    // javascript:/data: URL scheme. Google OAuth avatars are always https (#48).
     const safeAvatar = (r.avatar_url && r.avatar_url.startsWith('https://')) ? esc(r.avatar_url) : '';
     const who = '<span class="stats-player">' +
       (safeAvatar ? '<img class="cloud-avatar sm" src="' + safeAvatar + '" referrerpolicy="no-referrer">' : '') +
@@ -189,18 +211,16 @@ async function renderGlobal() {
     const pos = '<span class="stats-pos' + (i < 3 ? ' top' : '') + '">' + (i + 1) + '</span>';
     if (state.mode === 'suddendeath') return tr([ pos, who, rankPill(r.rank), fmtMMSS(r.survival_sec) ]);
     if (state.mode === 'gauntlet')    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', r.cleared ? '✓' : '—' ]);
-    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', fmtMMSS(r.duration_sec) ]); // time trial
+    return tr([ pos, who, rankPill(r.rank), r.green_pct + '%', fmtMMSS(r.duration_sec) ]);
   });
 
   const head = state.mode === 'suddendeath' ? ['#', 'Player', 'Best Rank', 'Survived']
     : state.mode === 'gauntlet' ? ['#', 'Player', 'Grade', 'Progress', 'Cleared']
     : ['#', 'Player', 'Grade', 'Green', 'Duration'];
-  $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + where + '</div>' +
+  $('statsContent').innerHTML = '<div class="stats-lb-where">' + modeLabel(state.mode) + ' · ' + esc(where) + '</div>' +
     table(head, body);
 }
 
-// ── Trophies / achievements (definitions live in achievements.js — shared with
-//    the game page so the run-end popup uses the exact same trophies) ───────────
 async function renderTrophies() {
   $('statsSummary').innerHTML = '';
   $('statsContent').innerHTML = '<div class="stats-loading">Loading…</div>';
@@ -229,7 +249,6 @@ async function renderTrophies() {
     '<div class="trophy-grid">' + cards.join('') + '</div>';
 }
 
-// ── tiny table helpers ───────────────────────────────────────────────────────
 function table(headers, rows) {
   return '<table class="stats-table"><thead><tr>' +
     headers.map(h => '<th>' + h + '</th>').join('') +
@@ -239,7 +258,6 @@ function tr(cells) { return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('
 function modeLabel(m) { return m === 'suddendeath' ? 'Sudden Death' : m === 'gauntlet' ? 'Gauntlet' : 'Time Trial'; }
 function instrLabel(i) { return i === 'snare' ? 'Snare' : 'Kick'; }
 
-// ── boot ─────────────────────────────────────────────────────────────────────
 wireControls();
 initAuthBars();
 

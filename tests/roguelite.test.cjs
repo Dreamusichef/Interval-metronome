@@ -298,6 +298,17 @@ describe('run scoring', () => {
     assert.equal(g, 22);   // 80 / 360
   });
 
+  test('endurancePct scales slot denominator by ticksPerBeat', () => {
+    assert.equal(endurancePct(600, 100, 6), 100);
+    assert.equal(endurancePct(400, 100, 4), 100);
+    const r = runResultPct({
+      mode: 'gauntlet', status: 'complete', hitsCleared: 600, totalRunBeats: 100,
+      tally: { good: 100, neutral: 0, bad: 0 }, ticksPerBeat: 6,
+    });
+    assert.equal(r.pct, 100);
+    assert.equal(r.rank, 'SS');
+  });
+
   test('rankFor bands', () => {
     assert.equal(rankFor(100), 'SS');
     assert.equal(rankFor(99), 'SS');

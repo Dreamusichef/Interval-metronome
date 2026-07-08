@@ -207,6 +207,7 @@ const CloudSupabaseBackend = (() => {
       p_duration_sec: record.duration_sec == null ? null : record.duration_sec,
       p_survival_sec: record.survival_sec == null ? null : record.survival_sec,
       p_cleared: !!record.cleared,
+      p_subdivision: record.subdivision || 'sixteenth',
     });
     if (error) {
       console.warn('[cloud] submitRun', error.message);
@@ -226,13 +227,14 @@ const CloudSupabaseBackend = (() => {
     return data || [];
   }
 
-  async function leaderboard(mode, bpm, level, instrument) {
+  async function leaderboard(mode, bpm, level, instrument, subdivision) {
     if (!init()) return [];
     const { data, error } = await client.rpc('get_leaderboard', {
       p_mode: mode,
       p_bpm: (bpm == null ? null : bpm),
       p_level: (level == null ? null : level),
       p_instrument: (instrument == null ? null : instrument),
+      p_subdivision: (subdivision == null ? null : subdivision),
     });
     if (error) { console.warn('[cloud] leaderboard', error.message); return []; }
     return data || [];
@@ -272,10 +274,42 @@ const CloudSupabaseBackend = (() => {
     return data || { pending: false };
   }
 
+  async function getRampPresets() {
+    if (!init() || !user) return null;
+    const { data, error } = await client.from('ramp_presets')
+      .select('presets, updated_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) {
+      console.warn('[cloud] getRampPresets', error.message);
+      return null;
+    }
+    if (!data) return { presets: [], updated_at: null };
+    const presets = Array.isArray(data.presets) ? data.presets : [];
+    return { presets, updated_at: data.updated_at || null };
+  }
+
+  async function saveRampPresets(presets) {
+    if (!init() || !user) return { error: 'signed-out' };
+    const list = Array.isArray(presets) ? presets : [];
+    const row = {
+      user_id: user.id,
+      presets: list,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await client.from('ramp_presets').upsert(row, { onConflict: 'user_id' });
+    if (error) {
+      console.warn('[cloud] saveRampPresets', error.message);
+      return { error: 'save-failed' };
+    }
+    return { ok: true, updated_at: row.updated_at };
+  }
+
   return {
     init, isReady, signIn, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
     requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
+    getRampPresets, saveRampPresets,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
   };
 })();
