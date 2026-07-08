@@ -20,6 +20,8 @@
      requestAccountDeletion({ immediate }) — delete now or schedule 30-day grace period
      cancelAccountDeletion()        — cancel a pending scheduled deletion
      getAccountDeletionStatus()     — { pending, scheduled_for } or { pending: false }
+     getRampPresets()               — { presets, updated_at } | null (signed-in)
+     saveRampPresets(presets)       — upsert private ramp favourites
      submitRun(record)              — validated insert via submit_run RPC / mock checks
      saveRun(record)                — alias for submitRun
      myRuns()                       — this user's runs (for personal stats)
@@ -194,6 +196,20 @@ const Cloud = (() => {
     return backend.getAccountDeletionStatus();
   }
 
+  async function getRampPresets() {
+    if (!init()) return null;
+    if (!currentUser()) return null;
+    if (!backend.getRampPresets) return null;
+    return backend.getRampPresets();
+  }
+
+  async function saveRampPresets(presets) {
+    if (!init()) return { error: 'no-client' };
+    if (!currentUser()) return { error: 'signed-out' };
+    if (!backend.saveRampPresets) return { error: 'no-client' };
+    return backend.saveRampPresets(presets);
+  }
+
   async function claimBetaSpot() {
     if (!init()) return 'error';
     return backend.claimBetaSpot();
@@ -336,6 +352,7 @@ const Cloud = (() => {
     init, onAuth, signIn, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
     requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
+    getRampPresets, saveRampPresets,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     mountAuthBar, resetMockData,
   };

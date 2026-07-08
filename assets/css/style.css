@@ -921,9 +921,10 @@ body {
 .ramp-favs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .ramp-fav-select { font-size: 0.95rem; text-align: left; color-scheme: dark; }
 .ramp-fav-select option { background: #0c1828; color: var(--text); }
-.ramp-favs-btns { display: flex; gap: 8px; }
+.ramp-favs-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .ramp-fav-btn {
   flex: 1;
+  min-width: 0;
   padding: 7px;
   min-height: 34px;
   border: 1px solid var(--border);
@@ -939,8 +940,91 @@ body {
   transition: box-shadow 0.15s, color 0.15s;
 }
 .ramp-fav-btn:hover { color: var(--text); }
+.ramp-fav-btn:disabled { opacity: 0.4; cursor: default; color: var(--text-dim); }
 .ramp-fav-btn.save { color: var(--text); border-color: rgba(18, 160, 255, 0.4); }
 .ramp-fav-btn.danger:hover { color: var(--danger, #ff5c5c); }
+.ramp-fav-sync-hint {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: left;
+  cursor: default;
+  line-height: 1.35;
+}
+.ramp-fav-sync-hint.is-cta {
+  color: var(--cyan);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ramp-fav-sync-hint.is-cta:hover { color: var(--text); }
+
+/* Ramp export / import modal */
+.ramp-io-gate {
+  position: fixed; inset: 0; z-index: 340;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(2, 6, 12, 0.82);
+}
+.ramp-io-gate[hidden] { display: none; }
+.ramp-io-card {
+  position: relative; width: 100%; max-width: 400px; text-align: left;
+  padding: 28px 24px 22px;
+  background: linear-gradient(155deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 50px rgba(0,200,255,0.12);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+}
+.ramp-io-close {
+  position: absolute; right: 12px; top: 10px;
+  background: none; border: 0; color: var(--text-dim); font-size: 1rem; cursor: pointer;
+}
+.ramp-io-close:hover { color: var(--danger); }
+.ramp-io-title {
+  font-family: 'Orbitron', monospace; font-weight: 900; font-size: 1rem;
+  letter-spacing: 0.04em; color: var(--text); margin-bottom: 8px; padding-right: 24px;
+}
+.ramp-io-msg {
+  font-family: 'Rajdhani', sans-serif; font-size: 0.88rem; font-weight: 600;
+  color: var(--text-dim); line-height: 1.4; margin: 0 0 16px;
+}
+.ramp-io-section { margin-bottom: 16px; }
+.ramp-io-section:last-child { margin-bottom: 0; }
+.ramp-io-section-label {
+  font-family: 'Orbitron', monospace; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px;
+}
+.ramp-io-list {
+  max-height: 180px; overflow-y: auto; margin-bottom: 10px;
+  border: 1px solid var(--border); background: var(--inset);
+  padding: 6px 8px;
+}
+.ramp-io-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 2px;
+  font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; font-weight: 600; color: var(--text);
+  cursor: pointer;
+}
+.ramp-io-item input { accent-color: var(--cyan); flex: none; }
+.ramp-io-empty {
+  font-family: 'Rajdhani', sans-serif; font-size: 0.85rem; font-weight: 600;
+  color: var(--text-dim); margin: 0 0 10px;
+}
+.ramp-io-actions { display: flex; gap: 8px; }
+.ramp-io-import-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 1 auto; padding: 7px 14px; box-sizing: border-box;
+}
+.ramp-io-status {
+  min-height: 1.2em; margin: 8px 0 0;
+  font-family: 'Rajdhani', sans-serif; font-size: 0.82rem; font-weight: 600; color: var(--cyan);
+}
+.ramp-io-status.is-error { color: var(--danger, #ff5c5c); }
 
 /* ── Roguelite Mode ────────────────────────────── */
 /* Reuses the existing Mass Effect HUD system (same panel base, cut corners,

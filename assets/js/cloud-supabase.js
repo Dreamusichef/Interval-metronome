@@ -274,10 +274,42 @@ const CloudSupabaseBackend = (() => {
     return data || { pending: false };
   }
 
+  async function getRampPresets() {
+    if (!init() || !user) return null;
+    const { data, error } = await client.from('ramp_presets')
+      .select('presets, updated_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) {
+      console.warn('[cloud] getRampPresets', error.message);
+      return null;
+    }
+    if (!data) return { presets: [], updated_at: null };
+    const presets = Array.isArray(data.presets) ? data.presets : [];
+    return { presets, updated_at: data.updated_at || null };
+  }
+
+  async function saveRampPresets(presets) {
+    if (!init() || !user) return { error: 'signed-out' };
+    const list = Array.isArray(presets) ? presets : [];
+    const row = {
+      user_id: user.id,
+      presets: list,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await client.from('ramp_presets').upsert(row, { onConflict: 'user_id' });
+    if (error) {
+      console.warn('[cloud] saveRampPresets', error.message);
+      return { error: 'save-failed' };
+    }
+    return { ok: true, updated_at: row.updated_at };
+  }
+
   return {
     init, isReady, signIn, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
     requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
+    getRampPresets, saveRampPresets,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
   };
 })();

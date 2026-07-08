@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260705a">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260708a">
   <script>
     // Early error catcher — must be in <head> to catch script load errors
     (function() {
@@ -202,6 +202,32 @@
       </div>
     </div>
 
+    <!-- Ramp export / import modal -->
+    <div class="ramp-io-gate" id="rampIoModal" hidden>
+      <div class="ramp-io-card" role="dialog" aria-labelledby="rampIoTitle" aria-modal="true">
+        <button type="button" class="ramp-io-close" id="rampIoClose" aria-label="Close">&#10005;</button>
+        <div class="ramp-io-title" id="rampIoTitle">Export / Import ramps</div>
+        <p class="ramp-io-msg">Export selected or all saved ramps as JSON. Import merges by name (same name overwrites).</p>
+
+        <div class="ramp-io-section">
+          <div class="ramp-io-section-label">Export</div>
+          <div class="ramp-io-list" id="rampIoList"></div>
+          <p class="ramp-io-empty" id="rampIoEmpty" hidden>No saved ramps yet.</p>
+          <div class="ramp-io-actions">
+            <button type="button" class="ramp-fav-btn save" id="rampIoExportSelected" disabled>Export selected</button>
+            <button type="button" class="ramp-fav-btn save" id="rampIoExportAll" disabled>Export all</button>
+          </div>
+        </div>
+
+        <div class="ramp-io-section">
+          <div class="ramp-io-section-label">Import</div>
+          <label class="ramp-io-import-btn ramp-fav-btn" for="rampIoFileInput">Choose file…</label>
+          <input type="file" id="rampIoFileInput" accept="application/json,.json" hidden>
+          <p class="ramp-io-status" id="rampIoStatus" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+
     <!-- Section A: Metronome Controls -->
     <section class="metronome-section">
       <div class="beat-count-row">
@@ -343,7 +369,9 @@
           <div class="ramp-favs-btns">
             <button type="button" class="ramp-fav-btn save" id="rampFavSave">Save current</button>
             <button type="button" class="ramp-fav-btn danger" id="rampFavDelete">Delete</button>
+            <button type="button" class="ramp-fav-btn" id="rampFavExportImport">Export / Import</button>
           </div>
+          <button type="button" class="ramp-fav-sync-hint" id="rampFavSyncHint">Sign in to sync ramps across devices</button>
         </div>
       </div>
     </section>
@@ -590,13 +618,13 @@
   <!-- All deferred so HTML/CSS paint immediately. sounds.js (2.4MB of cue audio)
        is NOT here — it's loaded lazily after the page is interactive (see below),
        since the metronome click is synthesized and needs no audio files. -->
-  <script defer src="assets/js/version.js?v=20260616a"></script>
+  <script defer src="assets/js/version.js?v=20260708a"></script>
   <script defer src="assets/js/faq-markdown.js?v=20260628a"></script>
   <script defer src="assets/js/patch-notes-storage.js?v=20260628f"></script>
   <script defer src="assets/js/patch-notes-check.js?v=20260628f"></script>
   <script defer src="assets/js/metronome.js?v=20260612c"></script>
   <script defer src="assets/js/game-subdivisions.js?v=20260706b"></script>
-  <script defer src="assets/js/app.js?v=20260705b"></script>
+  <script defer src="assets/js/app.js?v=20260708a"></script>
   <script defer src="assets/js/audio-input.js?v=5"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/sfx.js?v=7"></script>
@@ -611,8 +639,8 @@
     // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260706a', 'assets/js/cloud.js?v=20260705a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260705a', 'assets/js/cloud.js?v=20260705a'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260708a', 'assets/js/cloud.js?v=20260708a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260708a', 'assets/js/cloud.js?v=20260708a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
