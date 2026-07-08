@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 const CloudMockBackend = (() => {
   // Bump this when seed users / runs change — invalidates stale localStorage mock data.
-  const STORAGE_KEY = 'cloud:mock:v6';
+  const STORAGE_KEY = 'cloud:mock:v7';
 
   const DEV_USERS = [
     {
@@ -67,7 +67,7 @@ const CloudMockBackend = (() => {
       { id: uid(), user_id: 'dev-user-alex', mode: 'gauntlet', instrument: 'kick', subdivision: 'sextuplet', bpm: null, level: 1, rank: 'A', green_pct: 82, duration_sec: null, survival_sec: null, cleared: true, created_at: isoDaysAgo(2) },
       { id: uid(), user_id: 'dev-user-alex', mode: 'timetrial', instrument: 'snare', subdivision: 'sixteenth', bpm: 120, level: null, rank: 'C', green_pct: 68, duration_sec: 60, survival_sec: null, cleared: false, created_at: isoDaysAgo(6) },
     ];
-    return { profiles, runs, beta_waitlist: [], account_deletion_requests: [], sessionUserId: null };
+    return { profiles, runs, beta_waitlist: [], account_deletion_requests: [], ramp_presets: [], sessionUserId: null };
   }
 
   function purgeUserData(userId) {
@@ -76,6 +76,7 @@ const CloudMockBackend = (() => {
     db.runs = db.runs.filter(r => r.user_id !== userId);
     db.account_deletion_requests = (db.account_deletion_requests || [])
       .filter(r => r.user_id !== userId);
+    db.ramp_presets = (db.ramp_presets || []).filter(r => r.user_id !== userId);
     persistDb(db);
   }
 
@@ -85,6 +86,7 @@ const CloudMockBackend = (() => {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (!parsed.account_deletion_requests) parsed.account_deletion_requests = [];
+        if (!parsed.ramp_presets) parsed.ramp_presets = [];
         if (parsed.runs) parsed.runs.forEach(r => { if (!r.subdivision) r.subdivision = 'sixteenth'; });
         return parsed;
       }
@@ -421,6 +423,30 @@ const CloudMockBackend = (() => {
     return { pending: true, scheduled_for: row.scheduled_for };
   }
 
+  async function getRampPresets() {
+    if (!init() || !user || !db) return null;
+    if (!db.ramp_presets) db.ramp_presets = [];
+    const row = db.ramp_presets.find(r => r.user_id === user.id);
+    if (!row) return { presets: [], updated_at: null };
+    return {
+      presets: Array.isArray(row.presets) ? row.presets : [],
+      updated_at: row.updated_at || null,
+    };
+  }
+
+  async function saveRampPresets(presets) {
+    if (!init() || !user || !db) return { error: 'signed-out' };
+    if (!db.ramp_presets) db.ramp_presets = [];
+    const list = Array.isArray(presets) ? presets : [];
+    const updated_at = new Date().toISOString();
+    const row = { user_id: user.id, presets: list, updated_at };
+    const idx = db.ramp_presets.findIndex(r => r.user_id === user.id);
+    if (idx >= 0) db.ramp_presets[idx] = row;
+    else db.ramp_presets.push(row);
+    persistDb(db);
+    return { ok: true, updated_at };
+  }
+
   function resetMockData() {
     db = seedDb();
     persistDb(db);
@@ -432,6 +458,7 @@ const CloudMockBackend = (() => {
     init, isReady, signIn, signInAs, signOut, currentUser, getSessionUser,
     getProfile, updateProfile, resetProfileFromGoogle,
     requestAccountDeletion, cancelAccountDeletion, getAccountDeletionStatus,
+    getRampPresets, saveRampPresets,
     claimBetaSpot, joinWaitlist, submitRun, saveRun, myRuns, leaderboard,
     getDevUsers, resetMockData,
   };

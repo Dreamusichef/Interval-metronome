@@ -78,8 +78,8 @@
     // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
     (function loadCloudScripts() {
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260706a', 'assets/js/cloud.js?v=20260705a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260705a', 'assets/js/cloud.js?v=20260705a'];
+        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260708a', 'assets/js/cloud.js?v=20260708a']
+        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260708a', 'assets/js/cloud.js?v=20260708a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');

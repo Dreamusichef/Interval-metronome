@@ -479,12 +479,22 @@ function parseIntVal(el, fallback) {
 
 // ── Favourite ramps ───────────────────────────────────────────────────────────
 // Save the current ramp config under a name and reload it later with one pick.
-// Device-local (localStorage) — no sign-in needed. Saving a name that already
-// exists overwrites it (that's how you "edit" a favourite).
+// Always device-local (localStorage). When signed in, also syncs to Cloud
+// (private ramp_presets). Saving a name that already exists overwrites it.
 const RAMP_FAVS_KEY = 'gm_favramps';
 const rampFavSelect = document.getElementById('rampFavSelect');
 const rampFavSave   = document.getElementById('rampFavSave');
 const rampFavDelete = document.getElementById('rampFavDelete');
+const rampFavExportImport = document.getElementById('rampFavExportImport');
+const rampFavSyncHint = document.getElementById('rampFavSyncHint');
+const rampIoModal = document.getElementById('rampIoModal');
+const rampIoClose = document.getElementById('rampIoClose');
+const rampIoList = document.getElementById('rampIoList');
+const rampIoEmpty = document.getElementById('rampIoEmpty');
+const rampIoExportSelected = document.getElementById('rampIoExportSelected');
+const rampIoExportAll = document.getElementById('rampIoExportAll');
+const rampIoFileInput = document.getElementById('rampIoFileInput');
+const rampIoStatus = document.getElementById('rampIoStatus');
 
 function readRampFavs() {
   try { const a = JSON.parse(localStorage.getItem(RAMP_FAVS_KEY)); return Array.isArray(a) ? a : []; }
@@ -493,6 +503,107 @@ function readRampFavs() {
 function writeRampFavs(list) {
   try { localStorage.setItem(RAMP_FAVS_KEY, JSON.stringify(list)); } catch (e) {}
 }
+
+function normalizeRampPreset(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = String(raw.name || '').trim();
+  if (!name) return null;
+  const num = (v, fallback) => {
+    const n = typeof v === 'number' ? v : parseInt(v, 10);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  let countInBars = 1;
+  if (typeof raw.countInBars === 'number') {
+    countInBars = Math.max(0, Math.min(4, raw.countInBars));
+  } else if (typeof raw.countIn === 'boolean') {
+    countInBars = raw.countIn ? 1 : 0;
+  }
+  return {
+    name,
+    startBpm:     num(raw.startBpm, 80),
+    numSets:      num(raw.numSets, 4),
+    setMins:      num(raw.setMins, 2),
+    setSecs:      num(raw.setSecs, 0),
+    bpmIncrement: num(raw.bpmIncrement, 5),
+    restMins:     num(raw.restMins, 0),
+    restSecs:     num(raw.restSecs, 30),
+    countInBars,
+  };
+}
+
+/** Strict check for import files — reject incomplete rows (no silent defaults). */
+function isCompleteRampPreset(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  if (!String(raw.name || '').trim()) return false;
+  const keys = ['startBpm', 'numSets', 'setMins', 'setSecs', 'bpmIncrement', 'restMins', 'restSecs'];
+  for (let i = 0; i < keys.length; i++) {
+    const v = raw[keys[i]];
+    const n = typeof v === 'number' ? v : parseInt(v, 10);
+    if (!Number.isFinite(n)) return false;
+  }
+  return true;
+}
+
+function mergeRampLists(base, incoming, preferIncoming) {
+  const out = (Array.isArray(base) ? base : []).map(normalizeRampPreset).filter(Boolean);
+  (Array.isArray(incoming) ? incoming : []).forEach(raw => {
+    const cfg = normalizeRampPreset(raw);
+    if (!cfg) return;
+    const idx = out.findIndex(f => f.name.toLowerCase() === cfg.name.toLowerCase());
+    if (idx < 0) out.push(cfg);
+    else if (preferIncoming) out[idx] = cfg;
+  });
+  return out;
+}
+
+function persistRampFavs(list, selectName) {
+  writeRampFavs(list);
+  renderRampFavs(selectName);
+  pushRampFavsToCloud(list);
+}
+
+async function pushRampFavsToCloud(list) {
+  const C = window.Cloud;
+  if (!C || !C.currentUser || !C.currentUser() || !C.saveRampPresets) return;
+  try {
+    await C.saveRampPresets(list || readRampFavs());
+    updateRampSyncHint(true);
+  } catch (e) {
+    console.warn('[ramp] saveRampPresets', e);
+  }
+}
+
+async function syncRampFavsFromCloud() {
+  const C = window.Cloud;
+  if (!C || !C.currentUser || !C.currentUser() || !C.getRampPresets) return;
+  try {
+    const remote = await C.getRampPresets();
+    if (!remote) return;
+    const local = readRampFavs();
+    const remoteList = Array.isArray(remote.presets) ? remote.presets : [];
+    // Prefer local on name conflicts (offline edits on this device).
+    const merged = mergeRampLists(remoteList, local, true);
+    writeRampFavs(merged);
+    renderRampFavs();
+    await C.saveRampPresets(merged);
+    updateRampSyncHint(true);
+  } catch (e) {
+    console.warn('[ramp] syncRampFavsFromCloud', e);
+  }
+}
+
+function updateRampSyncHint(signedIn) {
+  if (!rampFavSyncHint) return;
+  if (signedIn) {
+    rampFavSyncHint.textContent = 'Synced to your account';
+    rampFavSyncHint.classList.remove('is-cta');
+    rampFavSyncHint.type = 'button';
+  } else {
+    rampFavSyncHint.textContent = 'Sign in to sync ramps across devices';
+    rampFavSyncHint.classList.add('is-cta');
+  }
+}
+
 function currentRampConfig() {
   return {
     startBpm:     parseIntVal(startBpmInput, 80),
@@ -534,6 +645,98 @@ function renderRampFavs(selectName) {
     const idx = list.findIndex(f => f.name === selectName);
     if (idx >= 0) rampFavSelect.value = String(idx);
   }
+  if (rampIoModal && !rampIoModal.hidden) renderRampIoList();
+}
+
+function slugRampName(name) {
+  const s = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return s || 'ramp';
+}
+
+function downloadRampJson(ramps, filename) {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    ramps: (ramps || []).map(normalizeRampPreset).filter(Boolean),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function setRampIoStatus(msg, isError) {
+  if (!rampIoStatus) return;
+  rampIoStatus.textContent = msg || '';
+  rampIoStatus.classList.toggle('is-error', !!isError);
+}
+
+function renderRampIoList() {
+  if (!rampIoList) return;
+  const list = readRampFavs();
+  rampIoList.innerHTML = '';
+  if (rampIoEmpty) rampIoEmpty.hidden = list.length > 0;
+  if (rampIoExportAll) rampIoExportAll.disabled = list.length === 0;
+  list.forEach((f, i) => {
+    const label = document.createElement('label');
+    label.className = 'ramp-io-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = String(i);
+    cb.addEventListener('change', updateRampIoExportSelectedState);
+    const span = document.createElement('span');
+    span.textContent = f.name;
+    label.appendChild(cb);
+    label.appendChild(span);
+    rampIoList.appendChild(label);
+  });
+  updateRampIoExportSelectedState();
+}
+
+function updateRampIoExportSelectedState() {
+  if (!rampIoExportSelected || !rampIoList) return;
+  const n = rampIoList.querySelectorAll('input[type="checkbox"]:checked').length;
+  rampIoExportSelected.disabled = n === 0;
+}
+
+function openRampIoModal() {
+  if (!rampIoModal) return;
+  setRampIoStatus('');
+  renderRampIoList();
+  rampIoModal.hidden = false;
+}
+
+function closeRampIoModal() {
+  if (!rampIoModal) return;
+  rampIoModal.hidden = true;
+  setRampIoStatus('');
+  if (rampIoFileInput) rampIoFileInput.value = '';
+}
+
+function parseRampImportFile(text) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { return { error: 'Invalid JSON file.' }; }
+  let rawList = null;
+  if (Array.isArray(data)) rawList = data;
+  else if (data && typeof data === 'object' && Array.isArray(data.ramps)) rawList = data.ramps;
+  else return { error: 'File must contain a ramps array.' };
+  if (!rawList.length) return { error: 'No ramps found in file.' };
+  const ramps = [];
+  for (let i = 0; i < rawList.length; i++) {
+    if (!isCompleteRampPreset(rawList[i])) {
+      return { error: 'Corrupt or incomplete ramp at index ' + i + '.' };
+    }
+    const cfg = normalizeRampPreset(rawList[i]);
+    if (!cfg) return { error: 'Corrupt or incomplete ramp at index ' + i + '.' };
+    ramps.push(cfg);
+  }
+  return { ramps };
 }
 
 if (rampFavSelect) {
@@ -551,10 +754,9 @@ if (rampFavSave) {
     const cfg  = currentRampConfig();
     cfg.name = name;
     const existing = list.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
-    if (existing >= 0) list[existing] = cfg;   // same name → edit in place
+    if (existing >= 0) list[existing] = cfg;
     else list.push(cfg);
-    writeRampFavs(list);
-    renderRampFavs(name);
+    persistRampFavs(list, name);
   });
 }
 if (rampFavDelete) {
@@ -566,10 +768,104 @@ if (rampFavDelete) {
     if (!f) return;
     if (!confirm('Delete saved ramp "' + f.name + '"?')) return;
     list.splice(idx, 1);
-    writeRampFavs(list);
-    renderRampFavs();
+    persistRampFavs(list);
   });
 }
+
+if (rampFavExportImport) {
+  rampFavExportImport.addEventListener('click', openRampIoModal);
+}
+if (rampIoClose) {
+  rampIoClose.addEventListener('click', closeRampIoModal);
+}
+if (rampIoModal) {
+  rampIoModal.addEventListener('click', (e) => {
+    if (e.target === rampIoModal) closeRampIoModal();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && rampIoModal && !rampIoModal.hidden) {
+    closeRampIoModal();
+  }
+});
+if (rampIoExportSelected) {
+  rampIoExportSelected.addEventListener('click', () => {
+    const list = readRampFavs();
+    const idxs = Array.from(rampIoList.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(cb => parseInt(cb.value, 10))
+      .filter(i => !isNaN(i) && list[i]);
+    const selected = idxs.map(i => list[i]);
+    if (!selected.length) return;
+    const filename = selected.length === 1
+      ? 'interval-metronome-ramp-' + slugRampName(selected[0].name) + '.json'
+      : 'interval-metronome-ramps.json';
+    downloadRampJson(selected, filename);
+    setRampIoStatus('Exported ' + selected.length + ' ramp' + (selected.length === 1 ? '' : 's') + '.');
+  });
+}
+if (rampIoExportAll) {
+  rampIoExportAll.addEventListener('click', () => {
+    const list = readRampFavs();
+    if (!list.length) return;
+    downloadRampJson(list, 'interval-metronome-ramps.json');
+    setRampIoStatus('Exported all ' + list.length + ' ramp' + (list.length === 1 ? '' : 's') + '.');
+  });
+}
+if (rampIoFileInput) {
+  rampIoFileInput.addEventListener('change', () => {
+    const file = rampIoFileInput.files && rampIoFileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseRampImportFile(String(reader.result || ''));
+      if (parsed.error) {
+        setRampIoStatus(parsed.error, true);
+        rampIoFileInput.value = '';
+        return;
+      }
+      const merged = mergeRampLists(readRampFavs(), parsed.ramps, true);
+      persistRampFavs(merged);
+      renderRampIoList();
+      setRampIoStatus('Imported ' + parsed.ramps.length + ' ramp' + (parsed.ramps.length === 1 ? '' : 's') + '.');
+      rampIoFileInput.value = '';
+    };
+    reader.onerror = () => {
+      setRampIoStatus('Could not read file.', true);
+      rampIoFileInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+}
+
+if (rampFavSyncHint) {
+  updateRampSyncHint(false);
+  rampFavSyncHint.addEventListener('click', () => {
+    if (!rampFavSyncHint.classList.contains('is-cta')) return;
+    if (window.Cloud && window.Cloud.signIn) window.Cloud.signIn();
+  });
+}
+
+(function wireRampCloudSync() {
+  function tryWire() {
+    if (!window.Cloud || !window.Cloud.onAuth) return false;
+    window.Cloud.onAuth((user) => {
+      if (user) {
+        updateRampSyncHint(true);
+        syncRampFavsFromCloud();
+      } else {
+        updateRampSyncHint(false);
+      }
+    });
+    return true;
+  }
+  if (tryWire()) return;
+  let tries = 0;
+  const t = setInterval(() => {
+    tries += 1;
+    if (tryWire() || tries > 40) clearInterval(t);
+  }, 100);
+})();
+
 renderRampFavs();
 
 function startIntervalSession() {
