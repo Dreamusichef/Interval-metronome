@@ -1,0 +1,18 @@
+/* AOD Core — design tokens. Apps may override on :root or a mount root. */
+:root {
+  --bg:          #060a10;
+  --surface:     #0c1828;
+  --surface2:    #070d18;
+  --inset:       #040810;
+  --border:      rgba(0, 200, 255, 0.18);
+  --accent:      #FFB800;
+  --accent-dim:  #c99000;
+  --accent-flash:#ffe066;
+  --cyan:        #00c8ff;
+  --cyan-dim:    #007899;
+  --text:        #e8f0f5;
+  --text-dim:    #8ab0c8;
+  --danger:      #ff3838;
+  --success:     #00e87a;
+  --cut:         14px;
+}

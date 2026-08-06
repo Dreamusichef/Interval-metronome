@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stats & Leaderboard — Game Metronome</title>
-  <link rel="icon" type="image/png" href="assets/img/logo.png?v=2">
-  <link rel="apple-touch-icon" href="assets/img/logo.png?v=2">
+  <link rel="icon" type="image/png" href="core/brand/logo.png?v=1.0.0">
+  <link rel="apple-touch-icon" href="core/brand/logo.png?v=1.0.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=20260705a">
+  <link rel="stylesheet" href="core/css/tokens.css?v=1.0.0">
+  <link rel="stylesheet" href="core/css/auth-bar.css?v=1.0.0">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260803a">
 </head>
 <body>
   <div class="app-container">
@@ -21,7 +23,7 @@
         <div class="cloud-authbar" id="cloudAuthBar"></div>
       </div>
 
-      <h1 class="stats-title"><img class="brand-logo sm" src="assets/img/logo.png?v=2" alt="">Stats &amp; Leaderboard</h1>
+      <h1 class="stats-title"><img class="brand-logo sm" src="core/brand/logo.png?v=1.0.0" alt="">Stats &amp; Leaderboard</h1>
 
       <!-- Signed-out prompt -->
       <div class="stats-signedout" id="statsSignedOut">
@@ -72,14 +74,14 @@
     </footer>
   </div>
 
-  <script src="assets/js/cloud-mode.js?v=1"></script>
+  <script src="core/js/cloud/mode.js?v=1.0.0"></script>
   <script>
     // Cloud loader: scripts are injected async (not defer), so page JS may run
-    // before auth is ready. Keep cloud-mode→backend→cloud.js order; bump ?v= when those change.
+    // before auth is ready. Keep mode→backend→auth→cloud-game order; bump ?v= when those change.
     (function loadCloudScripts() {
       var urls = window.__CLOUD_MODE__ === 'mock'
-        ? ['assets/js/profile-validation.js?v=20260619a', 'assets/js/run-submit-validation.js?v=1', 'assets/js/cloud-mock.js?v=20260708a', 'assets/js/cloud.js?v=20260708a']
-        : ['assets/js/profile-validation.js?v=20260619a', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'assets/js/cloud-supabase.js?v=20260708a', 'assets/js/cloud.js?v=20260708a'];
+        ? ['core/js/cloud/profile-validation.js?v=1.0.0', 'assets/js/run-submit-validation.js?v=1', 'core/js/cloud/mock-backend.js?v=1.0.0', 'core/js/cloud/auth.js?v=1.0.0', 'assets/js/cloud-game.js?v=20260803a']
+        : ['core/js/cloud/profile-validation.js?v=1.0.0', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'core/js/cloud/supabase-backend.js?v=1.0.0', 'core/js/cloud/auth.js?v=1.0.0', 'assets/js/cloud-game.js?v=20260803a'];
       function load(i) {
         if (i >= urls.length) return;
         var s = document.createElement('script');
@@ -91,7 +93,7 @@
       load(0);
     })();
   </script>
-  <script defer src="assets/js/game-subdivisions.js?v=20260706b"></script>
+  <script defer src="core/js/game-subdivisions.js?v=1.0.0"></script>
   <script defer src="assets/js/achievements.js?v=6"></script>
   <script defer src="assets/js/stats.js?v=20260705a"></script>
 </body>

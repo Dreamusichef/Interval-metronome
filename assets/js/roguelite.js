@@ -37,237 +37,17 @@
    (Roland, Alesis, ddrum) are tight enough that this is negligible.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ───────────────────────────────────────────────────────────────────────────
-   PURE TIMING MATH
-   No DOM, no MIDI, no engine. Kept pure so it can be unit-tested in node
-   (see tests/roguelite.test.cjs) — the detection/calibration formulas are the
-   one place a sign error or a clock-domain bug would silently corrupt
-   everything, so they get tested in isolation.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-/*
-  Clock reconciliation.
-
-  Two clocks are in play:
-    A — the audio clock: audioCtx.currentTime, in SECONDS. The metronome
-        schedules every tick against this.
-    P — the perf clock: performance.now(), in MILLISECONDS. Web MIDI
-        event.timeStamp lives here (a DOMHighResTimeStamp off performance.timeOrigin).
-
-  We can only compare a MIDI event to an expected click if both are in the same
-  domain. We capture one (a0, p0) sample — "audio time a0 corresponds to perf
-  time p0" — and convert linearly. The two clocks tick at the same rate (real
-  seconds), so a single offset sample is enough over a calibration/run window;
-  long-session drift is documented below.
-
-  CRITICAL: getting this wrong shifts every offset by a constant. Calibration
-  would then absorb that constant into meanOffset and the bug would be INVISIBLE
-  in the numbers — runs would still "work" but be measuring the wrong thing.
-  That's why audioToPerf/perfToAudio are tiny, pure, and tested, and why the
-  live layer logs raw offsets on the first calibration hits as a sanity check.
-*/
-function audioToPerfMs(audioSec, sync) {
-  return (audioSec - sync.a0) * 1000 + sync.p0;
-}
-function perfMsToAudio(perfMs, sync) {
-  return (perfMs - sync.p0) / 1000 + sync.a0;
-}
-
-/*
-  Calibration: collect signed offsets (event − expectedClick, ms) and reduce to
-  the per-session constant we subtract from every hit (meanOffset) plus the
-  spread (sd) we SHOW the player but never gate on.
-
-  Matching rule: for each expected click, take the nearest kick event; if none
-  within captureWindowMs (generous, e.g. ±150ms), skip that click — it doesn't
-  count as a hit and doesn't penalise (this is calibration, not a run).
-
-  Returns { meanOffset, sd, sampleCount }. sd is the population standard
-  deviation of the matched offsets.
-*/
-function computeCalibration(expectedPerfTimes, eventPerfTimes, captureWindowMs) {
-  const offsets = [];
-  for (const expected of expectedPerfTimes) {
-    let best = null;
-    let bestAbs = Infinity;
-    for (const ev of eventPerfTimes) {
-      const d = ev - expected;
-      const a = Math.abs(d);
-      if (a < bestAbs) { bestAbs = a; best = d; }
-    }
-    if (best !== null && bestAbs <= captureWindowMs) offsets.push(best);
-  }
-  const sampleCount = offsets.length;
-  if (sampleCount === 0) return { meanOffset: 0, sd: 0, sampleCount: 0 };
-  const mean = offsets.reduce((s, x) => s + x, 0) / sampleCount;
-  const variance = offsets.reduce((s, x) => s + (x - mean) * (x - mean), 0) / sampleCount;
-  return { meanOffset: mean, sd: Math.sqrt(variance), sampleCount };
-}
-
-/*
-  Classify a single expected hit during a run.
-
-  The capture window is ±windowMs around (expectedPerf + meanOffset) — i.e. we
-  shift the expected time by the systematic offset, then ask how far the nearest
-  kick landed.
-
-    - 'clear'   nearest event within ±windowMs of the corrected centre.
-    - 'out'     nearest event exists nearby (within searchWindowMs) but beyond
-                ±windowMs — a real but mistimed hit. FAILS.
-    - 'miss'    no event anywhere near the corrected centre. FAILS.
-
-  `events` is an array of { t, consumed } (perf ms). We match the nearest
-  UNCONSUMED event and return its index so the caller can mark it consumed —
-  this stops one kick from satisfying two adjacent subdivisions at high tempo.
-
-  Returns { result, offset, eventIndex }. offset is signed corrected ms
-  (event − correctedCentre); positive = late (rushed-late / dragging),
-  negative = early (rushing ahead). null when result is 'miss'.
-*/
-function classifyHit(expectedPerf, meanOffset, windowMs, events, searchWindowMs) {
-  const centre = expectedPerf + meanOffset;
-  let bestIdx = -1;
-  let bestAbs = Infinity;
-  let bestSigned = 0;
-  for (let i = 0; i < events.length; i++) {
-    if (events[i].consumed) continue;
-    const d = events[i].t - centre;
-    const a = Math.abs(d);
-    if (a < bestAbs) { bestAbs = a; bestIdx = i; bestSigned = d; }
-  }
-  if (bestIdx === -1 || bestAbs > searchWindowMs) {
-    return { result: 'miss', offset: null, eventIndex: -1 };
-  }
-  if (bestAbs <= windowMs) {
-    return { result: 'clear', offset: bestSigned, eventIndex: bestIdx };
-  }
-  return { result: 'out', offset: bestSigned, eventIndex: bestIdx };
-}
-
-/*
-  Continuity-game slot classifier (the actual run gate).
-
-  The run subdivides each quarter into four 16th SLOTS, each ±halfWindowMs wide and
-  centred at (expectedPerf + meanOffset). At halfWindow = half the 16th spacing the
-  slots tile the timeline, so every kick belongs to exactly one slot. The rule is
-  EXACTLY ONE kick per slot:
-    - 0 unconsumed kicks in the slot → 'drop'  (a skip / frozen foot)            FAILS
-    - 1                              → 'clear'                                    passes
-    - 2+                             → 'cram'   (over-rushed / extra stroke)      FAILS
-
-  Half-open window [centre-h, centre+h) so a kick on the boundary lands in exactly
-  one slot. Returns { result, count, indices } (indices into events).
-*/
-function classifySlot(expectedPerf, meanOffset, halfWindowMs, events) {
-  const centre = expectedPerf + meanOffset;
-  const indices = [];
-  for (let i = 0; i < events.length; i++) {
-    if (events[i].consumed) continue;
-    const d = events[i].t - centre;
-    if (d >= -halfWindowMs && d < halfWindowMs) indices.push(i);
-  }
-  if (indices.length === 0) return { result: 'drop', count: 0, indices, offset: null };
-  if (indices.length === 1) {
-    return { result: 'clear', count: 1, indices, offset: events[indices[0]].t - centre };
-  }
-  return { result: 'cram', count: indices.length, indices, offset: null };
-}
-
-/*
-  Lenient classifier for the FIRST gated 16th of a set only.
-
-  Starting a continuous-16ths run is the hardest moment to land cleanly, and the
-  normal slot is unforgiving on the EARLY side: a kick played before (centre - h)
-  is orphaned (there's no earlier gated slot to claim it) → the slot reads empty →
-  a drop. So for this one slot we widen the EARLY edge to (centre - earlyReachMs)
-  while keeping the late edge at (centre + halfWindowMs) — generous late would
-  steal the SECOND slot's kick. Present (however early) → 'clear'; nothing at all →
-  'drop'. Never 'cram'. Returns the same shape as classifySlot.
-*/
-function classifyFirstSlot(expectedPerf, meanOffset, halfWindowMs, events, earlyReachMs) {
-  const centre = expectedPerf + meanOffset;
-  let bestIdx = -1, bestAbs = Infinity, bestSigned = 0;
-  for (let i = 0; i < events.length; i++) {
-    if (events[i].consumed) continue;
-    const d = events[i].t - centre;
-    if (d >= -earlyReachMs && d < halfWindowMs) {
-      const a = Math.abs(d);
-      if (a < bestAbs) { bestAbs = a; bestIdx = i; bestSigned = d; }
-    }
-  }
-  if (bestIdx === -1) return { result: 'drop', count: 0, indices: [], offset: null };
-  return { result: 'clear', count: 1, indices: [bestIdx], offset: bestSigned };
-}
-
-/*
-  Run scoring (pure — unit-tested in tests/roguelite.test.cjs).
-
-  Time Trial: accuracy — green % of all quarter-beats played.
-  Sudden Death / Gauntlet: weighted endurance — 70% duration completed
-  (16th slots cleared ÷ full-run slots) + 30% hit accuracy (green % of beats played).
-*/
-function rankFor(pct) {
-  if (pct >= 99) return 'SS';
-  if (pct >= 91) return 'S';
-  if (pct >= 81) return 'A';
-  if (pct >= 66) return 'B';
-  if (pct >= 50) return 'C';
-  if (pct >= 26) return 'D';
-  return 'E';
-}
-
-function endurancePct(hitsCleared, totalRunBeats, ticksPerBeat = 4) {
-  const totalSlots = (totalRunBeats || 0) * ticksPerBeat;
-  if (!totalSlots) return 0;
-  return Math.round(Math.min(100, hitsCleared / totalSlots * 100));
-}
-
-function accuracyPct(tally) {
-  const total = (tally.good || 0) + (tally.neutral || 0) + (tally.bad || 0);
-  return total ? Math.round(tally.good / total * 100) : 0;
-}
-
-const ENDURANCE_DURATION_WEIGHT = 0.70;
-const ENDURANCE_ACCURACY_WEIGHT = 0.30;
-
-function enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat = 4) {
-  const duration = endurancePct(hitsCleared, totalRunBeats, ticksPerBeat);
-  const accuracy = accuracyPct(tally);
-  return Math.round(Math.min(100,
-    ENDURANCE_DURATION_WEIGHT * duration + ENDURANCE_ACCURACY_WEIGHT * accuracy));
-}
-
-function runResultPct({ mode, status, hitsCleared, totalRunBeats, tally, ticksPerBeat = 4 }) {
-  if (mode === 'suddendeath' || mode === 'gauntlet') {
-    const pct = enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat);
-    return { rank: rankFor(pct), pct };
-  }
-  const pct = accuracyPct(tally);
-  return { rank: rankFor(pct), pct };
-}
-
-function liveGaugePct({ mode, hitsCleared, totalRunBeats, tally, ticksPerBeat = 4 }) {
-  if (mode === 'suddendeath' || mode === 'gauntlet') {
-    return enduranceScorePct(hitsCleared, totalRunBeats, tally, ticksPerBeat);
-  }
-  const good = (tally && tally.good) || 0;
-  return Math.max(0, Math.min(100, Math.round(good / (totalRunBeats || 1) * 100)));
-}
-
-const RL_TimingMath = {
-  audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
-  rankFor, endurancePct, accuracyPct, enduranceScorePct, runResultPct, liveGaugePct,
-};
-
-// node export for unit tests; harmless/ignored in the browser.
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = RL_TimingMath;
-}
+/* Timing math: consume Core's TimingMath / RL_TimingMath (core/js/timing-math.js).
+   Do not redeclare those identifiers — classic scripts share one let/const scope. */
 
 /* ───────────────────────────────────────────────────────────────────────────
    THE FEATURE
    ─────────────────────────────────────────────────────────────────────────── */
 const RogueliteMode = (() => {
+  const {
+    audioToPerfMs, perfMsToAudio, classifySlot, classifyFirstSlot,
+    rankFor, runResultPct, liveGaugePct,
+  } = TimingMath;
 
   // Challenge levels — the ONLY difficulty knobs, all in one place so they can be
   // tuned against real student data without hunting through logic.
@@ -301,22 +81,9 @@ const RogueliteMode = (() => {
     return Math.max(GAME_BPM_MIN, Math.min(GAME_BPM_MAX, v));
   };
 
-  // Calibration is a TWO-PASS process (same audible quarter-note click throughout):
-  //   Pass 1 — you play QUARTERS. At 80 BPM the clicks are 750ms apart, so your
-  //            ~100ms offset is unambiguous: this fixes the GROSS offset (hardware
-  //            + MIDI latency). Without this anchor, pass 2 can't be de-aliased.
-  //   Pass 2 — you play continuous 16ths. We shift the 16th grid by the pass-1
-  //            gross offset so every kick matches its CORRECT 16th (no 150ms
-  //            aliasing), then measure the 16th distribution: its mean is your
-  //            habitual 16th rush ("drift"), its spread (sd) is your consistency.
-  // The run subtracts the pass-2 16th mean (gross + drift) so runs centre on 0 and
-  // gate your consistency; the drift is shown as feedback, not gated.
-  const CAL_BEATS = 4;                 // 4/4
-  const CAL_BPM_DEFAULT = 100;         // fallback calibration tempo (both steps) if input missing
-  const CAL_COUNTOFF_BARS = 2;         // ungated count-off at the start of each step
-  const CAL_MEASURE_BARS = 8;          // both steps: 2 count-off + 8 measured = 10-bar test
-  const CAL_CAPTURE_WINDOW_MS = 150;   // generous match window for the (quarter) gross pass
-  const CAL_MIN_SAMPLES = 8;           // below this, calibration is rejected
+  // Calibration constants + two-pass state machine live in core/js/calibrator.js.
+  const CAL_BEATS = Calibrator.CAL_BEATS;
+  const CAL_BPM_DEFAULT = Calibrator.CAL_BPM_DEFAULT;
 
   // Run constants.
   // Presence gate: each 16th "owns" a slot of ±(this fraction × 16th-spacing). At
@@ -344,10 +111,8 @@ const RogueliteMode = (() => {
   // only — the late edge stays normal so it can't steal the second slot's kick.
   const RUN_FIRST_SLOT_EARLY_MULT = 3;
   const EVAL_MARGIN_MS = 35;           // evaluate a slot this long after it closes
-  // Collapse hardware double-triggers: two note-ons for the SAME kick closer than
-  // this are treated as one. Kept small so a genuine fast double-stroke (which we
-  // WANT to fail as a 'cram') still registers as two. Tunable per module.
-  const KICK_DEBOUNCE_MS = 15;
+  // Debounce for audio path (MIDI debounce lives in MidiInput).
+  const KICK_DEBOUNCE_MS = (typeof MidiInput !== 'undefined' && MidiInput.KICK_DEBOUNCE_MS) || 15;
   const RUN_LEAD_IN_BARS = 2;          // bars 1–2 of every set play ungated (count-in)
   const RUN_REST_SECS = 10;            // fixed rest between sets during a run
   // Fixed climb shape for ALL levels (overrides the user's Ramp Mode settings):
@@ -368,14 +133,12 @@ const RogueliteMode = (() => {
   // kick events. Off for release (flip to true to debug timing/clock issues).
   const RL_DEBUG = false;
 
-  // Default GM note per drum (kick 36, acoustic snare 38). Overridable via "learn".
-  const DEFAULT_KICK_NOTE = 36;
-  const DEFAULT_NOTE = { kick: 36, snare: 38 };
-  // Accepted without learn: GM + Alesis Strata Prime (non-standard mapping).
-  const PLAYABLE_NOTES = { kick: [24, 35, 36], snare: [26, 38] };
-  const KICK_LEARN_NOTES = PLAYABLE_NOTES.kick;
-  const SNARE_LEARN_NOTES = PLAYABLE_NOTES.snare;
-  const INSTR_LABEL = { kick: 'Kick', snare: 'Snare' };
+  // GM defaults / learn maps — owned by MidiInput.
+  const DEFAULT_NOTE = MidiInput.DEFAULT_NOTE;
+  const DEFAULT_KICK_NOTE = DEFAULT_NOTE.kick;
+  const KICK_LEARN_NOTES = MidiInput.LEARN_NOTES.kick;
+  const SNARE_LEARN_NOTES = MidiInput.LEARN_NOTES.snare;
+  const INSTR_LABEL = MidiInput.INSTR_LABEL;
 
   // ── Run / session state ──────────────────────────────────────────────────
   const runState = {
@@ -407,12 +170,14 @@ const RogueliteMode = (() => {
     // change the MIDI layer would need.
   };
 
-  // ── MIDI layer state ───────────────────────────────────────────────────────
-  let midiAccess = null;
-  let midiInputs = [];          // [{ id, name }]
-  let selectedInputId = null;
-  let learning = false;         // true while waiting to capture the next note-on as the kick note
-  let onLearned = null;
+  // ── MIDI layer (core/js/midi-input.js) ─────────────────────────────────────
+  // Wire note-ons into the shared kick event buffer; status → UI.
+  MidiInput.onNote((perfMs) => { pushKickEvent(perfMs); });
+  MidiInput.onStatus((msg, isErr) => { setMidiStatus(msg, isErr); });
+  MidiInput.setOnInputsChanged(() => {
+    renderDeviceList();
+    tryLoadMidiCalibration();
+  });
 
   // ── Clock reconciliation ───────────────────────────────────────────────────
   let sync = null;              // { a0, p0 } captured fresh at each measurement phase
@@ -540,21 +305,25 @@ const RogueliteMode = (() => {
   let applyGameModeToggle = null;
 
   // ───────────────────────────────────────────────────────────────────────────
-  // MIDI
+  // MIDI  (delegates to window.MidiInput)
   // ───────────────────────────────────────────────────────────────────────────
 
   function persistMidiCalibration() {
+    const selectedInputId = MidiInput.getInputId();
     if (runState.inputSource !== 'midi' || !selectedInputId || !runState.calibration) return;
     if (runState.calibration.manual) return;
     if (!window.CalibrationStore) return;
+    const midiInputs = MidiInput.getInputs();
     const dev = midiInputs.find(i => i.id === selectedInputId);
     CalibrationStore.save(selectedInputId, dev ? dev.name : selectedInputId, runState.calibration);
   }
 
   function tryLoadMidiCalibration() {
     if (runState.inputSource !== 'midi') return;
+    const selectedInputId = MidiInput.getInputId();
     if (!selectedInputId || runState.status === 'calibrating' || runState.status === 'running') return;
     if (runState.calibration && runState.calibration.manual) return;
+    const midiInputs = MidiInput.getInputs();
     if (!midiInputs.some(i => i.id === selectedInputId)) {
       runState.calibration = null;
       runState.meanOffset = 0;
@@ -580,130 +349,48 @@ const RogueliteMode = (() => {
   }
 
   async function enableMidi() {
-    const blocked = midiUnavailableReason();
-    if (blocked) {
-      setMidiStatus(blocked, true);
-      return;
-    }
-    try {
-      midiAccess = await navigator.requestMIDIAccess({ sysex: false });
-    } catch (e) {
-      if (e && e.name === 'SecurityError') {
-        setMidiStatus(midiUnavailableReason() || 'MIDI blocked: serve this page over HTTPS.', true);
-        return;
-      }
-      setMidiStatus('MIDI access denied: ' + (e && e.message ? e.message : e), true);
-      return;
-    }
-    midiAccess.onstatechange = refreshInputs;
-    refreshInputs();
-  }
-
-  function refreshInputs() {
-    midiInputs = [];
-    if (midiAccess) {
-      for (const input of midiAccess.inputs.values()) {
-        midiInputs.push({ id: input.id, name: input.name || input.id });
-      }
-    }
-    // Auto-select if exactly one input; otherwise keep current or first.
-    if (midiInputs.length && !midiInputs.some(i => i.id === selectedInputId)) {
-      selectedInputId = midiInputs[0].id;
-    }
-    attachToSelectedInput();
-    renderDeviceList();
-    if (!midiInputs.length) {
-      setMidiStatus('No MIDI inputs found. Connect your module and try again.', true);
-    } else {
-      const cur = midiInputs.find(i => i.id === selectedInputId);
-      setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
-    }
-    tryLoadMidiCalibration();
-  }
-
-  function attachToSelectedInput() {
-    if (!midiAccess) return;
-    for (const input of midiAccess.inputs.values()) {
-      input.onmidimessage = (input.id === selectedInputId) ? handleMidiMessage : null;
-    }
+    await MidiInput.requestAccess();
   }
 
   function selectInput(id) {
-    selectedInputId = id;
-    attachToSelectedInput();
-    const cur = midiInputs.find(i => i.id === selectedInputId);
-    setMidiStatus('Connected: ' + (cur ? cur.name : '—'), false);
+    MidiInput.setInputId(id);
     tryLoadMidiCalibration();
-  }
-
-  function handleMidiMessage(event) {
-    const data = event.data;
-    if (!data || data.length < 3) return;
-    const status = data[0] & 0xf0;
-    const note = data[1];
-    const velocity = data[2];
-    // note-on with velocity > 0 only (note-on velocity 0 == note-off).
-    if (status !== 0x90 || velocity === 0) return;
-
-    // Use event.timeStamp (perf-clock DOMHighResTimeStamp). Guard against browsers
-    // that hand back 0 or a wildly different origin: if it isn't within ~1s of the
-    // moment we received it, fall back to performance.now() at receipt. (A wrong
-    // *constant* origin would otherwise be silently absorbed by calibration — the
-    // exact masking bug §6 warns about.)
-    const recv = performance.now();
-    let ts = event.timeStamp;
-    if (!(typeof ts === 'number') || ts <= 0 || Math.abs(ts - recv) > 1000) ts = recv;
-
-    if (learning) {
-      const learnNotes = runState.instrument === 'kick' ? KICK_LEARN_NOTES : SNARE_LEARN_NOTES;
-      if (!learnNotes.includes(note)) {
-        setMidiStatus(instrLabel() + ' learn only accepts MIDI notes ' + learnNotes.join(', ') + '. Hit your pad.', true);
-        return;
-      }
-      learning = false;
-      runState.kickNote = note;
-      el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + note);
-      if (onLearned) { const cb = onLearned; onLearned = null; cb(note); }
-      updateGates();
-      return;
-    }
-
-    if (isPlayableMidiNote(note)) {
-      // Debounce hardware double-triggers (one physical hit → two note-ons within a
-      // few ms) so they don't count as a 'cram'. Genuine strokes are far enough
-      // apart to pass. (No effect on calibration matching — it just drops dupes.)
-      if (ts - lastKickTs < KICK_DEBOUNCE_MS) return;
-      lastKickTs = ts;
-      pushKickEvent(ts);
-    }
   }
 
   function learnKick() {
     if (!runState.instrument) { setMidiStatus('Pick a drum (Kick or Snare) first.', true); return; }
-    if (!midiAccess) { setMidiStatus('Connect MIDI first.', true); return; }
-    learning = true;
+    if (!MidiInput.hasAccess()) { setMidiStatus('Connect MIDI first.', true); return; }
+    const learnNotes = runState.instrument === 'kick' ? KICK_LEARN_NOTES : SNARE_LEARN_NOTES;
     el.kickNote && (el.kickNote.textContent = 'Hit your ' + instrLabel().toLowerCase()
-      + ' (MIDI notes ' + (runState.instrument === 'kick' ? KICK_LEARN_NOTES : SNARE_LEARN_NOTES).join(', ') + ')…');
+      + ' (MIDI notes ' + learnNotes.join(', ') + ')…');
+    MidiInput.startLearn({
+      allowedNotes: learnNotes,
+      onLearned: (note) => {
+        runState.kickNote = note;
+        el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + note);
+        updateGates();
+      },
+      onReject: () => {
+        setMidiStatus(instrLabel() + ' learn only accepts MIDI notes ' + learnNotes.join(', ') + '. Hit your pad.', true);
+      },
+    });
   }
 
   // Current drum label ('Kick' | 'Snare'); falls back to 'Note' before a choice.
   function instrLabel() { return INSTR_LABEL[runState.instrument] || 'Note'; }
-
-  function isPlayableMidiNote(note) {
-    if (note === runState.kickNote) return true;
-    const notes = PLAYABLE_NOTES[runState.instrument];
-    return notes ? notes.includes(note) : false;
-  }
 
   // Compulsory drum choice. Sets the GM default note for that drum (until learned),
   // updates labels/gates. Switching drum resets the listened note to the default.
   function selectInstrument(instr) {
     if (instr !== 'kick' && instr !== 'snare') return;
     runState.instrument = instr;
-    runState.kickNote = DEFAULT_NOTE[instr];
+    MidiInput.setInstrument(instr);
+    runState.kickNote = MidiInput.getInstrumentNote();
     el.instrBtns && el.instrBtns.forEach(b => b.classList.toggle('active', b.dataset.instr === instr));
     el.kickNote && (el.kickNote.textContent = instrLabel() + ' note: ' + runState.kickNote + ' (default)');
-    setMidiStatus(midiAccess ? 'Now learn your ' + instrLabel().toLowerCase() + " note, or use the default." : 'Connect MIDI, then learn your ' + instrLabel().toLowerCase() + ' note.');
+    setMidiStatus(MidiInput.hasAccess()
+      ? 'Now learn your ' + instrLabel().toLowerCase() + " note, or use the default."
+      : 'Connect MIDI, then learn your ' + instrLabel().toLowerCase() + ' note.');
     updateGates();
   }
 
@@ -737,28 +424,9 @@ const RogueliteMode = (() => {
     if (el.midiSteps)  el.midiSteps.style.display  = audio ? 'none' : '';
     if (el.audioSteps) el.audioSteps.style.display = audio ? '' : 'none';
     if (!audio) {
-      const blocked = midiUnavailableReason();
+      const blocked = MidiInput.unavailableReason();
       if (blocked) setMidiStatus(blocked, true);
     }
-  }
-
-  // Web MIDI is only exposed in secure contexts (HTTPS, or http://localhost).
-  // Plain HTTP on a LAN IP hides the API — same browser works fine on prod HTTPS.
-  function midiUnavailableReason() {
-    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
-    const isIOS = /iPad|iPhone|iPod/.test(ua) ||
-      (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOS) {
-      return 'Web MIDI is not available on iPhone/iPad. Use Audio input instead.';
-    }
-    if (typeof window !== 'undefined' && window.isSecureContext === false) {
-      return 'Web MIDI needs HTTPS (browsers only allow it on https:// pages and localhost). ' +
-        'For LAN dev run: npm run dev:lan — then open https://<server-ip>:8127 and accept the certificate warning.';
-    }
-    if (!navigator.requestMIDIAccess) {
-      return 'Web MIDI not supported in this browser.';
-    }
-    return null;
   }
 
   // Open the audio interface/mic and start onset detection. Onsets feed the SAME
@@ -874,16 +542,63 @@ const RogueliteMode = (() => {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // CALIBRATION — TWO SEPARATE STEPS, each an 8-bar test at the chosen tempo:
-  //   Step 1 (quarters, REQUIRED): play QUARTERS → the gross offset (hardware + MIDI
-  //           latency + your click-reaction). This alone is enough to play. It's also
-  //           the de-alias anchor for step 2.
-  //   Step 2 (16ths, OPTIONAL): play 16ths → de-aliased by the step-1 offset, then
-  //           refined → your 16th-pocket mean. Replaces the offset with the pocket;
-  //           also reports drift (16ths vs quarters) + spread (consistency).
+  // CALIBRATION — TWO SEPARATE STEPS (orchestration via core/js/calibrator.js):
+  //   Step 1 (quarters, REQUIRED): play QUARTERS → the gross offset.
+  //   Step 2 (16ths, OPTIONAL): play 16ths → refined pocket + drift.
   // Skip both and type a known offset instead (see applyManualOffset).
   // ───────────────────────────────────────────────────────────────────────────
-  let calState = null;   // per-step collection state
+  let cal = null;
+
+  function ensureCalibrator() {
+    if (cal) return cal;
+    cal = Calibrator.create({
+      getMetronome: () => (typeof MetronomeEngine !== 'undefined' ? MetronomeEngine : null),
+      getSync: () => sync,
+      refreshSync,
+      getEvents: () => events,
+      clearEvents: () => { events = []; },
+      getGrossOffset: () => (runState.calibration && runState.calibration.grossOffset != null)
+        ? runState.calibration.grossOffset : 0,
+      onStatusBanner: (msg, cls) => setStatusBanner(el.calStatus, msg, cls),
+      onComplete: (result) => {
+        runState.status = 'idle';
+        runState.meanOffset = result.meanOffset;
+        runState.calibration = {
+          meanOffset: result.meanOffset,
+          sd: result.sd,
+          sampleCount: result.sampleCount,
+          grossOffset: result.grossOffset,
+          drift: result.drift || 0,
+          refined: !!result.refined,
+        };
+        captureLatencyCal();
+        persistMidiCalibration();
+        if (result.pass === 1) {
+          console.info('[roguelite] cal quarters gross offset:', signed(result.meanOffset) +
+            'ms (' + result.sampleCount + ' hits)');
+          setStatus(el.calStatus, 'Quarters calibrated @ ' + result.bpm + ' BPM. Offset ' +
+            signed(result.meanOffset) + 'ms (subtracted). Optional: refine your 16th pocket.', false);
+        } else {
+          const drift = result.drift || 0;
+          const dir = drift < 0 ? 'rushing' : 'dragging';
+          setStatus(el.calStatus,
+            'Pocket refined @ ' + result.bpm + ' BPM 16ths. Offset ' + signed(result.meanOffset) +
+            'ms (subtracted). 16ths ' + dir + ' ' + Math.abs(drift).toFixed(0) +
+            'ms vs quarters · consistency ±' + result.sd.toFixed(0) + 'ms over ' +
+            result.sampleCount + ' hits.', false);
+        }
+        updateGates();
+      },
+      onFail: (msg, meta) => {
+        runState.status = 'idle';
+        const isStop = meta && meta.stopped;
+        setStatus(el.calStatus, msg, !isStop);
+        updateGates();
+      },
+      evalMarginMs: EVAL_MARGIN_MS,
+    });
+    return cal;
+  }
 
   // Shared setup for either calibration step. Returns false if it couldn't start.
   async function beginCalStep() {
@@ -902,7 +617,11 @@ const RogueliteMode = (() => {
   // Step 1 (required): quarters → gross offset.
   async function startCalQuarters() {
     if (!(await beginCalStep())) return;
-    startCalPass(1);
+    if (!ensureCalibrator().startPass1(parseIntOr(el.cal16Bpm, CAL_BPM_DEFAULT))) {
+      runState.status = 'idle';
+      setCalStatus('Could not start calibration.', true);
+    }
+    updateGates();
   }
 
   // Step 2 (optional): 16ths → refined pocket. Needs a gross offset (from step 1 or a
@@ -913,166 +632,10 @@ const RogueliteMode = (() => {
       return;
     }
     if (!(await beginCalStep())) return;
-    startCalPass(2);
-  }
-
-  function startCalPass(pass) {
-    const totalBars = CAL_COUNTOFF_BARS + CAL_MEASURE_BARS;
-    const bpm = Math.max(40, Math.min(200, parseIntOr(el.cal16Bpm, CAL_BPM_DEFAULT)));
-    MetronomeEngine.setBpm(bpm);
-    events = [];
-    calState = {
-      pass,
-      bpm,
-      tickCount: 0,
-      countoffTicks: CAL_COUNTOFF_BARS * CAL_BEATS,
-      totalTicks: totalBars * CAL_BEATS,
-      measureBars: CAL_MEASURE_BARS,
-      lastTickPerf: 0,
-      loggedRaw: 0,
-      expected: [],   // pass 1: quarter perf times; pass 2: derived 16th perf times
-    };
-    updateGates();
-    MetronomeEngine.onSchedule(onCalTick);
-    MetronomeEngine.start();
-  }
-
-  function onCalTick(tickTimeSec) {
-    if (!calState) return;
-    refreshSync();                 // fresh audio↔perf anchor for this tick (drift-proof)
-    const idx = calState.tickCount++;
-    const perf = audioToPerfMs(tickTimeSec, sync);
-    calState.lastTickPerf = perf;
-
-    const bar = Math.floor(idx / CAL_BEATS) + 1;
-    const inCountoff = idx < calState.countoffTicks;
-
-    // Obvious banner so the count-off vs the measured phase is unmistakable.
-    const label = calState.pass === 1 ? 'QUARTERS' : '16THS';
-    if (inCountoff) {
-      setStatusBanner(el.calStatus, label + ' · COUNT-OFF ' + bar + '/' + CAL_COUNTOFF_BARS +
-        ' — get ready to play ' + (calState.pass === 1 ? 'QUARTERS' : '16ths'), 'countin');
-    } else if (idx < calState.totalTicks) {
-      const mbar = bar - CAL_COUNTOFF_BARS;
-      setStatusBanner(el.calStatus, label + ' — measuring bar ' + mbar + '/' +
-        calState.measureBars, 'live');
+    if (!ensureCalibrator().startPass2(parseIntOr(el.cal16Bpm, CAL_BPM_DEFAULT))) {
+      runState.status = 'idle';
+      setCalStatus('Could not start calibration.', true);
     }
-
-    // Collect expected times during the measured window.
-    if (idx >= calState.countoffTicks && idx < calState.totalTicks) {
-      if (calState.pass === 1) {
-        calState.expected.push(perf);                 // one sample per quarter click
-      } else {
-        const s = 60 / calState.bpm / 4;              // 16th interval (sec) at this pass's tempo
-        for (let k = 0; k < 4; k++) {
-          calState.expected.push(audioToPerfMs(tickTimeSec + k * s, sync));
-        }
-      }
-      // Sanity log: raw nearest-kick offset on the first few measured clicks. Should
-      // read as tens-to-low-hundreds of ms; thousands ⇒ clock reconciliation broken.
-      if (calState.loggedRaw < 3) {
-        const nearest = nearestRawOffset(perf);
-        if (nearest !== null) {
-          calState.loggedRaw++;
-          console.info('[roguelite] cal pass ' + calState.pass +
-            ' raw offset (uncorrected):', nearest.toFixed(1) + 'ms');
-        }
-      }
-    }
-
-    if (idx + 1 === calState.totalTicks) {
-      // Exactly the last measured tick — finalise once, just after its window closes.
-      const delay = (calState.lastTickPerf + CAL_CAPTURE_WINDOW_MS + EVAL_MARGIN_MS) - performance.now();
-      setTimeout(finishCalPass, Math.max(0, delay));
-    }
-  }
-
-  function nearestRawOffset(expectedPerf) {
-    let best = null, bestAbs = Infinity;
-    for (const ev of events) {
-      const d = ev.t - expectedPerf, a = Math.abs(d);
-      if (a < bestAbs) { bestAbs = a; best = d; }
-    }
-    return (best !== null && bestAbs <= CAL_CAPTURE_WINDOW_MS) ? best : null;
-  }
-
-  function finishCalPass() {
-    if (!calState) return;
-    MetronomeEngine.onSchedule(null);
-    MetronomeEngine.stop();
-
-    const pass = calState.pass;
-    const passBpm = calState.bpm;
-    const expectedTimes = calState.expected;
-    const eventTimes = events.map(e => e.t);
-    calState = null;
-    events = [];
-    runState.status = 'idle';
-
-    if (pass === 1) {
-      // STEP 1 (quarters): gross offset from the quarter grid (no aliasing). This is
-      // a complete, usable calibration on its own — the run can start after it.
-      const gross = computeCalibration(expectedTimes, eventTimes, CAL_CAPTURE_WINDOW_MS);
-      if (gross.sampleCount < CAL_MIN_SAMPLES) {
-        abortCalibration('Quarters: only ' + gross.sampleCount + ' hits detected — ' +
-          'play a hit on every click, then try again.');
-        return;
-      }
-      const G = gross.meanOffset;
-      console.info('[roguelite] cal quarters gross offset:', signed(G) + 'ms (' + gross.sampleCount + ' hits)');
-      runState.meanOffset = G;
-      runState.calibration = { meanOffset: G, sd: gross.sd, sampleCount: gross.sampleCount, grossOffset: G, drift: 0, refined: false };
-      captureLatencyCal();
-      persistMidiCalibration();
-      setStatus(el.calStatus, 'Quarters calibrated @ ' + passBpm + ' BPM. Offset ' + signed(G) +
-        'ms (subtracted). Optional: refine your 16th pocket.', false);
-      updateGates();
-      return;
-    }
-
-    // STEP 2 (16ths): de-alias against the existing gross offset, then REFINE.
-    // 16ths are spaced 60000/bpm/4 ms apart; matching is only unambiguous within
-    // ±half that. A first match shifted by the quarter offset G can mis-assign edge
-    // kicks at faster tempos, so we re-centre on that rough mean — residuals shrink
-    // to ~the spread, keeping every kick on its correct 16th at any tempo.
-    const G = (runState.calibration && runState.calibration.grossOffset != null)
-      ? runState.calibration.grossOffset : 0;
-    const spacing16 = 60000 / passBpm / 4;
-    const tight = spacing16 * 0.45;
-    const rough = computeCalibration(expectedTimes.map(t => t + G), eventTimes, tight);
-
-    let meanOffset, sd, sampleCount;
-    if (rough.sampleCount >= CAL_MIN_SAMPLES) {
-      const M0 = G + rough.meanOffset;
-      const refined = computeCalibration(expectedTimes.map(t => t + M0), eventTimes, tight);
-      meanOffset = M0 + refined.meanOffset;
-      sd = refined.sd;
-      sampleCount = refined.sampleCount;
-    } else {
-      meanOffset = G + rough.meanOffset;
-      sd = rough.sd;
-      sampleCount = rough.sampleCount;
-    }
-
-    if (sampleCount < CAL_MIN_SAMPLES) {
-      // Keep the quarters calibration intact; just report the refine failed.
-      setStatus(el.calStatus, '16ths: only ' + sampleCount + ' matched — keeping your quarters ' +
-        'offset. Play continuous 16ths and try the refine again.', true);
-      updateGates();
-      return;
-    }
-
-    const drift = meanOffset - G;             // 16th vs quarter (negative = rushing 16ths)
-    runState.meanOffset = meanOffset;
-    runState.calibration = { meanOffset, sd, sampleCount, grossOffset: G, drift, refined: true };
-    captureLatencyCal();
-    persistMidiCalibration();
-
-    const dir = drift < 0 ? 'rushing' : 'dragging';
-    setStatus(el.calStatus,
-      'Pocket refined @ ' + passBpm + ' BPM 16ths. Offset ' + signed(meanOffset) +
-      'ms (subtracted). 16ths ' + dir + ' ' + Math.abs(drift).toFixed(0) +
-      'ms vs quarters · consistency ±' + sd.toFixed(0) + 'ms over ' + sampleCount + ' hits.', false);
     updateGates();
   }
 
@@ -1090,13 +653,17 @@ const RogueliteMode = (() => {
   }
 
   function abortCalibration(msg, isErr) {
-    MetronomeEngine.onSchedule(null);
-    MetronomeEngine.stop();
-    calState = null;
-    events = [];
-    runState.status = 'idle';
-    setStatus(el.calStatus, msg, isErr !== false);
-    updateGates();
+    if (cal && cal.isActive()) cal.stop(msg);
+    else {
+      if (typeof MetronomeEngine !== 'undefined') {
+        MetronomeEngine.onSchedule(null);
+        MetronomeEngine.stop();
+      }
+      events = [];
+      runState.status = 'idle';
+      setStatus(el.calStatus, msg, isErr !== false);
+      updateGates();
+    }
   }
 
   // User pressed Stop during calibration.
@@ -1943,6 +1510,8 @@ const RogueliteMode = (() => {
 
   function renderDeviceList() {
     if (!el.deviceSelect) return;
+    const midiInputs = MidiInput.getInputs();
+    const selectedInputId = MidiInput.getInputId();
     el.deviceSelect.innerHTML = '';
     midiInputs.forEach(i => {
       const opt = document.createElement('option');
@@ -1957,7 +1526,7 @@ const RogueliteMode = (() => {
   // pick drum → MIDI → learn note → calibrate → choose mode/params → run.
   function updateGates() {
     const hasInstr = !!runState.instrument;     // compulsory
-    const hasMidi = !!midiAccess && midiInputs.length > 0;
+    const hasMidi = !!MidiInput.hasAccess() && MidiInput.getInputs().length > 0;
     const isAudio = runState.inputSource === 'audio';
     // A usable input: MIDI connected (+ note), or audio started.
     const hasInput = isAudio ? !!runState.audioReady : (hasMidi && runState.kickNote != null);
@@ -2269,19 +1838,45 @@ const RogueliteMode = (() => {
     reopenGameModeAfterSignIn();
 
     el.instrBtns.forEach(b => b.addEventListener('click', () => selectInstrument(b.dataset.instr)));
-    el.inputBtns.forEach(b => b.addEventListener('click', () => selectInputSource(b.dataset.src)));
-    el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
-    el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
-    el.audioEnableBtn && el.audioEnableBtn.addEventListener('click', () => enableAudio());
-    el.audioSensBtn   && el.audioSensBtn.addEventListener('click', () => setSensitivity());
-    el.audioDeviceSelect && el.audioDeviceSelect.addEventListener('change', () => { if (runState.audioReady) enableAudio(); });
+
+    // Input + calibration chrome (core mount helpers bind to existing Game Mode IDs).
+    if (typeof InputControls !== 'undefined') {
+      InputControls.mount(el.body || document, {
+        onSourceChange: selectInputSource,
+        onConnectMidi: enableMidi,
+        onLearn: learnKick,
+        onDeviceChange: selectInput,
+        onEnableAudio: enableAudio,
+        onSensitivity: setSensitivity,
+        onAudioDeviceChange: () => { if (runState.audioReady) enableAudio(); },
+        getState: () => ({ inputSource: runState.inputSource }),
+      });
+    } else {
+      el.inputBtns.forEach(b => b.addEventListener('click', () => selectInputSource(b.dataset.src)));
+      el.midiBtn  && el.midiBtn.addEventListener('click', () => enableMidi());
+      el.learnBtn && el.learnBtn.addEventListener('click', () => learnKick());
+      el.audioEnableBtn && el.audioEnableBtn.addEventListener('click', () => enableAudio());
+      el.audioSensBtn   && el.audioSensBtn.addEventListener('click', () => setSensitivity());
+      el.audioDeviceSelect && el.audioDeviceSelect.addEventListener('change', () => { if (runState.audioReady) enableAudio(); });
+      el.deviceSelect && el.deviceSelect.addEventListener('change', () => selectInput(el.deviceSelect.value));
+    }
     reflectInputSource();
-    el.calStopBtn && el.calStopBtn.addEventListener('click', () => stopCalibration());
-    el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
-    el.cal16Btn && el.cal16Btn.addEventListener('click', () => startCal16());
-    el.manualBtn && el.manualBtn.addEventListener('click', () => applyManualOffset());
+
+    if (typeof CalibrationControls !== 'undefined') {
+      CalibrationControls.mount(el.body || document, {
+        onCalQuarters: () => startCalQuarters(),
+        onCal16: () => startCal16(),
+        onStop: () => stopCalibration(),
+        onManual: () => applyManualOffset(),
+      });
+    } else {
+      el.calStopBtn && el.calStopBtn.addEventListener('click', () => stopCalibration());
+      el.calQuartersBtn && el.calQuartersBtn.addEventListener('click', () => startCalQuarters());
+      el.cal16Btn && el.cal16Btn.addEventListener('click', () => startCal16());
+      el.manualBtn && el.manualBtn.addEventListener('click', () => applyManualOffset());
+    }
+
     el.runBtn   && el.runBtn.addEventListener('click', () => startRun());
-    el.deviceSelect && el.deviceSelect.addEventListener('change', () => selectInput(el.deviceSelect.value));
     el.levelBtns.forEach(b => b.addEventListener('click', () => selectLevel(parseInt(b.dataset.level, 10))));
     el.modeBtns.forEach(b => b.addEventListener('click', () => selectMode(b.dataset.rmode)));
     el.gameBpmDec && el.gameBpmDec.addEventListener('click', () => stepGameBpm(-GAME_BPM_STEP));
@@ -2369,6 +1964,6 @@ const RogueliteMode = (() => {
   return {
     // public surface (mostly for debugging / future wiring)
     LEVELS, runState, enableMidi, learnKick, selectInstrument, startCalQuarters, startCal16, startRun,
-    _math: RL_TimingMath, _loadTrophyBaseline: loadTrophyBaseline,
+    _math: TimingMath, _loadTrophyBaseline: loadTrophyBaseline,
   };
 })();

@@ -1,0 +1,246 @@
+/* AOD Core — session / metronome control chrome.
+   Apps load this alongside tokens.css. Theme overrides via mount(root, { theme }).
+   Layout: root[data-session-layout="compact"] or .session-layout-compact. */
+
+.session-controls,
+[data-session-root] {
+  /* Local theme hooks (defaults come from tokens.css / :root) */
+  color: var(--text, #e8f0f5);
+}
+
+.session-layout-compact .bpm-value-input { font-size: 2.8rem; }
+.session-layout-compact .start-stop-btn,
+.session-layout-compact .tap-btn,
+.session-layout-compact .pause-btn { min-height: 40px; padding: 10px; }
+
+/* ── Beat Indicators ───────────────────────────── */
+.beat-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 362px;
+  margin: 0 auto;
+}
+.beat-indicator {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  padding: 3px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.beat-indicator:active { opacity: 0.65; }
+.beat-num {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-dim, #8ab0c8);
+  line-height: 1;
+}
+.beat-pip {
+  display: block;
+  width: 36px;
+  height: 36px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  transition: background 0.08s, filter 0.08s;
+}
+.beat-indicator[data-mode="accent"] .beat-pip {
+  background: linear-gradient(145deg, #ffe980 0%, var(--accent, #FFB800) 55%, #7a5000 100%);
+  filter: drop-shadow(0 0 5px rgba(255, 184, 0, 0.6));
+}
+.beat-indicator[data-mode="click"] .beat-pip {
+  background: linear-gradient(145deg, #80eeff 0%, var(--cyan, #00c8ff) 55%, #004466 100%);
+  filter: drop-shadow(0 0 5px rgba(0, 200, 255, 0.5));
+}
+.beat-indicator[data-mode="silent"] .beat-pip {
+  background: linear-gradient(145deg, #141e2e 0%, #070d18 100%);
+  filter: none;
+}
+.beat-indicator.flash-accent .beat-pip {
+  background: linear-gradient(145deg, #ffffff 0%, var(--accent-flash, #ffe066) 45%, var(--accent, #FFB800) 100%) !important;
+  filter: drop-shadow(0 0 14px rgba(255, 224, 102, 1)) !important;
+}
+.beat-indicator.flash-click .beat-pip {
+  background: linear-gradient(145deg, #ffffff 0%, #aaefff 45%, var(--cyan, #00c8ff) 100%) !important;
+  filter: drop-shadow(0 0 14px rgba(0, 200, 255, 1)) !important;
+}
+
+/* ── BPM ───────────────────────────────────────── */
+.bpm-value-input {
+  font-family: 'Orbitron', monospace;
+  font-size: 4rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--text, #e8f0f5);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  -moz-appearance: textfield;
+  cursor: text;
+}
+.bpm-value-input::-webkit-inner-spin-button,
+.bpm-value-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.bpm-slider-container { display: flex; align-items: center; gap: 8px; }
+.bpm-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--cyan-dim, #007899) 0%, var(--inset, #040810) 100%);
+  outline: none;
+  cursor: pointer;
+}
+.bpm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: linear-gradient(145deg, #80eeff 0%, var(--cyan, #00c8ff) 55%, #004466 100%);
+  cursor: pointer;
+}
+.bpm-btn {
+  flex: 1;
+  padding: 6px 2px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border, rgba(0, 200, 255, 0.18));
+  color: var(--text, #e8f0f5);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+/* ── Subdivision / Start ───────────────────────── */
+.sub-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 3px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border, rgba(0, 200, 255, 0.18));
+  color: var(--text-dim, #8ab0c8);
+  cursor: pointer;
+  min-height: 34px;
+}
+.sub-btn.active {
+  color: var(--cyan, #00c8ff);
+  box-shadow: inset 0 0 0 1px rgba(0, 200, 255, 0.22);
+}
+
+.start-stop-btn {
+  flex: 1;
+  padding: 15px;
+  background: linear-gradient(180deg, #ffd455 0%, var(--accent, #FFB800) 45%, #a87200 100%);
+  border: none;
+  color: #060a10;
+  font-family: 'Orbitron', monospace;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 48px;
+}
+.start-stop-btn.running {
+  background: linear-gradient(180deg, #ff5c5c 0%, #dd1a1a 45%, #7a0000 100%);
+  color: #fff;
+}
+
+.tap-btn {
+  flex: 1;
+  padding: 15px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border, rgba(0, 200, 255, 0.18));
+  color: var(--text, #e8f0f5);
+  font-family: 'Orbitron', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.pause-btn {
+  display: none;
+  flex: 1;
+  padding: 15px 8px;
+  background: linear-gradient(180deg, #0d1e32 0%, #071220 100%);
+  border: 1px solid rgba(0, 200, 255, 0.35);
+  color: var(--cyan, #00c8ff);
+  font-family: 'Orbitron', monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 48px;
+}
+.pause-btn.visible { display: flex; align-items: center; justify-content: center; }
+.pause-btn.resuming {
+  border-color: rgba(0, 232, 122, 0.45);
+  color: var(--success, #00e87a);
+}
+
+/* ── Ramp config / status ──────────────────────── */
+.interval-config { display: none; }
+.interval-config.visible { display: block; }
+.interval-status { display: none; }
+.interval-status.visible { display: flex; }
+
+.status-phase {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  background: rgba(255, 184, 0, 0.1);
+  color: var(--accent, #FFB800);
+  border: 1px solid rgba(255, 184, 0, 0.28);
+}
+.status-phase.rest {
+  background: rgba(0, 200, 255, 0.08);
+  color: var(--cyan, #00c8ff);
+  border-color: rgba(0, 200, 255, 0.28);
+}
+.status-phase.countin {
+  background: rgba(0, 232, 122, 0.1);
+  color: var(--success, #00e87a);
+  border-color: rgba(0, 232, 122, 0.3);
+}
+
+.progress-bar {
+  height: 100%;
+  width: 100%;
+  background-color: var(--cyan, #00c8ff);
+  transition: width 1s linear, background-color 0.3s;
+}
+.progress-bar.rest-mode { background-color: #3a60cc; }
+
+.count-in-row .ci-btn {
+  flex: 1;
+  min-height: 44px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border, rgba(0, 200, 255, 0.18));
+  color: var(--text-dim, #8ab0c8);
+}
+.count-in-row .ci-btn.active {
+  background: linear-gradient(180deg, #1ea7ff 0%, #0a66ff 100%);
+  border-color: var(--accent, #12a0ff);
+  color: #fff;
+}
+
+.config-input:disabled,
+.time-part:disabled { opacity: 0.35; cursor: not-allowed; }

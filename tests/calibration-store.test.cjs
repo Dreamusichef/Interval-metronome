@@ -2,7 +2,7 @@
 
 const { describe, test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const CalibrationStore = require('../assets/js/calibration-store.js');
+const CalibrationStore = require('../core/js/calibration-store.js');
 
 function mockStorage() {
   const data = {};
