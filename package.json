@@ -2,7 +2,7 @@
   "name": "interval-metronome",
   "private": true,
   "dependencies": {
-    "@dreamusichef/core": "1.0.0"
+    "@dreamusichef/core": "1.0.1"
   },
   "scripts": {
     "test": "node --test tests/roguelite.test.cjs tests/achievements.test.cjs tests/run-submit-validation.test.cjs tests/profile-validation.test.cjs tests/calibration-store.test.cjs",

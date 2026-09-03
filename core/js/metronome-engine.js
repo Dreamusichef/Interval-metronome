@@ -50,6 +50,7 @@ const MetronomeEngine = (() => {
   let scheduleCallback = null; // Roguelite hook: fires for every scheduled tick (audio-clock time)
   let pendingVisuals = [];
   let rafId = null;
+  let startWhenRunning = false;
 
   function scheduleBufferAt(buffer, time, gain) {
     const src = audioCtx.createBufferSource();
@@ -163,7 +164,69 @@ const MetronomeEngine = (() => {
   function init() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bindContextState();
     loadSoundBank();   // populates buffers if sounds.js is already loaded (else no-op)
+  }
+
+  function bindContextState() {
+    if (!audioCtx || typeof audioCtx.addEventListener !== 'function') return;
+    audioCtx.addEventListener('statechange', () => {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      if (startWhenRunning && !running) doStart();
+      else if (running) resyncClock();
+    });
+  }
+
+  function contextIsRunning() {
+    return !!(audioCtx && audioCtx.state === 'running');
+  }
+
+  // Opera (and some Chromium forks) leave Web Audio silent after resume() alone.
+  // A 1-sample buffer (or muted oscillator) started in the same user-gesture turn
+  // primes the destination. Safe to call repeatedly.
+  function primeOutput() {
+    if (!audioCtx) return;
+    try {
+      const rate = audioCtx.sampleRate > 0 ? audioCtx.sampleRate : 44100;
+      const buf = audioCtx.createBuffer(1, 1, rate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        g.gain.value = 0;
+        osc.connect(g);
+        g.connect(audioCtx.destination);
+        osc.start(0);
+        osc.stop((audioCtx.currentTime || 0) + 0.05);
+      } catch (e2) { /* ignore */ }
+    }
+  }
+
+  // Unlock / resume the shared AudioContext. Call from a user gesture (Start,
+  // pointerdown, key). Returns a promise that settles with the context (or null).
+  function unlock() {
+    try { init(); } catch (e) { return Promise.resolve(null); }
+    if (!audioCtx) return Promise.resolve(null);
+    primeOutput();
+    if (contextIsRunning()) return Promise.resolve(audioCtx);
+    if (typeof audioCtx.resume !== 'function') return Promise.resolve(audioCtx);
+    try {
+      return audioCtx.resume().then(() => {
+        primeOutput();
+        return audioCtx;
+      }).catch((err) => {
+        if (typeof window !== 'undefined' && window.__showError) {
+          window.__showError('audio resume failed: ' + (err && err.message ? err.message : err));
+        }
+        return audioCtx;
+      });
+    } catch (e) {
+      return Promise.resolve(audioCtx);
+    }
   }
 
   // Decode the cue/cowbell buffers from the (lazily loaded) sounds.js base64 blobs.
@@ -199,8 +262,7 @@ const MetronomeEngine = (() => {
       } catch (e) { welcomePlayed = false; }
     };
 
-    if (audioCtx.state === 'suspended') audioCtx.resume().then(fire).catch(() => {});
-    else fire();
+    unlock().then(() => { if (contextIsRunning()) fire(); }).catch(() => {});
   }
 
   // The scheduler is driven by a Web Worker timer rather than a main-thread
@@ -249,7 +311,8 @@ const MetronomeEngine = (() => {
   }
 
   function doStart() {
-    if (running) return;
+    if (running || !audioCtx) return;
+    startWhenRunning = false;
     running      = true;
     currentTick  = 0;
     nextTickTime = audioCtx.currentTime + 0.05;
@@ -260,17 +323,20 @@ const MetronomeEngine = (() => {
 
   function start() {
     if (!audioCtx) init();
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().then(doStart).catch((err) => {
-        if (window.__showError) window.__showError('audio resume failed: ' + (err && err.message ? err.message : err));
-        doStart();
-      });
-    } else {
-      doStart();
+    const begin = () => {
+      if (contextIsRunning()) doStart();
+      else startWhenRunning = true;
+    };
+    if (contextIsRunning()) {
+      begin();
+      return;
     }
+    startWhenRunning = true;
+    unlock().then(begin).catch(() => {});
   }
 
   function stop() {
+    startWhenRunning = false;
     if (!running) return;
     running = false;
     stopSchedulerClock();
@@ -359,23 +425,27 @@ const MetronomeEngine = (() => {
   function getCurrentBpm() { return bpm; }
   function isRunning()     { return running; }
 
-  // Resume a suspended context (mobile suspends it on background/lock) and re-align
-  // the schedule WITHOUT restarting the bar. The metronome only stops on an explicit
-  // stop() — switching apps/tabs never restarts it.
-  document.addEventListener('touchstart', () => {
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().then(resyncClock).catch(() => {});
-    }
-  }, { passive: true });
+  // Resume a suspended context (mobile suspends it on background/lock; Opera/desktop
+  // may never have unlocked on touchstart) and re-align WITHOUT restarting the bar.
+  // The metronome only stops on an explicit stop() — switching apps/tabs never restarts it.
+  function onUserGestureUnlock() {
+    unlock().then(() => { if (running) resyncClock(); }).catch(() => {});
+  }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden || !audioCtx || !running) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume().then(resyncClock).catch(() => {});
-    else resyncClock();
-  });
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    const gestureOpts = { capture: true, passive: true };
+    document.addEventListener('pointerdown', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('click', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('keydown', onUserGestureUnlock, true);
+    document.addEventListener('touchstart', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !audioCtx || !running) return;
+      unlock().then(() => { if (contextIsRunning()) resyncClock(); }).catch(() => {});
+    });
+  }
 
   return {
-    init, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
+    init, unlock, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
     setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
     playSetEndCue, playSetStartCue, playPracticeCompleteCue,
     setSoundMode, getSoundMode, playWelcomeGreeting,
