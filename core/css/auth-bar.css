@@ -1,0 +1,104 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   AUTH BAR — shared cloud auth chrome (sign-in / avatar / LOCAL badge / picker).
+
+   Extracted from assets/css/style.css into this shared kit. Apps may also keep
+   a local copy or import this sheet; tokens: --text, --border, --cyan, --panel,
+   --muted, --amber.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Auth bar (app + stats pages) */
+.cloud-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cloud-authbar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.cloud-name { font-family: 'Rajdhani', sans-serif; font-weight: 700; color: var(--text); font-size: 0.85rem; }
+.cloud-avatar { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); }
+.cloud-avatar.sm { width: 20px; height: 20px; }
+
+.cloud-btn {
+  padding: 7px 12px;
+  background: linear-gradient(180deg, #141e2e 0%, #0a1220 100%);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  min-height: 32px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.cloud-btn:hover { color: var(--cyan); box-shadow: 0 0 10px rgba(0, 200, 255, 0.18); }
+.cloud-google { display: inline-flex; align-items: center; gap: 8px; }
+.cloud-g {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; color: #4285F4; font-family: 'Orbitron', monospace; font-weight: 900; font-size: 0.72rem;
+}
+.cloud-stats-link {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.cloud-stats-link:hover { text-shadow: 0 0 10px rgba(0, 200, 255, 0.4); }
+
+.cloud-local-badge {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--amber, #ffb020);
+  border: 1px solid rgba(255, 176, 32, 0.45);
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+}
+.cloud-dev-signin-wrap { display: inline-flex; }
+.cloud-dev-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.cloud-dev-picker-panel {
+  background: var(--panel, #0f1824);
+  border: 1px solid var(--border, #2a3d52);
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 240px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.cloud-dev-picker-title {
+  margin: 0 0 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text, #e8f0f5);
+}
+.cloud-dev-picker-hint {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  color: var(--muted, #8ab0c8);
+}
+.cloud-dev-picker-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cloud-dev-picker-user { width: 100%; justify-content: center; }
+.cloud-dev-picker-cancel { width: 100%; opacity: 0.85; }

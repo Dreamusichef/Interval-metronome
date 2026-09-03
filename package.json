@@ -1,9 +1,15 @@
 {
   "name": "interval-metronome",
   "private": true,
+  "dependencies": {
+    "@dreamusichef/core": "1.0.1"
+  },
   "scripts": {
     "test": "node --test tests/roguelite.test.cjs tests/achievements.test.cjs tests/run-submit-validation.test.cjs tests/profile-validation.test.cjs tests/calibration-store.test.cjs",
     "dev": "npx -y http-server -p 8127 -c-1",
-    "dev:lan": "node scripts/dev-https.mjs"
+    "dev:lan": "node scripts/dev-https.mjs",
+    "sync-core": "node scripts/sync-core.mjs",
+    "cache-bust-core": "node scripts/cache-bust-core.mjs",
+    "upgrade-core": "node scripts/upgrade-core.mjs"
   }
 }

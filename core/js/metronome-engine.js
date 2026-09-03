@@ -1,0 +1,454 @@
+'use strict';
+
+const MetronomeEngine = (() => {
+  const SCHEDULE_AHEAD_TIME = 0.1;
+  // While the tab is hidden, browsers throttle timers (and may freeze them), so we
+  // queue far more audio ahead — already-scheduled buffer sources keep playing on
+  // the audio thread through a frozen main thread, giving gapless background audio.
+  const HIDDEN_SCHEDULE_AHEAD = 1.5;
+  const SCHEDULER_INTERVAL = 25;
+  function scheduleAhead() { return document.hidden ? HIDDEN_SCHEDULE_AHEAD : SCHEDULE_AHEAD_TIME; }
+
+  const SUBDIVISION_TICKS = {
+    quarter:   1,
+    eighth:    2,
+    triplet:   3,
+    sixteenth: 4,
+    sextuplet: 6,
+  };
+
+  const BEAT_MODES = ['accent', 'click', 'silent'];
+
+  let soundMode = 'click'; // 'click' | 'cowbell'
+
+  // Per-sound level trims (linear gain = 10^(dB/20)). The metronome accent sits at
+  // the 1.0 ceiling, so the metronome can't be boosted further without clipping —
+  // instead the non-metronome sounds are trimmed an extra 2dB so the metronome is
+  // effectively +2dB louder relative to them (click already carries its own +2dB).
+  const WELCOME_GAIN = 0.473;   // welcome greeting  −6.5dB (was −5dB, trimmed −1.5dB more)
+  const COWBELL_GAIN = 1.122;   // cowbell click     +1dB (the metronome's other voice — kept louder)
+  const CUE_GAIN     = 0.708;   // set start cue  −3dB (−1 requested −2)
+  const SET_END_GAIN = 0.398;   // set-end cue: CUE_GAIN −5dB (quieter than the others by request)
+  const PRACTICE_COMPLETE_GAIN = 0.562;   // practice-complete (ramp) cue: CUE_GAIN −2dB more (−5dB total)
+
+  let audioCtx = null;
+  let setEndBuffer = null;
+  let setStartBuffer = null;
+  let practiceCompleteBuffer = null;
+  let cowbellBeatBuffer   = null;
+  let cowbellAccentBuffer = null;
+  let bpm = 120;
+  let subdivision = 'quarter';
+  let beatsPerMeasure = 4;
+  let beatModes = ['accent', 'click', 'click', 'click'];
+  let running = false;
+  let schedulerTimer = null;
+  let nextTickTime = 0;
+  let currentTick = 0;
+  let tickInterval = 0.5;
+  let beatCallback = null;
+  let scheduleCallback = null; // Roguelite hook: fires for every scheduled tick (audio-clock time)
+  let pendingVisuals = [];
+  let rafId = null;
+  let startWhenRunning = false;
+
+  function scheduleBufferAt(buffer, time, gain) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    if (gain != null && gain !== 1) {
+      const g = audioCtx.createGain();
+      g.gain.value = gain;
+      src.connect(g); g.connect(audioCtx.destination);
+    } else {
+      src.connect(audioCtx.destination);
+    }
+    src.start(time);
+  }
+
+  function scheduleSound(time, soundType) {
+    if (soundType === 'silent') return;
+
+    if (soundMode === 'cowbell') {
+      const buf = soundType === 'accent' ? cowbellAccentBuffer : cowbellBeatBuffer;
+      if (buf) { scheduleBufferAt(buf, time, COWBELL_GAIN); return; }   // +1dB
+      // fall through to click if buffers not yet loaded
+    }
+
+    // Click +2dB (0.62→0.78). Accent stays at 1.0 (already at the safe ceiling —
+    // boosting it would clip the downbeat transient).
+    let freq, gainPeak, duration;
+    if (soundType === 'accent') { freq = 880; gainPeak = 1.0;  duration = 0.06; }
+    else                        { freq = 540; gainPeak = 0.78; duration = 0.04; } // click
+
+    const osc    = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const gain   = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    // Low-pass at 2kHz removes harsh upper harmonics while keeping the click crisp
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000;
+    filter.Q.value = 0.5;
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(gainPeak, time + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(time);
+    osc.stop(time + duration + 0.01);
+  }
+
+  function scheduler() {
+    const ticksPerBeat   = SUBDIVISION_TICKS[subdivision] || 1;
+    tickInterval         = 60 / bpm / ticksPerBeat;
+    const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
+
+    while (nextTickTime < audioCtx.currentTime + scheduleAhead()) {
+      const beatIndex  = Math.floor(currentTick / ticksPerBeat) % beatsPerMeasure;
+      const tickInBeat = currentTick % ticksPerBeat;
+      const isFirst    = tickInBeat === 0;
+      const mode       = beatModes[beatIndex];
+
+      let soundType;
+      if (mode === 'silent') {
+        soundType = 'silent';
+      } else if (isFirst) {
+        soundType = mode; // 'accent' | 'click' for the beat itself
+      } else {
+        soundType = 'click'; // subdivisions always click
+      }
+
+      scheduleSound(nextTickTime, soundType);
+
+      // Roguelite detection hook. Fires synchronously as each tick is scheduled,
+      // handing out the tick's precise time in the audio clock (audioCtx.currentTime
+      // domain, seconds). Additive only — has no effect when no callback is registered.
+      if (scheduleCallback) {
+        scheduleCallback(nextTickTime, soundType, beatIndex, tickInBeat);
+      }
+
+      // Beat-pip visuals only matter when on-screen. requestAnimationFrame is paused
+      // while hidden, so skip queueing then — otherwise the backlog drains as a flash
+      // burst on return.
+      if (isFirst && !document.hidden) {
+        pendingVisuals.push({ time: nextTickTime, beatIndex, soundType });
+      }
+
+      nextTickTime  += tickInterval;
+      currentTick    = (currentTick + 1) % ticksPerMeasure;
+    }
+  }
+
+  function visualLoop() {
+    const now = audioCtx ? audioCtx.currentTime : 0;
+    while (pendingVisuals.length > 0 && pendingVisuals[0].time <= now) {
+      const v = pendingVisuals.shift();
+      if (beatCallback) beatCallback(v.beatIndex, v.soundType);
+    }
+    if (running || pendingVisuals.length > 0) {
+      rafId = requestAnimationFrame(visualLoop);
+    }
+  }
+
+  function loadAudio(dataUrl, setter) {
+    if (!dataUrl) return;
+    try {
+      const raw = atob(dataUrl.split(',')[1]);
+      const buf = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+      audioCtx.decodeAudioData(buf.buffer.slice(0)).then(setter).catch(() => {});
+    } catch (e) {}
+  }
+
+  function init() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bindContextState();
+    loadSoundBank();   // populates buffers if sounds.js is already loaded (else no-op)
+  }
+
+  function bindContextState() {
+    if (!audioCtx || typeof audioCtx.addEventListener !== 'function') return;
+    audioCtx.addEventListener('statechange', () => {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      if (startWhenRunning && !running) doStart();
+      else if (running) resyncClock();
+    });
+  }
+
+  function contextIsRunning() {
+    return !!(audioCtx && audioCtx.state === 'running');
+  }
+
+  // Opera (and some Chromium forks) leave Web Audio silent after resume() alone.
+  // A 1-sample buffer (or muted oscillator) started in the same user-gesture turn
+  // primes the destination. Safe to call repeatedly.
+  function primeOutput() {
+    if (!audioCtx) return;
+    try {
+      const rate = audioCtx.sampleRate > 0 ? audioCtx.sampleRate : 44100;
+      const buf = audioCtx.createBuffer(1, 1, rate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        g.gain.value = 0;
+        osc.connect(g);
+        g.connect(audioCtx.destination);
+        osc.start(0);
+        osc.stop((audioCtx.currentTime || 0) + 0.05);
+      } catch (e2) { /* ignore */ }
+    }
+  }
+
+  // Unlock / resume the shared AudioContext. Call from a user gesture (Start,
+  // pointerdown, key). Returns a promise that settles with the context (or null).
+  function unlock() {
+    try { init(); } catch (e) { return Promise.resolve(null); }
+    if (!audioCtx) return Promise.resolve(null);
+    primeOutput();
+    if (contextIsRunning()) return Promise.resolve(audioCtx);
+    if (typeof audioCtx.resume !== 'function') return Promise.resolve(audioCtx);
+    try {
+      return audioCtx.resume().then(() => {
+        primeOutput();
+        return audioCtx;
+      }).catch((err) => {
+        if (typeof window !== 'undefined' && window.__showError) {
+          window.__showError('audio resume failed: ' + (err && err.message ? err.message : err));
+        }
+        return audioCtx;
+      });
+    } catch (e) {
+      return Promise.resolve(audioCtx);
+    }
+  }
+
+  // Decode the cue/cowbell buffers from the (lazily loaded) sounds.js base64 blobs.
+  // Idempotent + safe to call before sounds.js exists: each buffer is only decoded
+  // once, and missing SOUND_*_B64 globals are skipped (the metronome click itself is
+  // synthesized, so the core app never waits on these). Called from init() and again
+  // by the background loader once sounds.js arrives.
+  function loadSoundBank() {
+    if (!audioCtx) return;
+    if (!setEndBuffer)           loadAudio(typeof SOUND_SET_END_B64           !== 'undefined' ? SOUND_SET_END_B64           : null, b => { setEndBuffer           = b; });
+    if (!setStartBuffer)         loadAudio(typeof SOUND_SET_START_B64         !== 'undefined' ? SOUND_SET_START_B64         : null, b => { setStartBuffer         = b; });
+    if (!practiceCompleteBuffer) loadAudio(typeof SOUND_PRACTICE_COMPLETE_B64 !== 'undefined' ? SOUND_PRACTICE_COMPLETE_B64 : null, b => { practiceCompleteBuffer = b; });
+    if (!cowbellBeatBuffer)      loadAudio(typeof SOUND_COWBELL_BEAT_B64      !== 'undefined' ? SOUND_COWBELL_BEAT_B64      : null, b => { cowbellBeatBuffer      = b; });
+    if (!cowbellAccentBuffer)    loadAudio(typeof SOUND_COWBELL_ACCENT_B64    !== 'undefined' ? SOUND_COWBELL_ACCENT_B64    : null, b => { cowbellAccentBuffer    = b; });
+  }
+
+  let welcomePlayed = false;
+  function playWelcomeGreeting() {
+    if (welcomePlayed) return;
+    if (typeof SOUND_WELCOME_B64 === 'undefined' || !SOUND_WELCOME_B64) return;
+    if (!audioCtx) init();
+
+    const fire = () => {
+      if (welcomePlayed || audioCtx.state !== 'running') return;
+      welcomePlayed = true;
+      try {
+        const raw = atob(SOUND_WELCOME_B64.split(',')[1]);
+        const buf = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+        audioCtx.decodeAudioData(buf.buffer.slice(0))
+          .then(b => playBuffer(b, WELCOME_GAIN))
+          .catch(() => { welcomePlayed = false; });
+      } catch (e) { welcomePlayed = false; }
+    };
+
+    unlock().then(() => { if (contextIsRunning()) fire(); }).catch(() => {});
+  }
+
+  // The scheduler is driven by a Web Worker timer rather than a main-thread
+  // setInterval. Background tabs heavily throttle (or pause) main-thread timers,
+  // which is what made the audio drop out when switching away; a worker timer keeps
+  // firing, and combined with the larger hidden look-ahead the audio stays gapless.
+  // Falls back to setInterval if Workers are unavailable.
+  let schedulerWorker = null;
+  function startSchedulerClock() {
+    stopSchedulerClock();
+    try {
+      const src = 'let t=null;onmessage=function(e){' +
+        'if(e.data==="start"){t=setInterval(function(){postMessage(0);},' + SCHEDULER_INTERVAL + ');}' +
+        'else if(e.data==="stop"){clearInterval(t);t=null;}};';
+      const blob = new Blob([src], { type: 'application/javascript' });
+      schedulerWorker = new Worker(URL.createObjectURL(blob));
+      schedulerWorker.onmessage = () => { if (running) scheduler(); };
+      schedulerWorker.postMessage('start');
+    } catch (e) {
+      schedulerTimer = setInterval(scheduler, SCHEDULER_INTERVAL);
+    }
+  }
+  function stopSchedulerClock() {
+    if (schedulerWorker) {
+      try { schedulerWorker.postMessage('stop'); schedulerWorker.terminate(); } catch (_) {}
+      schedulerWorker = null;
+    }
+    if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
+  }
+
+  // After a background gap the audio clock has moved on while nextTickTime stalled.
+  // Skip the missed ticks — advancing currentTick with them so the beat-grid phase is
+  // preserved — instead of restarting the bar at beat 1 or firing a burst of catch-up
+  // clicks. No-op when we're not actually behind (audio kept playing seamlessly).
+  function resyncClock() {
+    if (!audioCtx || !running) return;
+    const ticksPerBeat    = SUBDIVISION_TICKS[subdivision] || 1;
+    const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
+    tickInterval          = 60 / bpm / ticksPerBeat;
+    const now = audioCtx.currentTime;
+    if (nextTickTime >= now - 0.05) return;   // not behind → leave phase untouched
+    while (nextTickTime < now + 0.02) {
+      nextTickTime += tickInterval;
+      currentTick   = (currentTick + 1) % ticksPerMeasure;
+    }
+  }
+
+  function doStart() {
+    if (running || !audioCtx) return;
+    startWhenRunning = false;
+    running      = true;
+    currentTick  = 0;
+    nextTickTime = audioCtx.currentTime + 0.05;
+    scheduler();
+    startSchedulerClock();
+    rafId = requestAnimationFrame(visualLoop);
+  }
+
+  function start() {
+    if (!audioCtx) init();
+    const begin = () => {
+      if (contextIsRunning()) doStart();
+      else startWhenRunning = true;
+    };
+    if (contextIsRunning()) {
+      begin();
+      return;
+    }
+    startWhenRunning = true;
+    unlock().then(begin).catch(() => {});
+  }
+
+  function stop() {
+    startWhenRunning = false;
+    if (!running) return;
+    running = false;
+    stopSchedulerClock();
+    pendingVisuals = [];
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  function setBpm(newBpm) {
+    bpm = Math.max(20, Math.min(400, Math.round(newBpm)));
+  }
+
+  function setSubdivision(mode) {
+    if (!SUBDIVISION_TICKS[mode]) return;
+    subdivision = mode;
+    currentTick = 0;
+  }
+
+  function setBeatsPerMeasure(n) {
+    n = Math.max(1, Math.min(16, n));
+    beatsPerMeasure = n;
+    while (beatModes.length < n) beatModes.push('click');
+    beatModes = beatModes.slice(0, n);
+    currentTick = 0;
+  }
+
+  function getBeatsPerMeasure() { return beatsPerMeasure; }
+
+  function setBeatMode(beatIndex, mode) {
+    if (beatIndex >= 0 && beatIndex < beatsPerMeasure && BEAT_MODES.includes(mode)) {
+      beatModes[beatIndex] = mode;
+    }
+  }
+
+  function getBeatModes() { return [...beatModes]; }
+
+  function onBeat(callback) { beatCallback = callback; }
+
+  // Roguelite hook: register/unregister a per-tick scheduling callback.
+  // callback(tickTimeSec, soundType, beatIndex, tickInBeat). Pass null to clear.
+  function onSchedule(callback) { scheduleCallback = callback; }
+
+  // Exposes the shared audio clock so the roguelite layer can reconcile it with
+  // the Web MIDI / performance.now() clock. Returns null until init() has run.
+  function getAudioContext() { return audioCtx; }
+
+  function playSyntheticCue(pitches, spacing, peakGain) {
+    if (!audioCtx) return;
+    if (peakGain == null) peakGain = 0.389;   // −3dB, matches the set-start/set-end cue buffers
+    pitches.forEach((freq, i) => {
+      const t    = audioCtx.currentTime + i * spacing;
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(peakGain, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.22);
+    });
+  }
+
+  function playBuffer(buffer, gain) {
+    if (!audioCtx || !buffer) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    if (gain != null && gain !== 1) {
+      const g = audioCtx.createGain();
+      g.gain.value = gain;
+      src.connect(g); g.connect(audioCtx.destination);
+    } else {
+      src.connect(audioCtx.destination);
+    }
+    src.start();
+  }
+
+  function playSetEndCue()         { if (setEndBuffer)           playBuffer(setEndBuffer,           SET_END_GAIN); else playSyntheticCue([880, 660, 440],       0.12); }
+  function playSetStartCue()       { if (setStartBuffer)         playBuffer(setStartBuffer,         CUE_GAIN); else playSyntheticCue([440, 660, 880],       0.18); }
+  function playPracticeCompleteCue() { if (practiceCompleteBuffer) playBuffer(practiceCompleteBuffer, PRACTICE_COMPLETE_GAIN); else playSyntheticCue([440, 550, 660, 880], 0.15, 0.309); }
+
+  function setSoundMode(mode) { if (mode === 'click' || mode === 'cowbell') soundMode = mode; }
+  function getSoundMode()     { return soundMode; }
+
+  function getCurrentBpm() { return bpm; }
+  function isRunning()     { return running; }
+
+  // Resume a suspended context (mobile suspends it on background/lock; Opera/desktop
+  // may never have unlocked on touchstart) and re-align WITHOUT restarting the bar.
+  // The metronome only stops on an explicit stop() — switching apps/tabs never restarts it.
+  function onUserGestureUnlock() {
+    unlock().then(() => { if (running) resyncClock(); }).catch(() => {});
+  }
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    const gestureOpts = { capture: true, passive: true };
+    document.addEventListener('pointerdown', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('click', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('keydown', onUserGestureUnlock, true);
+    document.addEventListener('touchstart', onUserGestureUnlock, gestureOpts);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !audioCtx || !running) return;
+      unlock().then(() => { if (contextIsRunning()) resyncClock(); }).catch(() => {});
+    });
+  }
+
+  return {
+    init, unlock, start, stop, setBpm, setSubdivision, onBeat, getCurrentBpm, isRunning,
+    setBeatsPerMeasure, getBeatsPerMeasure, setBeatMode, getBeatModes,
+    playSetEndCue, playSetStartCue, playPracticeCompleteCue,
+    setSoundMode, getSoundMode, playWelcomeGreeting,
+    onSchedule, getAudioContext, loadSoundBank,
+  };
+})();

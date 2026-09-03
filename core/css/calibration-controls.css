@@ -1,0 +1,3 @@
+/* Calibration controls chrome — thin stub; Game Mode styles live in assets/css/style.css.
+   Apps may override tokens on the mount root via CalibrationControls.mount theme option. */
+.calibration-controls--compact .rogue-cal-statusrow { gap: 4px; }

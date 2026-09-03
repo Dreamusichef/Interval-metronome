@@ -8,7 +8,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const V = require('../assets/js/profile-validation.js');
+const V = require('../core/js/cloud/profile-validation.js');
 
 describe('ProfileValidation.validateProfileFields', () => {
   test('accepts valid alias and null avatar (hidden)', () => {

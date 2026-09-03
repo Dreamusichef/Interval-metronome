@@ -1,7 +1,7 @@
 'use strict';
 
 /*
-  Unit tests for the pure timing math in roguelite.js.
+  Unit tests for the pure timing math in core/js/timing-math.js.
 
   Executable form of the §6 / §11-step-1 verification: clock-reconciliation
   conversions are exact, calibration recovers systematic offset and spread, and a
@@ -16,7 +16,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const M = require('../assets/js/roguelite.js');
+const M = require('../core/js/timing-math.js');
 const {
   audioToPerfMs, perfMsToAudio, computeCalibration, classifyHit, classifySlot, classifyFirstSlot,
   rankFor, endurancePct, accuracyPct, enduranceScorePct, runResultPct, liveGaugePct,

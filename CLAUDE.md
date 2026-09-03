@@ -30,9 +30,9 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Local preview:** `npx http-server -p 8127 -c-1` (see `.claude/launch.json`), or the
   Claude Code preview tool (server name `metronome`). NOTE: the preview screenshot tool
   tends to hang on index.html (animated canvas) — use `preview_eval` to read state instead.
-  **On localhost / 127.0.0.1 the app uses a localStorage mock DB** (`cloud-mock.js`) instead
+  **On localhost / 127.0.0.1 the app uses a localStorage mock DB** (`core/js/cloud/mock-backend.js`) instead
   of production Supabase — dev sign-in picker (Alex / Wei / Sam), isolated leaderboards.
-  Seed data applies on first load per `STORAGE_KEY` in cloud-mock.js; bump that key when
+  Seed data applies on first load per `STORAGE_KEY` in mock-backend.js; bump that key when
   seed users/runs change (or run `Cloud.resetMockData()` in the console).
   Deployed hosts still use real Supabase + Google OAuth.
 - **Validate JS before committing:** `node --check <file>.js`.
@@ -45,7 +45,7 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Database/DDL: Claude does NOT run SQL.** Write the SQL and **paste it in chat** for the
   human to run in the Supabase SQL editor (owner creds required). Pasting in chat is the
   user's stated preference (not a separate .sql file unless asked).
-- **Secrets:** the Supabase **anon public key IS committed** in cloud-supabase.js (safe — RLS
+- **Secrets:** the Supabase **anon public key IS committed** in `core/js/cloud/supabase-backend.js` (safe — RLS
   protects data). The **service_role** key must NEVER be committed/shared. Any third-party
   API keys (e.g. Kit) must live server-side (Supabase Edge Function secret), never in client JS.
 - `.claude/settings.local.json` is gitignored. Source-art originals (`Rank *.png`,
@@ -55,27 +55,41 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 ## File map
 - `index.html` — main app (metronome + Game Mode UI, settings panel, beta gate, result overlay).
 - `stats.html` — Stats & Leaderboard page (Personal / Global / Trophies).
-- `assets/css/style.css` — shared stylesheet.
-- `assets/js/metronome.js` — **MetronomeEngine** (Web Audio scheduler, sounds, cues). Top-level `const`
+- `core/` — **vendored `@dreamusichef/core`** (see `core/README.md`). Engines, MIDI/audio/cal, timing math,
+  session chrome, Cloud auth/`getClient()`, FAQ/patch-notes format helpers, tokens, brand logo.
+  Dual `window.*` + `module.exports` for browser + Node tests. Upgrade: `npm run upgrade-core -- X.Y.Z`.
+- `core/js/metronome-engine.js` — **MetronomeEngine** (Web Audio scheduler, sounds, cues). Top-level `const`
   (a global lexical binding) — reference it **bare** as `MetronomeEngine`, NOT `window.MetronomeEngine`.
-- `assets/js/app.js` — ramp/session engine, metronome controls, keyboard shortcuts, finishSession.
-- `assets/js/roguelite.js` — **Game Mode** core: calibration, clock reconciliation, run gating/scoring,
-  ranks, result reveal sequence, beta gate, latency compensation. (Biggest file.)
+- `core/js/session-engine.js` / `session-controls.js` — ramp/set/rest engine + `mount()` chrome; app
+  exposes `window.AppRamp = SessionEngine.publicApi`.
+- `core/js/timing-math.js` — pure timing/scoring math (`TimingMath` / `RL_TimingMath`).
+- `core/js/midi-input.js`, `audio-input.js`, `onset-detector.js`, `calibrator.js` — input + two-pass cal.
+- `core/js/cloud/` — auth facade (`auth.js`), mode, profile-validation, supabase/mock backends.
+- `assets/css/style.css` — game app stylesheet (tokens come from `core/css/tokens.css`).
+- `assets/js/app.js` — app shell: mounts session controls, stopwatch, keyboard shortcuts.
+- `assets/js/main.js` — bootstrap: remounts input/cal chrome helpers after core scripts load.
+- `assets/js/roguelite.js` — **Game Mode** shell: run gating/scoring, ranks, result reveal, beta gate,
+  latency compensation; consumes core MidiInput/Calibrator/TimingMath. (Biggest game file.)
 - `assets/js/achievements.js` — trophy definitions + evaluation (shared by game + stats pages).
 - `assets/js/sfx.js` — result-screen reward sounds (`window.GameSfx`), per-key volume, mp3 manifest.
-- `assets/js/cloud.js` — Cloud facade (`window.Cloud`); picks mock vs Supabase by hostname.
-- `assets/js/cloud-supabase.js` — production backend: Google OAuth, runs, leaderboard RPC, beta.
-- `assets/js/cloud-mock.js` — localhost-only localStorage mock DB + dev user picker.
+- `assets/js/cloud-game.js` — game Cloud APIs (`submitRun`, `leaderboard`, beta) mixed onto `window.Cloud`.
 - `assets/js/stats.js` — stats page logic.
-- `assets/js/audio-input.js`, `assets/js/onset-detector.js` — mic/interface hit detection (AudioWorklet).
 - `assets/js/sounds.js` — base64 metronome/cue samples (large; lazy-loaded).
 - `assets/js/settings.js` — top-right gear panel (wake lock, latency-comp toggle, shortcuts list).
-- `assets/img/` — `logo.png`, rank emblems (`rank/*.png`), trophy art (`trophy/*.png`).
+- `assets/img/` — rank emblems (`rank/*.png`), trophy art (`trophy/*.png`). Logo: `core/brand/logo.png`.
 - `sounds/` — mp3 reward clips.
 - `sql/supabase-schema.sql` — canonical DB schema (tables, RLS, get_leaderboard RPC).
 - `sandbox/` — dev sandboxes (`preview-reveal.html`, `vs-sandbox.html`).
-- `tests/roguelite.test.cjs` — timing-math unit tests (`node:test`).
+- `tests/roguelite.test.cjs` — timing-math unit tests (`node:test`) against `core/js/timing-math.js`.
 - `tests/achievements.test.cjs` — trophy metric / tier / retroactive-diff unit tests (`node:test`).
+
+## Core package consumption
+- Source of truth: `AODB-Core` → GitHub Package `@dreamusichef/core`.
+- This repo pins the version in `package.json`, vendors into committed `core/` (`npm run sync-core`).
+- One-shot upgrade: `npm run upgrade-core -- X.Y.Z` (install + sync + cache-bust + `npm test`).
+- Do not hand-edit `core/` to mirror unpublished Core changes — release Core, then upgrade the pin.
+- Keep timing/scoring math (`TimingMath`) pure & rendering-agnostic so it ports to a future engine.
+- Additional practice apps: consume the same package (own tables, same Supabase Auth).
 
 ## Backend (Supabase) — project ref `mmdmibimpipxckgfmhmz`
 - Tables: `profiles`, `runs`, `beta_members`, `beta_allowlist`, `beta_waitlist`. RLS on all.
@@ -100,12 +114,13 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 
 ## Known gotchas
 - **Cloud auth timing:** `index.html` / `stats.html` load cloud scripts **async** (mock or
-  Supabase CDN → backend → `cloud.js`), while `stats.js` / `roguelite.js` run on `defer` and
-  may subscribe **after** `getSession()` resolves. UI must use `Cloud.onAuth(fn)`, never a
-  one-shot `currentUser()` on load. Backends must set `ready = true` **before** the first
-  `onAuthChange` call (`cloud-supabase.js` getSession, `cloud-mock.js` init); `cloud.js`
-  `onAuth` also re-checks `backend.isReady()` for late registrants. Breaking this leaves
-  Stats stuck on the signed-out screen even when a Google session exists.
+  Supabase CDN → backend → `core/js/cloud/auth.js` → `cloud-game.js`), while `stats.js` /
+  `roguelite.js` run on `defer` and may subscribe **after** `getSession()` resolves. UI must
+  use `Cloud.onAuth(fn)`, never a one-shot `currentUser()` on load. Backends must set
+  `ready = true` **before** the first `onAuthChange` call (`supabase-backend.js` getSession,
+  `mock-backend.js` init); `auth.js` `onAuth` also re-checks `backend.isReady()` for late
+  registrants. Breaking this leaves Stats stuck on the signed-out screen even when a Google
+  session exists.
 - **iOS/iPadOS: no Web MIDI** in any browser → MIDI mode can't work there; use audio-input.
   Web MIDI works on desktop (Chrome/Edge/Firefox) + Android Chrome.
 - **Laptop audio latency drifts** (power state) → 20–30ms calibration swings; the latency-comp
@@ -119,7 +134,7 @@ Drumming HQ (AODHQ). Players drum along (kick or snare) via **MIDI e-drums** or
 - **Waitlist → Kit (ConvertKit):** route `beta_waitlist` signups into Kit via a Supabase Edge
   Function (Kit API key as a Supabase secret — never client-side). Cuts out Tally.
 - **Multi-pad game modes** (2 pads for hand rudiments, 2 kicks, eventually full kit) — natural
-  next gameplay step; higher value than graphics. Keep timing/scoring math (`RL_TimingMath`)
+  next gameplay step; higher value than graphics. Keep timing/scoring math (`TimingMath`)
   pure & rendering-agnostic so it ports to a future engine.
 - **Hardware bundle** (sell-with): eDRUMin 4 (~$149, USB-MIDI, 4 inputs) + single mesh pad,
   or eDRUMin + acoustic trigger (Yamaha DT50K/Roland RT-30K, single-zone). Research in chat history.
